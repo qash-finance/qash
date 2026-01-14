@@ -1,0 +1,45 @@
+name: Node.js CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20.19]
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+      - name: Use Docker
+        uses: actions-hub/docker/cli@master
+        env:
+          SKIP_LOGIN: true
+      - name: Copy .env.example to .env.test
+        run: cp .env.example .env.test
+      - name: copy secrets to .env.test
+        run: echo "${{ secrets.ENV_TEST }}" >> .env.test
+      - run: pnpm install
+      - run: pnpm run prisma:generate
+      - run: pnpm run build
+        name: Build
+      - run: pnpm run lint
+        name: Lint
+      # TODO: Enable tests
+      # - run: pnpm run test
+      #   name: Test

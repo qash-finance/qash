@@ -1,0 +1,621 @@
+@import "tailwindcss";
+@import "./theme.css";
+
+@font-face {
+  font-family: "Repetition Scrolling";
+  src: url("../public/fonts/repet___.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "DFVN";
+  src: url("../public/fonts/DFVN_36daysoftype.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme inline {
+  /* Background */
+  --color-app-background: var(--app-background);
+  --color-background: var(--background);
+
+  /* Text */
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+
+  /* Badge */
+  --color-badge-neutral-background: var(--badge-neutral-background);
+  --color-badge-neutral-text: var(--badge-neutral-text);
+
+  /* Divider */
+  --color-primary-divider: var(--primary-divider);
+  --color-secondary-divider: var(--secondary-divider);
+  --color-tertiary-divider: var(--tertiary-divider);
+
+  /* Button */
+  --color-primary-button: var(--primary-button);
+  --color-primary-button-text: var(--primary-button-text);
+  --color-primary-button-border-top: var(--primary-button-border-top);
+  --color-primary-button-background: var(--primary-button-background);
+  --color-primary-button-disabled: var(--primary-button-disabled);
+  --color-primary-button-disabled-text: var(--primary-button-disabled-text);
+  --color-primary-button-disabled-border-top: var(--primary-button-disabled-border-top);
+  --color-primary-button-disabled-background: var(--primary-button-disabled-background);
+
+  --color-secondary-dark-button-text: var(--secondary-dark-button-text);
+  --color-secondary-dark-button-background: var(--secondary-dark-button-background);
+  --color-secondary-dark-button-border-top: var(--secondary-dark-button-border-top);
+  --color-secondary-light-button-text: var(--secondary-light-button-text);
+  --color-secondary-light-button-background: var(--secondary-light-button-background);
+  --color-secondary-light-button-border-top: var(--secondary-light-button-border-top);
+  --color-secondary-red-button-text: var(--secondary-red-button-text);
+  --color-secondary-red-button-background: var(--secondary-red-button-background);
+  --color-secondary-red-button-border-top: var(--secondary-red-button-border-top);
+
+  /* Card */
+  --color-card-button-text: var(--card-button-text);
+  --color-card-button-background: var(--card-button-background);
+  --color-card-button-border-top: var(--card-button-border-top);
+
+  /* Toast */
+  --color-toast-background: var(--toast-background);
+  --color-toast-text: var(--toast-text);
+  --color-toast-border: var(--toast-border);
+
+  /* Primary */
+  --color-primary-blue: var(--primary-blue);
+
+  /* Base Container */
+  --color-base-container-main-background: var(--base-container-main-background);
+  --color-base-container-sub-background: var(--base-container-sub-background);
+  --color-base-container-sub-border-top: var(--base-container-sub-border-top);
+
+  /* Badge */
+  --color-badge-success-background: var(--badge-success-background);
+  --color-badge-success-text: var(--badge-success-text);
+  --color-badge-success-border: var(--badge-success-border);
+  --color-badge-fail-background: var(--badge-fail-background);
+  --color-badge-fail-text: var(--badge-fail-text);
+  --color-badge-fail-border: var(--badge-fail-border);
+  --color-badge-private-background: var(--badge-private-background);
+  --color-badge-private-text: var(--badge-private-text);
+  --color-badge-private-border: var(--badge-private-border);
+  --color-badge-public-background: var(--badge-public-background);
+  --color-badge-public-text: var(--badge-public-text);
+  --color-badge-public-border: var(--badge-public-border);
+  --color-badge-neutral-background: var(--badge-neutral-background);
+  --color-badge-neutral-text: var(--badge-neutral-text);
+  --color-badge-neutral-border: var(--badge-neutral-border);
+  --color-badge-awaiting-background: var(--badge-awaiting-background);
+  --color-badge-awaiting-text: var(--badge-awaiting-text);
+  --color-badge-awaiting-border: var(--badge-awaiting-border);
+
+  /* Loading Bar */
+  --color-loading-bar-background: var(--loading-bar-background);
+  --color-loading-bar-border: var(--loading-bar-border);
+  --color-loading-bar-gradient: var(--loading-bar-gradient);
+
+  /* Table */
+  --color-table-header-background: var(--table-header-background);
+  --color-table-header-text: var(--table-header-text);
+  --color-table-header-border: var(--table-header-border);
+  --color-table-row-background: var(--table-row-background);
+  --color-table-row-background-hover: var(--table-row-background-hover);
+  --color-table-row-text: var(--table-row-text);
+  --color-table-row-border: var(--table-row-border);
+  --color-table-row-selected-background: var(--table-row-selected-background);
+
+  /* Payroll */
+  --color-payroll-main-background: var(--payroll-main-background);
+  --color-payroll-sub-background: var(--payroll-sub-background);
+
+  /* --color-primary: var(--primary);
+  --color-secondary: var(--secondary);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-divider: var(--divider);
+  --color-surface-light: var(--surface-light);
+  --color-surface-blue: var(--surface-blue);
+  --color-tertiary: var(--tertiary);
+
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring)); */
+  --radius: var(--radius);
+  --font-sans: var(--font-barlow);
+  --font-mono: var(--font-geist-mono);
+
+  --animate-wiggle: wiggle 1s ease-in-out infinite;
+  @keyframes wiggle {
+    0%,
+    100% {
+      transform: rotate(-1deg);
+    }
+    50% {
+      transform: rotate(1deg);
+    }
+  }
+}
+
+.nanum-pen-script-regular {
+  font-family: "Nanum Pen Script", cursive;
+  font-weight: 400;
+  font-style: normal;
+}
+
+.anton-regular {
+  font-family: "Anton", sans-serif;
+  font-weight: 400;
+  font-style: normal;
+}
+
+.font-repetition-scrolling {
+  font-family: "Repetition Scrolling", sans-serif;
+}
+
+.font-dfvn {
+  font-family: "DFVN", sans-serif;
+}
+
+html,
+body {
+  background-color: var(--app-background);
+  font-family: var(--font-barlow), system-ui, sans-serif;
+}
+
+@media (max-width: 1280px) {
+  html {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 1024px) {
+  html {
+    font-size: 10px;
+  }
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Override autofill background */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px transparent inset !important;
+  -webkit-text-fill-color: var(--text-primary) !important;
+  color: var(--text-primary) !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* For Firefox */
+input:-moz-autofill {
+  background-color: transparent !important;
+  color: var(--text-primary) !important;
+}
+
+input:-webkit-autofill-background-color {
+  background-color: transparent !important;
+  color: var(--text-primary) !important;
+}
+
+/* Additional autofill overrides for better consistency */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+input:-moz-autofill,
+input:-moz-autofill:hover,
+input:-moz-autofill:focus,
+input:-moz-autofill:active {
+  color: var(--text-primary) !important;
+  -webkit-text-fill-color: var(--text-primary) !important;
+  -webkit-text-stroke: 0px var(--text-primary) !important;
+}
+
+.border-gradient {
+  position: relative;
+  background: #1c1d1d;
+  border-radius: 9999px;
+  border: none;
+}
+
+.border-gradient::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  background: linear-gradient(
+    158.39deg,
+    rgba(255, 255, 255, 0.1) 14.19%,
+    rgba(255, 255, 255, 0.025) 50.59%,
+    rgba(255, 255, 255, 0.025) 68.79%,
+    rgba(255, 255, 255, 0.1) 105.18%
+  );
+  border-radius: 9999px;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Hide scrollbar for webkit browsers */
+.overflow-y-auto::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for Firefox */
+.overflow-y-auto {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.5s ease-out forwards;
+}
+
+@keyframes slideInFromTop {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideOutToTop {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/************ Custom Checkbox ************/
+.custom-checkbox {
+  position: relative;
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+}
+
+.custom-checkbox input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 16px;
+  width: 16px;
+  z-index: 1;
+}
+
+.custom-checkbox .checkmark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  background: #f6f6f6;
+  border: 1px solid #e7e8ea;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.custom-checkbox:hover .checkmark {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.custom-checkbox input[type="checkbox"]:checked ~ .checkmark {
+  background: #000000;
+  border: none;
+}
+
+.custom-checkbox .checkmark::after {
+  content: "";
+  position: absolute;
+  display: none;
+  left: 50%;
+  top: 50%;
+  transform: translate(-45%, -50%);
+  width: 13px;
+  height: 13px;
+  background-image: url("/custom-check-icon.svg");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.custom-checkbox input[type="checkbox"]:checked ~ .checkmark::after {
+  display: block;
+}
+/************ Custom Checkbox ************/
+
+/************ Custom Checkbox ************/
+.custom-blue-checkbox {
+  position: relative;
+  display: inline-block;
+  width: 25px;
+  height: 25px;
+}
+
+.custom-blue-checkbox input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 25px;
+  width: 25px;
+  z-index: 1;
+}
+
+.custom-blue-checkbox .blue-checkmark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 25px;
+  height: 25px;
+  background: #f6f6f6;
+  border: 1px solid #e7e8ea;
+  border-radius: 9999px;
+  transition: all 0.2s ease;
+}
+
+.custom-blue-checkbox:hover .blue-checkmark {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.custom-blue-checkbox input[type="checkbox"]:checked ~ .blue-checkmark {
+  background: #066EFF;
+  border: none;
+}
+
+.custom-blue-checkbox .blue-checkmark::after {
+  content: "";
+  position: absolute;
+  display: none;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 15px;
+  height: 15px;
+  background-image: url("/custom-check-icon.svg");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.custom-blue-checkbox input[type="checkbox"]:checked ~ .blue-checkmark::after {
+  display: block;
+}
+/************ Custom Checkbox ************/
+
+/************ Table Scrollbar ************/
+/* Table scrollbar styling */
+.overflow-x-auto::-webkit-scrollbar {
+  height: 8px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-track {
+  background: #1a1a1a;
+  border-radius: 4px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb {
+  background: #404040;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb:hover {
+  background: #525252;
+}
+
+.overflow-x-auto::-webkit-scrollbar-corner {
+  background: #1a1a1a;
+}
+
+/* Firefox scrollbar styling */
+.overflow-x-auto {
+  scrollbar-width: thin;
+  scrollbar-color: #404040 #1a1a1a;
+}
+
+/* Table specific scrollbar */
+.table-scrollbar::-webkit-scrollbar {
+  height: 8px;
+}
+
+.table-scrollbar::-webkit-scrollbar-track {
+  background: #1a1a1a;
+  border-radius: 4px;
+}
+
+.table-scrollbar::-webkit-scrollbar-thumb {
+  background: #404040;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.table-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #525252;
+}
+
+.table-scrollbar::-webkit-scrollbar-corner {
+  background: #1a1a1a;
+}
+
+.table-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #404040 #1a1a1a;
+}
+/************ Table Scrollbar ************/
+
+/************ Hide Horizontal Scrollbar ************/
+/* Hide horizontal scrollbar for webkit browsers */
+.overflow-x-auto::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide horizontal scrollbar for Firefox */
+.overflow-x-auto {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+/* Universal horizontal scrollbar hiding */
+.hide-scrollbar-x::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar-x {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+/* Hide all scrollbars */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+/************ Hide Horizontal Scrollbar ************/
+
+/* Custom pulse animation for table rows */
+@keyframes pulse-hover {
+  0%,
+  100% {
+    background-color: #1e1e1e;
+  }
+  50% {
+    background-color: #292929;
+  }
+}
+
+.animate-pulse-hover {
+  animation: pulse-hover 2s ease-in-out infinite;
+}
+
+.gift-background {
+  background: linear-gradient(180deg, #a4f3fd 0%, #cff8ff 100%);
+}
+
+.font-complain {
+  font-family: "Complain", sans-serif;
+  /* border: 3px solid #ffc629; */
+}
+
+.gift-text {
+  text-align: center;
+  text-shadow: 7px 4px 0 #ffc629;
+  -webkit-text-stroke-width: 3px;
+  -webkit-text-stroke-color: #ffc629;
+  font-family: Complain;
+  font-size: 50px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: -1.44px;
+}
+
+/* Custom scrollbar styles */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 0px;
+  display: none;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: transparent;
+}
+
+/* Firefox scrollbar */
+.custom-scrollbar {
+  scrollbar-width: none;
+  scrollbar-color: transparent transparent;
+}
+
+/* Disable image dragging */
+img {
+  -webkit-user-drag: none;
+  -khtml-user-drag: none;
+  -moz-user-drag: none;
+  -o-user-drag: none;
+  user-drag: none;
+}
+
+/* Infinity scroll animation */
+@keyframes scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-10%);
+  }
+}
+
+.animate-scroll {
+  animation: scroll 60s linear infinite;
+  width: 1000%;
+}

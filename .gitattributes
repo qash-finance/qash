@@ -1,0 +1,47 @@
+# Auto detect text files and normalize line endings
+* text=auto
+
+# Source code
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Shell scripts
+*.sh text eol=lf
+
+# Windows scripts
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg binary
+*.woff binary
+*.woff2 binary
+*.eot binary
+*.ttf binary
+*.otf binary
+
+# Archives
+*.zip binary
+*.tar binary
+*.gz binary
+*.7z binary
+*.rar binary
+
+# Exclude from GitHub language statistics
+*.generated.* linguist-generated=true
+**/prisma/migrations/* linguist-generated=true
+**/generated/* linguist-generated=true
+**/.next/* linguist-generated=true
+**/dist/* linguist-generated=true
+**/build/* linguist-generated=true

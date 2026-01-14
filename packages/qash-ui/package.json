@@ -1,0 +1,23 @@
+{
+  "name": "@qash/ui-root",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Qash UI Root Package",
+  "scripts": {
+    "dev": "pnpm --filter @qash/web dev",
+    "build": "pnpm run -r build",
+    "build:web": "pnpm --filter @qash/web build",
+    "build:docs": "pnpm --filter @qash/docs build",
+    "lint": "pnpm --filter @qash/web lint",
+    "format": "pnpm --filter @qash/web format"
+  },
+  "devDependencies": {
+    "daisyui": "^4.7.3"
+  },
+  "dependencies": {
+    "postcss": "^8.4.38"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  }
+}

@@ -1,0 +1,593 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../generated"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id   Int    @id @default(autoincrement())
+  uuid String @unique @default(cuid()) @map("uuid")
+
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime     @updatedAt @map("updated_at") @db.Timestamp(6)
+  email     String       @unique @db.VarChar(255)
+  role      UserRoleEnum @default(USER)
+  isActive  Boolean      @default(true) @map("is_active")
+  lastLogin DateTime?    @map("last_login") @db.Timestamp(6)
+
+  teamMembership TeamMember? // 1:1 relationship, each user is a company team member
+  invitedMembers TeamMember[] @relation("TeamMemberInviter")
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+model TeamMember {
+  id   Int    @id @default(autoincrement())
+  uuid String @unique @default(cuid()) @map("uuid")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  firstName      String  @map("first_name") @db.VarChar(100)
+  lastName       String  @map("last_name") @db.VarChar(100)
+  position       String? @db.VarChar(100)
+  profilePicture String? @map("profile_picture") @db.Text
+
+  role     TeamMemberRoleEnum
+  isActive Boolean            @default(true) @map("is_active")
+
+  companyId Int     @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  userId Int  @unique @map("user_id")
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  invitedBy Int?      @map("invited_by")
+  inviter   User?     @relation("TeamMemberInviter", fields: [invitedBy], references: [id])
+  invitedAt DateTime? @map("invited_at") @db.Timestamp(6)
+  joinedAt  DateTime? @map("joined_at") @db.Timestamp(6)
+
+  metadata Json? @db.Json
+
+  @@index([companyId])
+  @@index([role])
+  @@index([userId])
+  @@map("team_members")
+}
+
+model Company {
+  id   Int    @id @default(autoincrement())
+  uuid String @unique @default(cuid()) @map("uuid")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  companyName        String          @map("company_name") @db.VarChar(255)
+  registrationNumber String          @unique @map("registration_number") @db.VarChar(100)
+  companyType        CompanyTypeEnum @map("company_type")
+  taxId              String?         @map("tax_id") @db.VarChar(100)
+  notificationEmail  String?         @map("notification_email") @db.VarChar(255)
+  ccNotifications    String[]        @map("cc_notifications") @db.VarChar(255)
+
+  country    String  @db.VarChar(100)
+  address1   String  @map("address_1") @db.VarChar(255)
+  address2   String? @map("address_2") @db.VarChar(255)
+  city       String  @db.VarChar(100)
+  postalCode String  @map("postal_code") @db.VarChar(20)
+
+  verificationStatus CompanyVerificationStatusEnum @default(PENDING) @map("verification_status")
+  isActive           Boolean                       @default(true) @map("is_active")
+
+  metadata Json? @db.Json
+
+  teamMembers      TeamMember[]
+  contacts         Employee[]
+  clients          Client[]
+  groups           EmployeeGroup[]
+  payrolls         Payroll[]
+  bills            Bill[]
+  invoicesFrom     Invoice[]         @relation("InvoiceFromCompany") // B2B invoices where this company is the sender
+  invoicesTo       Invoice[]         @relation("InvoiceToCompany") // B2B invoices where this company is the recipient
+  paymentLinks     PaymentLink[]
+  invoiceSchedules InvoiceSchedule[]
+
+  @@index([registrationNumber])
+  @@index([companyName])
+  @@index([verificationStatus])
+  @@map("companies")
+}
+
+model Employee {
+  id   Int    @id() @default(autoincrement())
+  uuid String @unique @default(cuid()) @map("uuid")
+
+  createdAt DateTime @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @map("updated_at") @db.Timestamp(6)
+
+  companyId Int     @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  name          String      @db.VarChar
+  walletAddress String      @db.VarChar
+  email         String      @db.VarChar
+  token         Json        @db.Json
+  network       Json        @db.Json
+  gender        GenderEnum? @default(PREFER_NOT_TO_SAY) @map("gender")
+  nationality   String?     @map("nationality") @db.VarChar(100)
+  taxId         String?     @map("tax_id")
+
+  address    String? @map("address") @db.VarChar(255)
+  city       String? @db.VarChar(100)
+  country    String? @db.VarChar(100)
+  postalCode String? @map("postal_code") @db.VarChar(20)
+
+  order   Int           @default(autoincrement())
+  groupId Int           @map("groupId")
+  group   EmployeeGroup @relation(fields: [groupId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  payrolls Payroll[]
+  invoices Invoice[] @relation("InvoiceEmployee")
+
+  metadata Json? @db.Json
+
+  @@index([companyId])
+  @@index([groupId])
+  @@index([email])
+  @@map("employees")
+}
+
+model Client {
+  id   Int    @id @default(autoincrement())
+  uuid String @unique @default(cuid()) @map("uuid")
+
+  createdAt DateTime @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @map("updated_at") @db.Timestamp(6)
+
+  companyId Int      @map("company_id")
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  ccEmails  String[] @map("cc_emails") @db.VarChar(255)
+
+  email       String @db.VarChar(255)
+  companyName String @map("company_name") @db.VarChar(255)
+
+  companyType        String? @map("company_type") @db.VarChar(100)
+  country            String? @db.VarChar(100)
+  state              String? @db.VarChar(100)
+  city               String? @db.VarChar(100)
+  address1           String? @map("address_1") @db.VarChar(255)
+  address2           String? @map("address_2") @db.VarChar(255)
+  taxId              String? @map("tax_id") @db.VarChar(100)
+  postalCode         String? @map("postal_code") @db.VarChar(20)
+  registrationNumber String? @map("registration_number") @db.VarChar(100)
+
+  invoiceSchedules InvoiceSchedule[]
+
+  @@unique([companyId, email])
+  @@index([companyId])
+  @@index([email])
+  @@map("clients")
+}
+
+model EmployeeGroup {
+  id   Int    @id() @default(autoincrement())
+  uuid String @unique @default(cuid()) @map("uuid")
+
+  createdAt DateTime @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @map("updated_at") @db.Timestamp(6)
+
+  name  String            @db.VarChar
+  shape CategoryShapeEnum @default(CIRCLE)
+  color String            @db.VarChar
+  order Int               @default(autoincrement())
+
+  companyId Int     @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  employees Employee[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@index([order])
+  @@map("employee_groups")
+}
+
+model Payroll {
+  id   Int    @id @default(autoincrement())
+  uuid String @unique @default(cuid()) @map("uuid")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  companyId  Int      @map("company_id")
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employeeId Int      @map("employee_id")
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  network Json   @db.Json
+  token   Json   @db.Json
+  amount  String @db.VarChar(50)
+
+  contractTerm       ContractTermEnum
+  payrollCycle       Int               @map("payroll_cycle")
+  currentCycleNumber Int               @default(0) @map("current_cycle_number")
+  paydayDay          Int               @map("payday_day")
+  joiningDate        DateTime          @map("joining_date") @db.Timestamp(6)
+  payStartDate       DateTime          @map("pay_start_date") @db.Timestamp(6)
+  payEndDate         DateTime          @map("pay_end_date") @db.Timestamp(6)
+  description        String            @map("description") @db.Text // the item description
+  status             PayrollStatusEnum @default(ACTIVE)
+
+  note     String? @db.Text
+  metadata Json?   @db.Json
+
+  invoices         Invoice[]
+  invoiceSchedules InvoiceSchedule[]
+
+  @@index([companyId])
+  @@index([employeeId])
+  @@index([status])
+  @@index([payStartDate])
+  @@index([payEndDate])
+  @@map("payrolls")
+}
+
+model Invoice {
+  id   Int    @id @default(autoincrement())
+  uuid String @unique @default(cuid()) @map("uuid")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  // Invoice Type and Numbering
+  invoiceType   InvoiceTypeEnum @default(EMPLOYEE) @map("invoice_type")
+  invoiceNumber String          @map("invoice_number") @db.VarChar(50)
+  issueDate     DateTime        @map("issue_date") @db.Timestamp(6)
+  dueDate       DateTime        @map("due_date") @db.Timestamp(6)
+
+  // Auto-generation settings (for scheduled invoices)
+  isAutoGenerated           Boolean   @default(false) @map("is_auto_generated")
+  autoGenerateFromPayrollId Int?      @map("auto_generate_from_payroll_id")
+  nextAutoGenerateDate      DateTime? @map("next_auto_generate_date") @db.Timestamp(6)
+
+  // FROM: Employee or Company (sender)
+  // For EMPLOYEE invoices: from = employee, to = company
+  // For B2B invoices: from = company, to = company
+  payrollId  Int?      @map("payroll_id")
+  payroll    Payroll?  @relation(fields: [payrollId], references: [id], onDelete: Cascade)
+  employeeId Int?      @map("employee_id")
+  employee   Employee? @relation("InvoiceEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+
+  fromCompanyId Int?     @map("from_company_id")
+  fromCompany   Company? @relation("InvoiceFromCompany", fields: [fromCompanyId], references: [id], onDelete: Cascade)
+
+  // TO: Company (recipient)
+  // Can be registered company OR unregistered company
+  toCompanyId Int?     @map("to_company_id")
+  toCompany   Company? @relation("InvoiceToCompany", fields: [toCompanyId], references: [id], onDelete: Cascade)
+
+  // Unregistered company details (when toCompanyId is null)
+  toCompanyName        String? @map("to_company_name") @db.VarChar(255)
+  toCompanyEmail       String? @map("to_company_email") @db.VarChar(255)
+  toCompanyAddress     String? @map("to_company_address") @db.Text
+  toCompanyTaxId       String? @map("to_company_tax_id") @db.VarChar(100)
+  toCompanyContactName String? @map("to_company_contact_name") @db.VarChar(255)
+  toCompanyMetadata    Json?   @map("to_company_metadata") @db.Json
+
+  // Email Configuration
+  emailTo      String   @map("email_to") @db.VarChar(255) // Primary recipient
+  emailCc      String[] @map("email_cc") @db.VarChar(255) // CC recipients
+  emailBcc     String[] @map("email_bcc") @db.VarChar(255) // BCC recipients
+  emailSubject String?  @map("email_subject") @db.VarChar(500)
+  emailBody    String?  @map("email_body") @db.Text
+
+  // Invoice Details (flexible JSON for additional sender/recipient info)
+  fromDetails Json? @map("from_details") @db.Json // Sender details (employee or company)
+  toDetails   Json? @map("to_details") @db.Json // Recipient details (company)
+
+  // Financial Details
+  subtotal  String @db.VarChar(50)
+  taxRate   String @db.VarChar(10) // Percentage as string
+  taxAmount String @db.VarChar(50)
+  discount  String @default("0.00") @db.VarChar(50) // Discount amount
+  total     String @db.VarChar(50)
+  currency  String @default("USD") @db.VarChar(10) // Currency code
+
+  paymentNetwork       Json   @map("payment_network") @db.Json
+  paymentToken         Json   @map("payment_token") @db.Json
+  paymentWalletAddress String @map("payment_wallet_address") @db.VarChar(255)
+
+  // Status and Workflow
+  status InvoiceStatusEnum @default(DRAFT)
+
+  // Timeline tracking
+  sentAt      DateTime? @map("sent_at") @db.Timestamp(6)
+  reviewedAt  DateTime? @map("reviewed_at") @db.Timestamp(6)
+  confirmedAt DateTime? @map("confirmed_at") @db.Timestamp(6)
+  paidAt      DateTime? @map("paid_at") @db.Timestamp(6)
+
+  // Relations
+  items InvoiceItem[]
+  bill  Bill?
+
+  // Additional metadata
+  metadata Json? @db.Json
+  memo     Json? @map("memo") @db.Json
+  footer   Json? @map("footer") @db.Json
+  terms    Json? @map("terms") @db.Json // Payment terms, conditions, etc.
+
+  @@index([payrollId])
+  @@index([employeeId])
+  @@index([fromCompanyId])
+  @@index([toCompanyId])
+  @@index([invoiceType])
+  @@index([status])
+  @@index([invoiceNumber])
+  @@index([dueDate])
+  @@index([isAutoGenerated])
+  @@index([autoGenerateFromPayrollId])
+  @@index([nextAutoGenerateDate])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id   Int    @id @default(autoincrement())
+  uuid String @unique @default(cuid()) @map("uuid")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  invoiceId Int     @map("invoice_id")
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  // Item details
+  description String  @db.Text
+  quantity    String  @db.VarChar(50) // Store as string for precision
+  unitPrice   String  @db.VarChar(50) // Price per unit
+  unit        String? @db.VarChar(50) // Unit of measurement (e.g., "hours", "items", "months")
+  taxRate     String  @default("0.00") @db.VarChar(10) // Tax rate for this item
+  discount    String  @default("0.00") @db.VarChar(50) // Discount amount for this item
+  total       String  @db.VarChar(50) // Total for this line item (quantity * unitPrice - discount + tax)
+
+  // Ordering
+  order Int @default(0) // Display order
+
+  // Additional metadata
+  metadata Json? @db.Json
+
+  @@index([invoiceId])
+  @@index([order])
+  @@map("invoice_items")
+}
+
+model InvoiceSchedule {
+  id   Int    @id @default(autoincrement())
+  uuid String @unique @default(cuid()) @map("uuid")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  // Link to payroll (for employee invoices) - mutually exclusive with clientId
+  payrollId Int?     @map("payroll_id")
+  payroll   Payroll? @relation(fields: [payrollId], references: [id], onDelete: Cascade)
+
+  // Link to client (for B2B invoices) - mutually exclusive with payrollId
+  clientId Int?    @map("client_id")
+  client   Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  // Company that owns this schedule (for B2B schedules)
+  companyId Int?     @map("company_id")
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Schedule configuration
+  isActive           Boolean @default(true) @map("is_active")
+  frequency          String  @db.VarChar(50) // "MONTHLY", "WEEKLY", "BIWEEKLY", "QUARTERLY", etc.
+  dayOfMonth         Int?    @map("day_of_month") // For monthly: day of month (1-31)
+  dayOfWeek          Int?    @map("day_of_week") // For weekly: day of week (0-6, Sunday=0)
+  generateDaysBefore Int     @default(0) @map("generate_days_before") // Generate X days before due date
+
+  // Next generation date
+  nextGenerateDate DateTime? @map("next_generate_date") @db.Timestamp(6)
+  lastGeneratedAt  DateTime? @map("last_generated_at") @db.Timestamp(6)
+
+  // Auto-send configuration (for B2B invoices)
+  autoSend Boolean @default(false) @map("auto_send")
+
+  // Invoice template settings
+  invoiceTemplate Json? @map("invoice_template") @db.Json // Template for auto-generated invoices
+
+  // Metadata
+  metadata Json? @db.Json
+
+  @@index([payrollId])
+  @@index([clientId])
+  @@index([companyId])
+  @@index([isActive])
+  @@index([nextGenerateDate])
+  @@map("invoice_schedules")
+}
+
+model Bill {
+  id   Int    @id @default(autoincrement())
+  uuid String @unique @default(cuid()) @map("uuid")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  companyId Int     @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoiceId Int     @unique @map("invoice_id")
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  status BillStatusEnum @default(PENDING)
+
+  paidAt          DateTime? @map("paid_at") @db.Timestamp(6)
+  transactionHash String?   @map("transaction_hash") @db.VarChar(100)
+
+  metadata Json? @db.Json
+
+  @@index([companyId])
+  @@index([status])
+  @@index([invoiceId])
+  @@map("bills")
+}
+
+model PaymentLink {
+  id                   Int                   @id() @default(autoincrement())
+  uuid                 String                @unique @default(cuid()) @map("uuid")
+  code                 String                @unique() @map("code") @db.VarChar
+  createdAt            DateTime              @map("created_at") @db.Timestamp(6)
+  updatedAt            DateTime              @map("updated_at") @db.Timestamp(6)
+  title                String                @db.VarChar
+  description          String                @db.VarChar
+  amount               String                @db.VarChar
+  status               PaymentLinkStatusEnum @default(ACTIVE)
+  order                Int                   @default(autoincrement())
+  companyId            Int                   @map("company_id")
+  company              Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  records              PaymentLinkRecord[]
+  paymentWalletAddress String                @map("payment_wallet_address") @db.VarChar
+  acceptedTokens       Json                  @map("accepted_tokens")
+  acceptedChains       Json?                 @map("accepted_chains")
+
+  @@index([code])
+  @@index([companyId])
+  @@index([order])
+  @@map("payment_link")
+}
+
+model PaymentLinkRecord {
+  id            Int         @id() @default(autoincrement())
+  uuid          String      @unique @default(cuid()) @map("uuid")
+  createdAt     DateTime    @map("created_at") @db.Timestamp(6)
+  updatedAt     DateTime    @map("updated_at") @db.Timestamp(6)
+  payer         String      @db.VarChar
+  txid          String?     @map("txid") @db.VarChar
+  paymentLinkId Int         @map("payment_link_id")
+  PaymentLink   PaymentLink @relation(fields: [paymentLinkId], references: [id])
+  token         Json?
+  chain         Json?
+
+  @@map("payment_link_record")
+}
+
+model Notifications {
+  id            Int                     @id() @default(autoincrement())
+  createdAt     DateTime                @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt     DateTime                @default(now()) @map("updated_at") @db.Timestamp(6)
+  title         String
+  message       String?
+  type          NotificationsTypeEnum
+  status        NotificationsStatusEnum @default(UNREAD)
+  metadata      Json?
+  actionUrl     String?                 @map("action_url") @db.VarChar
+  walletAddress String                  @map("wallet_address") @db.VarChar
+  readAt        DateTime?               @map("read_at") @db.Timestamp(6)
+
+  @@index([status])
+  @@index([type])
+  @@index([walletAddress])
+  @@index([walletAddress, createdAt])
+  @@index([walletAddress, status])
+  @@map("notifications")
+}
+
+enum ContractTermEnum {
+  PERMANENT
+  CONTRACTOR
+}
+
+enum PayrollStatusEnum {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+  DELETED
+}
+
+enum InvoiceTypeEnum {
+  EMPLOYEE // Employee <> Employer invoice (linked to payroll)
+  B2B // Business to Business invoice (company <> company)
+}
+
+enum InvoiceStatusEnum {
+  DRAFT
+  SENT
+  REVIEWED
+  CONFIRMED
+  CANCELLED
+  PAID
+  OVERDUE
+  DELETED
+}
+
+enum BillStatusEnum {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum CategoryShapeEnum {
+  CIRCLE
+  DIAMOND
+  SQUARE
+  TRIANGLE
+}
+
+enum NotificationsStatusEnum {
+  UNREAD
+  READ
+}
+
+enum NotificationsTypeEnum {
+  NOP
+}
+
+enum PaymentLinkStatusEnum {
+  ACTIVE
+  DEACTIVATED
+}
+
+enum CompanyTypeEnum {
+  SOLE_PROPRIETORSHIP
+  PARTNERSHIP
+  LLP
+  LLC
+  PRIVATE_LIMITED_COMPANY
+  CORPORATION
+  PUBLIC_LIMITED_COMPANY
+  NON_PROFIT
+  OTHER
+}
+
+enum CompanyVerificationStatusEnum {
+  PENDING
+  UNDER_REVIEW
+  VERIFIED
+  REJECTED
+  SUSPENDED
+}
+
+enum TeamMemberRoleEnum {
+  OWNER
+  ADMIN
+  VIEWER
+}
+
+enum UserRoleEnum {
+  USER
+  ADMIN
+}
+
+enum GenderEnum {
+  MALE
+  FEMALE
+  PREFER_NOT_TO_SAY
+  OTHER
+}

@@ -1,0 +1,52 @@
+name: Claude Code Review
+
+on:
+  pull_request_review_comment:
+    types: [created]
+  issue_comment:
+    types: [created]
+
+jobs:
+  claude-review:
+    # Only trigger when @claude is mentioned with /review command
+    if: |
+      github.event.issue.pull_request &&
+      (contains(github.event.comment.body, '@claude') && contains(github.event.comment.body, '/review'))
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Claude Code Review
+        id: claude-review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
+          plugins: 'code-review@claude-code-plugins'
+          prompt: |
+            You are reviewing code for a neobank solution backend built with NestJS, TypeScript, PostgreSQL (Prisma), and Redis.
+
+            Key areas to focus on:
+            - **Security**: Authentication, authorization, JWT handling, password hashing, SQL injection prevention, XSS protection
+            - **Financial accuracy**: Transaction handling, invoice processing, payroll calculations, currency precision (use Decimal/BigInt)
+            - **Data integrity**: Database transactions, ACID compliance, race conditions in concurrent operations
+            - **Compliance**: Audit trails, data privacy (GDPR), secure logging (no sensitive data in logs)
+            - **Error handling**: Proper error responses, no leaking sensitive information in errors
+            - **API design**: RESTful practices, proper status codes, input validation (class-validator)
+            - **Performance**: N+1 queries, proper indexing, efficient database operations, caching strategies
+            - **Testing**: Unit tests, integration tests for critical financial operations
+
+            /code-review:code-review ${{ github.repository }}/pull/${{ github.event.issue.number }}
+          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
+          # or https://code.claude.com/docs/en/cli-reference for available options
+
