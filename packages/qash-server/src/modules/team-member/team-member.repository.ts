@@ -5,6 +5,7 @@ import {
   Prisma,
   PrismaClient,
   TeamMemberRoleEnum,
+  TeamMemberStatusEnum,
 } from '../../database/generated/client';
 import {
   BaseRepository,
@@ -32,8 +33,10 @@ export interface UpdateTeamMemberData {
   position?: string;
   profilePicture?: string;
   role?: TeamMemberRoleEnum;
-  isActive?: boolean;
+  status?: TeamMemberStatusEnum;
   joinedAt?: Date;
+  invitationToken?: string | null;
+  invitationExpiresAt?: Date | null;
   metadata?: any;
 }
 
@@ -46,7 +49,7 @@ export interface TeamMemberWithRelations extends TeamMemberModel {
 export interface TeamMemberFilters {
   companyId?: number;
   role?: TeamMemberRoleEnum;
-  isActive?: boolean;
+  status?: TeamMemberStatusEnum;
   hasUser?: boolean; // Filter by whether they have a user account
   search?: string; // Search in name or email
 }
@@ -167,8 +170,8 @@ export class TeamMemberRepository extends BaseRepository<
       if (filters.role) {
         whereClause.role = filters.role;
       }
-      if (typeof filters.isActive === 'boolean') {
-        whereClause.isActive = filters.isActive;
+      if (filters.status) {
+        whereClause.status = filters.status;
       }
       if (typeof filters.hasUser === 'boolean') {
         whereClause.userId = filters.hasUser ? { not: null } : null;
@@ -273,7 +276,7 @@ export class TeamMemberRepository extends BaseRepository<
       where: {
         companyId,
         userId,
-        isActive: true,
+        status: TeamMemberStatusEnum.ACTIVE,
         role: { in: requiredRoles },
       },
     });
@@ -293,7 +296,7 @@ export class TeamMemberRepository extends BaseRepository<
       where: {
         companyId,
         userId,
-        isActive: true,
+        status: TeamMemberStatusEnum.ACTIVE,
       },
       select: { role: true },
     });
@@ -314,8 +317,8 @@ export class TeamMemberRepository extends BaseRepository<
       if (filters.role) {
         whereClause.role = filters.role;
       }
-      if (typeof filters.isActive === 'boolean') {
-        whereClause.isActive = filters.isActive;
+      if (filters.status) {
+        whereClause.status = filters.status;
       }
     }
 
@@ -327,23 +330,29 @@ export class TeamMemberRepository extends BaseRepository<
    */
   async getCompanyStats(companyId: number, tx?: PrismaTransactionClient) {
     const model = this.getModel(tx);
-    const [total, owners, admins, viewers, active, pending] = await Promise.all(
+    const [total, owners, admins, reviewers, viewers, active, pending, suspended] = await Promise.all(
       [
         model.count({ where: { companyId } }),
         model.count({
-          where: { companyId, role: 'OWNER' },
+          where: { companyId, role: TeamMemberRoleEnum.OWNER },
         }),
         model.count({
-          where: { companyId, role: 'ADMIN' },
+          where: { companyId, role: TeamMemberRoleEnum.ADMIN },
         }),
         model.count({
-          where: { companyId, role: 'VIEWER' },
+          where: { companyId, role: TeamMemberRoleEnum.REVIEWER },
         }),
         model.count({
-          where: { companyId, isActive: true },
+          where: { companyId, role: TeamMemberRoleEnum.VIEWER },
         }),
         model.count({
-          where: { companyId, userId: null, isActive: true },
+          where: { companyId, status: TeamMemberStatusEnum.ACTIVE },
+        }),
+        model.count({
+          where: { companyId, status: TeamMemberStatusEnum.PENDING },
+        }),
+        model.count({
+          where: { companyId, status: TeamMemberStatusEnum.SUSPENDED },
         }),
       ],
     );
@@ -352,9 +361,11 @@ export class TeamMemberRepository extends BaseRepository<
       total,
       owners,
       admins,
+      reviewers,
       viewers,
       active,
-      pending, // Members without user accounts (invited but not joined)
+      pending,
+      suspended,
     };
   }
 
@@ -381,13 +392,13 @@ export class TeamMemberRepository extends BaseRepository<
   }
 
   /**
-   * Deactivate team member
+   * Suspend team member
    */
-  async deactivate(
+  async suspend(
     id: number,
     tx?: PrismaTransactionClient,
   ): Promise<TeamMemberModel> {
-    return this.update({ id }, { isActive: false }, tx);
+    return this.update({ id }, { status: TeamMemberStatusEnum.SUSPENDED }, tx);
   }
 
   /**
@@ -397,7 +408,16 @@ export class TeamMemberRepository extends BaseRepository<
     id: number,
     tx?: PrismaTransactionClient,
   ): Promise<TeamMemberModel> {
-    return this.update({ id }, { isActive: true }, tx);
+    return this.update(
+      { id },
+      {
+        status: TeamMemberStatusEnum.ACTIVE,
+        joinedAt: new Date(),
+        invitationToken: null,
+        invitationExpiresAt: null,
+      },
+      tx,
+    );
   }
 
   /**
@@ -413,7 +433,7 @@ export class TeamMemberRepository extends BaseRepository<
         user: {
           email,
         },
-        isActive: true,
+        status: TeamMemberStatusEnum.PENDING,
       },
       include: {
         company: {
@@ -467,5 +487,74 @@ export class TeamMemberRepository extends BaseRepository<
       },
     });
     return !!existing;
+  }
+
+  /**
+   * Find team member by invitation token
+   */
+  async findByInvitationToken(
+    token: string,
+    tx?: PrismaTransactionClient,
+  ): Promise<TeamMemberWithRelations | null> {
+    const model = this.getModel(tx);
+    return model.findUnique({
+      where: {
+        invitationToken: token,
+      },
+      include: {
+        company: {
+          select: {
+            id: true,
+            companyName: true,
+            registrationNumber: true,
+          },
+        },
+        user: {
+          select: {
+            id: true,
+            email: true,
+          },
+        },
+        inviter: {
+          select: {
+            id: true,
+            email: true,
+          },
+        },
+      },
+    });
+  }
+
+  /**
+   * Update invitation token
+   */
+  async updateInvitationToken(
+    id: number,
+    token: string,
+    expiresAt: Date,
+    tx?: PrismaTransactionClient,
+  ): Promise<TeamMemberModel> {
+    return this.update(
+      { id },
+      {
+        invitationToken: token,
+        invitationExpiresAt: expiresAt,
+      },
+      tx,
+    );
+  }
+
+  /**
+   * Get team member with user for checking permissions
+   */
+  async findByIdWithUser(
+    id: number,
+    tx?: PrismaTransactionClient,
+  ): Promise<(TeamMemberModel & { user: UserModel | null }) | null> {
+    const model = this.getModel(tx);
+    return model.findUnique({
+      where: { id },
+      include: { user: true },
+    });
   }
 }

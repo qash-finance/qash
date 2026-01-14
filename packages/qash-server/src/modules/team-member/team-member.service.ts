@@ -5,6 +5,7 @@ import {
   ConflictException,
   ForbiddenException,
   BadRequestException,
+  GoneException,
 } from '@nestjs/common';
 import { TeamMemberRepository } from './team-member.repository';
 import { CompanyRepository } from '../company/company.repository';
@@ -17,11 +18,17 @@ import {
   TeamMemberSearchQueryDto,
   AcceptInvitationDto,
   BulkInviteTeamMembersDto,
+  AcceptInvitationByTokenDto,
 } from './team-member.dto';
-import { TeamMemberRoleEnum } from '../../database/generated/client';
+import {
+  TeamMemberRoleEnum,
+  TeamMemberStatusEnum,
+} from '../../database/generated/client';
 import { ErrorCompany, ErrorTeamMember } from 'src/common/constants/errors';
 import { PrismaService } from 'src/database/prisma.service';
 import { handleError } from 'src/common/utils/errors';
+import { randomUUID } from 'crypto';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class TeamMemberService {
@@ -33,6 +40,7 @@ export class TeamMemberService {
     private readonly teamMemberRepository: TeamMemberRepository,
     private readonly companyRepository: CompanyRepository,
     private readonly userRepository: UserRepository,
+    private readonly configService: ConfigService,
   ) {}
 
   /**
@@ -146,6 +154,11 @@ export class TeamMemberService {
           throw new ConflictException(ErrorTeamMember.EmailAlreadyInvited);
         }
 
+        // Generate invitation token with 7-day expiry
+        const invitationToken = randomUUID();
+        const invitationExpiresAt = new Date();
+        invitationExpiresAt.setDate(invitationExpiresAt.getDate() + 7);
+
         // Create user first (required for 1:1 relationship)
         const user = await this.userRepository.create(
           {
@@ -154,13 +167,17 @@ export class TeamMemberService {
           tx,
         );
 
-        // Create team member record
+        // Create team member record with PENDING status
         const teamMember = await this.teamMemberRepository.create(
           {
             firstName: inviteDto.firstName,
             lastName: inviteDto.lastName,
             position: inviteDto.position,
             role: inviteDto.role,
+            status: TeamMemberStatusEnum.PENDING,
+            invitationToken,
+            invitationExpiresAt,
+            invitedAt: new Date(),
             company: {
               connect: {
                 id: companyId,
@@ -183,7 +200,7 @@ export class TeamMemberService {
 
         // Send invitation email
         try {
-          await this.sendInvitationEmail(teamMember, company);
+          await this.sendInvitationEmail(teamMember, company, invitationToken);
         } catch (error) {
           this.logger.error('Failed to send invitation email:', error);
           // Don't throw error, invitation is created but email failed
@@ -270,6 +287,7 @@ export class TeamMemberService {
         [
           TeamMemberRoleEnum.OWNER,
           TeamMemberRoleEnum.ADMIN,
+          TeamMemberRoleEnum.REVIEWER,
           TeamMemberRoleEnum.VIEWER,
         ],
       );
@@ -301,6 +319,7 @@ export class TeamMemberService {
         [
           TeamMemberRoleEnum.OWNER,
           TeamMemberRoleEnum.ADMIN,
+          TeamMemberRoleEnum.REVIEWER,
           TeamMemberRoleEnum.VIEWER,
         ],
       );
@@ -393,7 +412,7 @@ export class TeamMemberService {
           throw new NotFoundException(ErrorTeamMember.NotFound);
         }
 
-        // Only owners can change roles, and admins can change viewer roles
+        // Only OWNER can change roles for ADMIN, and ADMIN can change REVIEWER/VIEWER roles
         const userRole = await this.teamMemberRepository.getUserRoleInCompany(
           teamMember.companyId,
           userId,
@@ -404,39 +423,28 @@ export class TeamMemberService {
           throw new ForbiddenException(ErrorTeamMember.AccessDenied);
         }
 
-        // Role change permissions
+        // Cannot change OWNER role - only one OWNER per company
+        if (newRole === TeamMemberRoleEnum.OWNER) {
+          throw new ForbiddenException(ErrorTeamMember.CannotAssignOwnerRole);
+        }
+
+        // Role change permissions based on hierarchy: OWNER > ADMIN > REVIEWER > VIEWER
         if (userRole === TeamMemberRoleEnum.OWNER) {
-          // Owners can change any role
+          // Owner can change any role except to OWNER (handled above)
         } else if (userRole === TeamMemberRoleEnum.ADMIN) {
-          // Admins can only change viewer roles and cannot promote to owner
+          // Admin cannot change OWNER or other ADMIN roles
           if (
-            teamMember.role !== TeamMemberRoleEnum.VIEWER ||
-            newRole === TeamMemberRoleEnum.OWNER
+            teamMember.role === TeamMemberRoleEnum.OWNER ||
+            teamMember.role === TeamMemberRoleEnum.ADMIN ||
+            newRole === TeamMemberRoleEnum.ADMIN
           ) {
             throw new ForbiddenException(
               ErrorTeamMember.InsufficientPermissions,
             );
           }
         } else {
+          // REVIEWER and VIEWER cannot change roles
           throw new ForbiddenException(ErrorTeamMember.InsufficientPermissions);
-        }
-
-        // Prevent removing the last owner
-        if (
-          teamMember.role === TeamMemberRoleEnum.OWNER &&
-          newRole !== TeamMemberRoleEnum.OWNER
-        ) {
-          const ownerCount = await this.teamMemberRepository.countByCompany(
-            teamMember.companyId,
-            { role: TeamMemberRoleEnum.OWNER, isActive: true },
-            tx,
-          );
-
-          if (ownerCount <= 1) {
-            throw new BadRequestException(
-              ErrorTeamMember.CannotRemoveLastOwner,
-            );
-          }
         }
 
         return this.teamMemberRepository.updateRole(teamMemberId, newRole, tx);
@@ -451,7 +459,7 @@ export class TeamMemberService {
   }
 
   /**
-   * Remove team member
+   * Remove team member (suspend)
    */
   async removeTeamMember(teamMemberId: number, userId: number) {
     try {
@@ -464,7 +472,221 @@ export class TeamMemberService {
           throw new NotFoundException(ErrorTeamMember.NotFound);
         }
 
-        // Check permissions
+        // Get the requesting user's role
+        const userRole = await this.teamMemberRepository.getUserRoleInCompany(
+          teamMember.companyId,
+          userId,
+          tx,
+        );
+
+        if (!userRole) {
+          throw new ForbiddenException(ErrorTeamMember.AccessDenied);
+        }
+
+        // Cannot remove the OWNER
+        if (teamMember.role === TeamMemberRoleEnum.OWNER) {
+          throw new BadRequestException(ErrorTeamMember.CannotRemoveOwner);
+        }
+
+        // Only OWNER can remove ADMIN members
+        if (
+          teamMember.role === TeamMemberRoleEnum.ADMIN &&
+          userRole !== TeamMemberRoleEnum.OWNER
+        ) {
+          throw new ForbiddenException(
+            ErrorTeamMember.OnlyOwnerCanRemoveAdmin,
+          );
+        }
+
+        // ADMIN can remove REVIEWER and VIEWER
+        if (
+          userRole !== TeamMemberRoleEnum.OWNER &&
+          userRole !== TeamMemberRoleEnum.ADMIN
+        ) {
+          throw new ForbiddenException(ErrorTeamMember.InsufficientPermissions);
+        }
+
+        return this.teamMemberRepository.suspend(teamMemberId, tx);
+      });
+    } catch (error) {
+      this.logger.error(`Failed to remove team member ${teamMemberId}:`, error);
+      handleError(error, this.logger);
+    }
+  }
+
+  /**
+   * Suspend team member
+   */
+  async suspendTeamMember(teamMemberId: number, userId: number) {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const teamMember = await this.teamMemberRepository.findById(
+          teamMemberId,
+          tx,
+        );
+        if (!teamMember) {
+          throw new NotFoundException(ErrorTeamMember.NotFound);
+        }
+
+        // Get the requesting user's role
+        const userRole = await this.teamMemberRepository.getUserRoleInCompany(
+          teamMember.companyId,
+          userId,
+          tx,
+        );
+
+        if (!userRole) {
+          throw new ForbiddenException(ErrorTeamMember.AccessDenied);
+        }
+
+        // Cannot suspend the OWNER
+        if (teamMember.role === TeamMemberRoleEnum.OWNER) {
+          throw new BadRequestException(ErrorTeamMember.CannotRemoveOwner);
+        }
+
+        // Only OWNER can suspend ADMIN members
+        if (
+          teamMember.role === TeamMemberRoleEnum.ADMIN &&
+          userRole !== TeamMemberRoleEnum.OWNER
+        ) {
+          throw new ForbiddenException(
+            ErrorTeamMember.OnlyOwnerCanRemoveAdmin,
+          );
+        }
+
+        // ADMIN can suspend REVIEWER and VIEWER
+        if (
+          userRole !== TeamMemberRoleEnum.OWNER &&
+          userRole !== TeamMemberRoleEnum.ADMIN
+        ) {
+          throw new ForbiddenException(ErrorTeamMember.InsufficientPermissions);
+        }
+
+        return this.teamMemberRepository.suspend(teamMemberId, tx);
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to suspend team member ${teamMemberId}:`,
+        error,
+      );
+      handleError(error, this.logger);
+    }
+  }
+
+  /**
+   * Reactivate suspended team member
+   */
+  async reactivateTeamMember(teamMemberId: number, userId: number) {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const teamMember = await this.teamMemberRepository.findById(
+          teamMemberId,
+          tx,
+        );
+        if (!teamMember) {
+          throw new NotFoundException(ErrorTeamMember.NotFound);
+        }
+
+        // Only SUSPENDED members can be reactivated
+        if (teamMember.status !== TeamMemberStatusEnum.SUSPENDED) {
+          throw new BadRequestException(ErrorTeamMember.NotSuspended);
+        }
+
+        // Get the requesting user's role
+        const userRole = await this.teamMemberRepository.getUserRoleInCompany(
+          teamMember.companyId,
+          userId,
+          tx,
+        );
+
+        if (!userRole) {
+          throw new ForbiddenException(ErrorTeamMember.AccessDenied);
+        }
+
+        // Only OWNER can reactivate ADMIN members
+        if (
+          teamMember.role === TeamMemberRoleEnum.ADMIN &&
+          userRole !== TeamMemberRoleEnum.OWNER
+        ) {
+          throw new ForbiddenException(
+            ErrorTeamMember.InsufficientPermissions,
+          );
+        }
+
+        // ADMIN can reactivate REVIEWER and VIEWER
+        if (
+          userRole !== TeamMemberRoleEnum.OWNER &&
+          userRole !== TeamMemberRoleEnum.ADMIN
+        ) {
+          throw new ForbiddenException(ErrorTeamMember.InsufficientPermissions);
+        }
+
+        return this.teamMemberRepository.activate(teamMemberId, tx);
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to reactivate team member ${teamMemberId}:`,
+        error,
+      );
+      handleError(error, this.logger);
+    }
+  }
+
+  /**
+   * Accept invitation by token (from email link)
+   */
+  async acceptInvitationByToken(token: string) {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const teamMember =
+          await this.teamMemberRepository.findByInvitationToken(token, tx);
+
+        if (!teamMember) {
+          throw new NotFoundException(ErrorTeamMember.InvalidInvitationToken);
+        }
+
+        if (teamMember.status !== TeamMemberStatusEnum.PENDING) {
+          throw new BadRequestException(ErrorTeamMember.InvitationNotActive);
+        }
+
+        // Check if invitation has expired
+        if (
+          teamMember.invitationExpiresAt &&
+          new Date() > teamMember.invitationExpiresAt
+        ) {
+          throw new GoneException(ErrorTeamMember.InvitationExpired);
+        }
+
+        // Activate the team member
+        return this.teamMemberRepository.activate(teamMember.id, tx);
+      });
+    } catch (error) {
+      this.logger.error('Failed to accept invitation by token:', error);
+      handleError(error, this.logger);
+    }
+  }
+
+  /**
+   * Resend invitation email
+   */
+  async resendInvitation(teamMemberId: number, userId: number) {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const teamMember =
+          await this.teamMemberRepository.findByIdWithRelations(
+            teamMemberId,
+            tx,
+          );
+
+        if (!teamMember) {
+          throw new NotFoundException(ErrorTeamMember.NotFound);
+        }
+
+        if (teamMember.status !== TeamMemberStatusEnum.PENDING) {
+          throw new BadRequestException(ErrorTeamMember.NotPendingInvitation);
+        }
+
+        // Check if user can manage team
         const canManage = await this.teamMemberRepository.hasPermission(
           teamMember.companyId,
           userId,
@@ -476,31 +698,47 @@ export class TeamMemberService {
           throw new ForbiddenException(ErrorTeamMember.InsufficientPermissions);
         }
 
-        // Prevent removing the last owner
-        if (teamMember.role === TeamMemberRoleEnum.OWNER) {
-          const ownerCount = await this.teamMemberRepository.countByCompany(
-            teamMember.companyId,
-            { role: TeamMemberRoleEnum.OWNER, isActive: true },
-            tx,
-          );
+        // Generate new invitation token with 7-day expiry
+        const invitationToken = randomUUID();
+        const invitationExpiresAt = new Date();
+        invitationExpiresAt.setDate(invitationExpiresAt.getDate() + 7);
 
-          if (ownerCount <= 1) {
-            throw new BadRequestException(
-              ErrorTeamMember.CannotRemoveLastOwner,
-            );
-          }
+        await this.teamMemberRepository.updateInvitationToken(
+          teamMemberId,
+          invitationToken,
+          invitationExpiresAt,
+          tx,
+        );
+
+        // Get company details
+        const company = await this.companyRepository.findById(
+          teamMember.companyId,
+          tx,
+        );
+        if (!company) {
+          throw new NotFoundException(ErrorCompany.CompanyNotFound);
         }
 
-        return this.teamMemberRepository.deactivate(teamMemberId, tx);
+        // Send invitation email
+        await this.sendInvitationEmail(
+          { ...teamMember, invitationToken },
+          company,
+          invitationToken,
+        );
+
+        return { message: 'Invitation resent successfully' };
       });
     } catch (error) {
-      this.logger.error(`Failed to remove team member ${teamMemberId}:`, error);
+      this.logger.error(
+        `Failed to resend invitation for team member ${teamMemberId}:`,
+        error,
+      );
       handleError(error, this.logger);
     }
   }
 
   /**
-   * Accept invitation (when user creates account)
+   * Accept invitation (when user creates account) - deprecated, use acceptInvitationByToken
    */
   async acceptInvitation(
     teamMemberId: number,
@@ -517,22 +755,21 @@ export class TeamMemberService {
           throw new NotFoundException(ErrorTeamMember.NotFound);
         }
 
-        if (teamMember.userId) {
-          throw new BadRequestException(ErrorTeamMember.UserAlreadyJoined);
+        // Check if team member is the current user
+        if (teamMember.userId !== userId) {
+          throw new ForbiddenException(ErrorTeamMember.AccessDenied);
         }
 
-        if (!teamMember.isActive) {
+        if (teamMember.status !== TeamMemberStatusEnum.PENDING) {
           throw new BadRequestException(ErrorTeamMember.InvitationNotActive);
         }
 
         // Prepare update data
         const updateData: any = {
-          user: {
-            connect: {
-              id: userId,
-            },
-          },
+          status: TeamMemberStatusEnum.ACTIVE,
           joinedAt: new Date(),
+          invitationToken: null,
+          invitationExpiresAt: null,
         };
 
         if (acceptDto?.profilePicture) {
@@ -591,6 +828,7 @@ export class TeamMemberService {
         [
           TeamMemberRoleEnum.OWNER,
           TeamMemberRoleEnum.ADMIN,
+          TeamMemberRoleEnum.REVIEWER,
           TeamMemberRoleEnum.VIEWER,
         ],
       );
@@ -643,12 +881,23 @@ export class TeamMemberService {
   /**
    * Send invitation email
    */
-  private async sendInvitationEmail(teamMember: any, company: any) {
+  private async sendInvitationEmail(
+    teamMember: any,
+    company: any,
+    invitationToken: string,
+  ) {
     const subject = `Invitation to join ${company.companyName}`;
-    const html = this.getInvitationEmailTemplate(teamMember, company);
+    const html = this.getInvitationEmailTemplate(
+      teamMember,
+      company,
+      invitationToken,
+    );
+
+    // Get email from user relation
+    const email = teamMember.user?.email || teamMember.email;
 
     await this.mailService.sendEmail({
-      to: teamMember.email,
+      to: email,
       subject,
       html,
     });
@@ -657,7 +906,16 @@ export class TeamMemberService {
   /**
    * Get invitation email template
    */
-  private getInvitationEmailTemplate(teamMember: any, company: any): string {
+  private getInvitationEmailTemplate(
+    teamMember: any,
+    company: any,
+    invitationToken: string,
+  ): string {
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    const acceptUrl = `${frontendUrl}/invite/accept?token=${invitationToken}`;
+    const email = teamMember.user?.email || teamMember.email;
+
     return `
       <!DOCTYPE html>
       <html>
@@ -706,6 +964,14 @@ export class TeamMemberService {
             font-size: 14px; 
             color: #666; 
           }
+          .expiry-notice {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 15px 0;
+            font-size: 14px;
+          }
         </style>
       </head>
       <body>
@@ -728,28 +994,26 @@ export class TeamMemberService {
             </div>
           </div>
           
-          <p>To accept this invitation and join the team:</p>
-          <ol>
-            <li>Create an account or sign in with this email address</li>
-            <li>Navigate to your pending invitations</li>
-            <li>Accept the invitation from ${company.companyName}</li>
-          </ol>
+          <div class="expiry-notice">
+            ⏰ This invitation expires in 7 days. Please accept it before it expires.
+          </div>
           
           <div style="text-align: center;">
-            <a href="#" class="cta-button">Accept Invitation</a>
+            <a href="${acceptUrl}" class="cta-button">Accept Invitation</a>
           </div>
           
           <p><strong>What you'll be able to do:</strong></p>
           <ul>
-            ${teamMember.role === 'OWNER' ? '<li>Full company management access</li><li>Manage team members and permissions</li><li>Update company information</li>' : ''}
-            ${teamMember.role === 'ADMIN' ? '<li>Manage team members</li><li>Update company information</li><li>View all company data</li>' : ''}
-            ${teamMember.role === 'VIEWER' ? '<li>View company information</li><li>Access team directory</li>' : ''}
+            ${teamMember.role === 'OWNER' ? '<li>Full company management access</li><li>Manage all team members including admins</li><li>Create and manage payroll, invoices, and clients</li>' : ''}
+            ${teamMember.role === 'ADMIN' ? '<li>Manage reviewers and viewers</li><li>Create and manage payroll, invoices, and clients</li><li>View all company data</li>' : ''}
+            ${teamMember.role === 'REVIEWER' ? '<li>Review and approve transactions</li><li>View all company data</li>' : ''}
+            ${teamMember.role === 'VIEWER' ? '<li>View company information</li><li>Access team directory</li><li>View reports and dashboards</li>' : ''}
           </ul>
           
           <p>If you have any questions, please contact the person who invited you.</p>
           
           <div class="footer">
-            <p>This invitation was sent to ${teamMember.email}</p>
+            <p>This invitation was sent to ${email}</p>
             <p>If you didn't expect this invitation, you can safely ignore this email.</p>
           </div>
         </div>

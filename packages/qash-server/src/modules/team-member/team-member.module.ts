@@ -10,7 +10,7 @@ import { TeamMemberController } from './team-member.controller';
 @Module({
   imports: [
     PrismaModule,
-    AuthModule,
+    forwardRef(() => AuthModule), // Use forwardRef to avoid circular dependency
     MailModule,
     forwardRef(() => CompanyModule),
   ],

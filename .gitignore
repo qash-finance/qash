@@ -49,3 +49,6 @@ coverage/
 .yarn/
 .yarnrc.yml
 yarn.lock
+
+#Copilot
+.github/copilot-instructions.md

@@ -11,8 +11,12 @@ import {
   IsUrl,
   IsNumber,
   IsPositive,
+  IsUUID,
 } from 'class-validator';
-import { TeamMemberRoleEnum } from '../../database/generated/client';
+import {
+  TeamMemberRoleEnum,
+  TeamMemberStatusEnum,
+} from '../../database/generated/client';
 
 export class CreateTeamMemberDto {
   @ApiProperty({
@@ -201,9 +205,23 @@ export class InviteTeamMemberDto {
   metadata?: any;
 }
 
+export class AcceptInvitationByTokenDto {
+  @ApiProperty({
+    description: 'Invitation token from email link',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @IsUUID()
+  token: string;
+}
+
 export class TeamMemberResponseDto {
   @ApiProperty({ description: 'Team member ID', example: 1 })
   id: number;
+
+  @ApiProperty({ description: 'UUID', example: 'cuid123' })
+  uuid: string;
 
   @ApiProperty({ description: 'First name', example: 'John' })
   firstName: string;
@@ -230,8 +248,12 @@ export class TeamMemberResponseDto {
   })
   role: TeamMemberRoleEnum;
 
-  @ApiProperty({ description: 'Is active', example: true })
-  isActive: boolean;
+  @ApiProperty({
+    description: 'Status',
+    enum: TeamMemberStatusEnum,
+    example: TeamMemberStatusEnum.ACTIVE,
+  })
+  status: TeamMemberStatusEnum;
 
   @ApiProperty({ description: 'Company ID', example: 1 })
   companyId: number;
@@ -301,14 +323,20 @@ export class TeamMemberStatsResponseDto {
   @ApiProperty({ description: 'Number of admins', example: 3 })
   admins: number;
 
-  @ApiProperty({ description: 'Number of viewers', example: 6 })
+  @ApiProperty({ description: 'Number of reviewers', example: 2 })
+  reviewers: number;
+
+  @ApiProperty({ description: 'Number of viewers', example: 4 })
   viewers: number;
 
-  @ApiProperty({ description: 'Active members', example: 9 })
+  @ApiProperty({ description: 'Active members', example: 8 })
   active: number;
 
   @ApiProperty({ description: 'Pending invitations', example: 2 })
   pending: number;
+
+  @ApiProperty({ description: 'Suspended members', example: 0 })
+  suspended: number;
 }
 
 export class TeamMemberSearchQueryDto {
@@ -321,12 +349,12 @@ export class TeamMemberSearchQueryDto {
   role?: TeamMemberRoleEnum;
 
   @ApiPropertyOptional({
-    description: 'Active status filter',
-    example: true,
+    description: 'Status filter',
+    enum: TeamMemberStatusEnum,
   })
   @IsOptional()
-  @IsBoolean()
-  isActive?: boolean;
+  @IsEnum(TeamMemberStatusEnum)
+  status?: TeamMemberStatusEnum;
 
   @ApiPropertyOptional({
     description: 'Filter by whether member has user account',

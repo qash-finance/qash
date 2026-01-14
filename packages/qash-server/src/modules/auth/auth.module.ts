@@ -9,11 +9,14 @@ import { UserRepository } from './repositories/user.repository';
 import { ParaJwtStrategy } from './strategies/para-jwt.strategy';
 import { ParaJwtAuthGuard } from './guards/para-jwt-auth.guard';
 import { CompanyAuthGuard } from './guards/company-auth.guard';
+import { RolesGuard } from './guards/roles.guard';
+import { TeamMemberModule } from '../team-member/team-member.module';
 
 @Module({
   imports: [
     PrismaModule,
     forwardRef(() => CompanyModule), // Use forwardRef to avoid circular dependency
+    forwardRef(() => TeamMemberModule), // For RolesGuard
     PassportModule.register({ defaultStrategy: 'para-jwt' }),
   ],
   providers: [
@@ -26,6 +29,7 @@ import { CompanyAuthGuard } from './guards/company-auth.guard';
     // Auth Strategy & Guards
     ParaJwtStrategy, // Para JWT authentication strategy
     CompanyAuthGuard,
+    RolesGuard,
     {
       provide: APP_GUARD,
       useClass: ParaJwtAuthGuard, // Use Para JWT guard as default
@@ -38,6 +42,9 @@ import { CompanyAuthGuard } from './guards/company-auth.guard';
 
     // Repositories (in case other modules need them)
     UserRepository,
+
+    // Guards (for use with @UseGuards)
+    RolesGuard,
 
     // Passport
     PassportModule,
