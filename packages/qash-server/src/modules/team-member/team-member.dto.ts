@@ -229,9 +229,6 @@ export class TeamMemberResponseDto {
   @ApiProperty({ description: 'Last name', example: 'Doe' })
   lastName: string;
 
-  @ApiProperty({ description: 'Email address', example: 'john.doe@acme.com' })
-  email: string;
-
   @ApiPropertyOptional({ description: 'Position', example: 'CEO' })
   position?: string;
 

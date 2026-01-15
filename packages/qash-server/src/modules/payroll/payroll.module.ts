@@ -6,9 +6,10 @@ import { PrismaModule } from '../../database/prisma.module';
 import { EmployeeModule } from '../employee/employee.module';
 import { AuthModule } from '../auth/auth.module';
 import { CompanyModule } from '../company/company.module';
+import { TeamMemberModule } from '../team-member/team-member.module';
 
 @Module({
-  imports: [PrismaModule, EmployeeModule, AuthModule, CompanyModule],
+  imports: [PrismaModule, EmployeeModule, AuthModule, CompanyModule, TeamMemberModule],
   controllers: [PayrollController],
   providers: [PayrollService, PayrollRepository],
   exports: [PayrollService, PayrollRepository],

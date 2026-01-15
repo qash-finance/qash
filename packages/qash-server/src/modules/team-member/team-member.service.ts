@@ -51,7 +51,7 @@ export class TeamMemberService {
     createTeamMemberDto: CreateTeamMemberDto,
   ) {
     try {
-      await this.prisma.$transaction(async (tx) => {
+      return await this.prisma.$transaction(async (tx) => {
         const { companyId } = createTeamMemberDto;
 
         // Check if user can manage team

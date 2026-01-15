@@ -112,7 +112,7 @@ export class TeamMembershipInfoDto {
   role: string;
 
   @ApiProperty({ description: 'Is team member active', example: true })
-  isActive: boolean;
+  status: string;
 
   @ApiProperty({ description: 'Creation timestamp' })
   createdAt: Date;
