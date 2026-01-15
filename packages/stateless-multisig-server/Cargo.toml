@@ -1,0 +1,46 @@
+[package]
+name = "para-multisig-server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# Axum web framework
+axum = { version = "0.8", features = ["macros"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+
+# Miden dependencies
+miden-client = { version = "0.12.5", features = ["testing", "tonic"] }
+miden-lib = { version = "0.12.4", default-features = false }
+miden-objects = { version = "0.12.4", default-features = false }
+miden-crypto = { version = "0.20.1", features = ["executable"] }
+miden-tx = "0.12.4"
+miden-assembly = "0.20.1"
+miden-client-sqlite-store = "0.12.5"
+
+# Async runtime
+tokio = { version = "1.40", features = [
+    "rt-multi-thread",
+    "net",
+    "macros",
+    "fs",
+    "sync",
+] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1.0", features = ["raw_value"] }
+postcard = { version = "1.0", features = ["alloc"] }
+
+# Utilities
+hex = "0.4"
+uuid = { version = "1.0", features = ["v4"] }
+rand = { version = "0.9" }
+rand_chacha = "0.9.0"
+anyhow = "1.0"
+thiserror = { version = "2.0", default-features = false }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+miden-testing = "0.12.3"
