@@ -8,6 +8,7 @@
     "build": "pnpm run -r build",
     "build:web": "pnpm --filter @qash/web build",
     "build:docs": "pnpm --filter @qash/docs build",
+    "start": "pnpm --filter @qash/web start",
     "lint": "pnpm --filter @qash/web lint",
     "format": "pnpm --filter @qash/web format"
   },

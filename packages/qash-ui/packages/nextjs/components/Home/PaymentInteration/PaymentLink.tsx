@@ -103,14 +103,6 @@ export const PaymentLink: React.FC<PaymentLinkProps> = ({ checkedRows, setChecke
     }
   };
 
-  const handleViewDetail = (linkIndex: number) => {
-    const link = allLinks[linkIndex];
-    if (link) {
-      router.push(`/payment-link/detail?code=${link.code}`);
-      setActiveTooltipId(null);
-    }
-  };
-
   const handleToggleStatus = (linkIndex: number, isActive: boolean) => {
     const link = allLinks[linkIndex];
     if (link) {
@@ -324,7 +316,6 @@ export const PaymentLink: React.FC<PaymentLinkProps> = ({ checkedRows, setChecke
               <PaymentLinkActionsTooltip
                 link={link}
                 onEdit={() => handleEdit(index)}
-                onViewDetail={() => handleViewDetail(index)}
                 onToggleStatus={(isActive: boolean) => handleToggleStatus(index, isActive)}
                 onRemove={() => handleRemove(index)}
               />

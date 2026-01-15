@@ -20,6 +20,7 @@
     "dev:web": "pnpm --filter @qash/web dev",
     "dev:server": "pnpm --filter @qash/server start:dev",
     "dev:docs": "pnpm --filter @qash/docs start",
+    "dev:multisig-server": "cd packages/stateless-multisig-server && cargo run",
     
     "build": "pnpm run -r build",
     "build:web": "pnpm --filter @qash/web build",
