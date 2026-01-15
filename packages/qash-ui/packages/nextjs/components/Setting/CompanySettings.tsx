@@ -5,7 +5,7 @@ import { useAuth } from "@/services/auth/context";
 import InputOutlined from "../Common/Input/InputOutlined";
 import { CompanyTypeDropdown } from "../Common/Dropdown/CompanyTypeDropdown";
 import { CountryDropdown } from "../Common/Dropdown/CountryDropdown";
-import { CompanyInfo } from "@/types/company";
+import { CompanyInfoDto as CompanyInfo } from "@qash/types/dto/company";
 import toast from "react-hot-toast";
 import SettingHeader from "./SettingHeader";
 import { useUpdateCompany } from "@/services/api/company";

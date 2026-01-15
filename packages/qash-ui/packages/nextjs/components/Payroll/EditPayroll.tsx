@@ -8,9 +8,10 @@ import { useModal } from "@/contexts/ModalManagerProvider";
 import { AssetWithMetadata } from "@/types/faucet";
 import { ContractTerm } from "./ContractTerm";
 import { useTitle } from "@/contexts/TitleProvider";
-import { CompanyContactResponseDto } from "@/types/employee";
-import { useCreateSandboxPayroll, useGetPayrollDetails, useUpdatePayroll } from "@/services/api/payroll";
-import { ContractTermEnum, CreatePayrollDto, UpdatePayrollDto } from "@/types/payroll";
+import { CompanyContactResponseDto } from "@qash/types/dto/employee";
+import { useGetPayrollDetails, useUpdatePayroll } from "@/services/api/payroll";
+import { ContractTermEnum } from "@qash/types/enums";
+import { UpdatePayrollDto } from "@qash/types/dto/payroll";
 import toast from "react-hot-toast";
 
 interface CreatePayrollFormData {
@@ -186,15 +187,12 @@ const EditPayroll = () => {
       network: {
         name: selectedNetwork.name,
         chainId: parseInt(selectedNetwork.value),
-        description: selectedNetwork.name,
-        metadata: {},
       },
       token: {
         address: selectedToken.faucetId, // Use faucetId or provide a default address
         symbol: selectedToken.metadata.symbol,
         decimals: selectedToken.metadata.decimals,
         name: selectedToken.metadata.symbol,
-        metadata: {},
       },
       paydayDay: selectedPayDay,
       contractTerm: ContractTermEnum.PERMANENT,

@@ -1,27 +1,16 @@
-// Payroll related DTOs and types
+/**
+ * Shared Payroll DTOs for Qash monorepo
+ * 
+ * These types define the contract between frontend and backend
+ * for payroll management.
+ */
 
-import { InvoiceItemDto, InvoiceModel } from "./invoice";
+import type { ContractTermEnum } from '../enums/index.js';
+import type { TokenDto } from './token.js';
+import type { NetworkDto } from './network.js';
+import type { PaginationMetaDto } from './common.js';
 
-export enum ContractTermEnum {
-  PERMANENT = "PERMANENT",
-  CONTRACTOR = "CONTRACTOR",
-}
-
-export interface NetworkDto {
-  name: string;
-  chainId: number;
-  metadata?: Record<string, any>;
-  description?: string;
-}
-
-export interface TokenDto {
-  address: string;
-  symbol: string;
-  decimals: number;
-  name: string;
-  metadata?: Record<string, any>;
-}
-
+// Request DTOs
 export interface CreatePayrollDto {
   employeeId: number;
   network: NetworkDto;
@@ -29,12 +18,12 @@ export interface CreatePayrollDto {
   contractTerm: ContractTermEnum;
   payrollCycle: number;
   amount: string;
-  payStartDate: string;
+  payday: number;
   joiningDate: string;
-  payEndDate: string;
   description: string;
   note?: string;
   metadata?: Record<string, any>;
+  generateDaysBefore?: number;
 }
 
 export interface CreatePayroll {
@@ -45,8 +34,8 @@ export interface CreatePayroll {
   payrollCycle: number;
   amount: string;
   joiningDate: string;
-  payday: string;
-  generateDaysBefore: number;
+  payday: number;
+  generateDaysBefore?: number;
   description: string;
   note?: string;
   metadata?: Record<string, any>;
@@ -72,6 +61,7 @@ export interface PayrollQueryDto {
   search?: string;
 }
 
+// Response DTOs
 export interface PayrollStatsDto {
   totalActive: number;
   totalPaused: number;
@@ -80,7 +70,13 @@ export interface PayrollStatsDto {
   dueThisMonth: number;
 }
 
-export interface PayrollModel {
+export interface PendingInvoiceReviewsDto {
+  hasPendingReviews: boolean;
+  pendingCount?: number;
+  pendingInvoiceUuids?: string[];
+}
+
+export interface PayrollModelDto {
   id: number;
   employeeId: number;
   companyId: number;
@@ -92,7 +88,7 @@ export interface PayrollModel {
   payStartDate: string;
   joiningDate: string;
   payEndDate: string;
-  description?: string;
+  description: string;
   employee: {
     id: number;
     name: string;
@@ -108,27 +104,19 @@ export interface PayrollModel {
     order: number;
     companyId: number;
   };
-  invoices: InvoiceModel[];
+  invoices: any[];
   note?: string;
   metadata?: Record<string, any>;
   status: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
   paydayDay: number;
 }
 
 export interface PaginatedPayrollsResponseDto {
-  payrolls: PayrollModel[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
+  payrolls: PayrollModelDto[];
+  pagination: PaginationMetaDto;
 }
 
-export interface PendingInvoiceReviewsDto {
-  hasPendingReviews: boolean;
-  pendingCount?: number;
-  pendingInvoiceUuids?: string[];
-}
+// Type aliases for backwards compatibility
+export type PayrollModel = PayrollModelDto;

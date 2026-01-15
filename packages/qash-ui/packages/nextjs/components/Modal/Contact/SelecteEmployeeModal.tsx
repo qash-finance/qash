@@ -12,7 +12,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { turnBechToHex } from "@/services/utils/turnBechToHex";
 import { blo } from "blo";
 import { createShapeElement } from "../../Common/ToolTip/ShapeSelectionTooltip";
-import { CompanyContactResponseDto, CompanyGroupResponseDto } from "@/types/employee";
+import { CompanyContactResponseDto, CompanyGroupResponseDto } from "@qash/types/dto/employee";
 import { useAuth } from "@/services/auth/context";
 
 interface AddressItemProps {

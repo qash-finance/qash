@@ -9,10 +9,10 @@ import { useModal } from "@/contexts/ModalManagerProvider";
 import { InvoiceModalProps } from "@/types/modal";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useInvoice } from "@/hooks/server/useInvoice";
-import { InvoiceStatusEnum } from "@/types/invoice";
+import { InvoiceStatusEnum } from "@qash/types/enums";
 import { CategoryBadge } from "../ContactBook/ContactBookContainer";
 import { useGetAllEmployeeGroups } from "@/services/api/employee";
-import { CategoryShapeEnum } from "@/types/employee";
+import { CategoryShapeEnum } from "@qash/types/enums";
 
 const BillDetailContainer = () => {
   const router = useRouter();

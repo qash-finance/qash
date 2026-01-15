@@ -2,7 +2,7 @@
 
 import { useInvoice } from "@/hooks/server/useInvoice";
 import { useGetAllEmployeeGroups } from "@/services/api/employee";
-import { InvoiceStatusEnum } from "@/types/invoice";
+import { InvoiceStatusEnum } from "@qash/types/enums";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { Badge, BadgeStatus } from "../Common/Badge";
@@ -12,7 +12,6 @@ import BillDetailActionTooltip from "../Common/ToolTip/BillDetailActionTooltip";
 import { InvoiceModalProps } from "@/types/modal";
 import toast from "react-hot-toast";
 import { CategoryBadge } from "../ContactBook/EmployeeContact";
-import { CategoryShapeEnum } from "@/types/employee";
 import { useModal } from "@/contexts/ModalManagerProvider";
 import { ApproveVote, ConfirmVote, FinalVoteApproved, FinalVoteRejected, RejectVote } from "./Vote";
 

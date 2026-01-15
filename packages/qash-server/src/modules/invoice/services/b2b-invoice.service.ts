@@ -32,9 +32,9 @@ import { handleError } from 'src/common/utils/errors';
 import { BillService } from 'src/modules/bill/bill.service';
 import { ClientRepository } from 'src/modules/client/repositories/client.repository';
 import { CompanyRepository } from 'src/modules/company/company.repository';
-import { TokenDto } from 'src/modules/employee/employee.dto';
 import { UserRepository } from 'src/modules/auth/repositories/user.repository';
 import { TeamMemberRepository } from 'src/modules/team-member/team-member.repository';
+import { TokenDto } from 'src/modules/shared/shared.dto';
 
 @Injectable()
 export class B2BInvoiceService {

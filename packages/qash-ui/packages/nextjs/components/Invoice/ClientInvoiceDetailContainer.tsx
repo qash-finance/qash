@@ -9,10 +9,9 @@ import { useModal } from "@/contexts/ModalManagerProvider";
 import { InvoiceModalProps } from "@/types/modal";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getB2BInvoiceByUUID, downloadB2BInvoicePdf, cancelB2BInvoice } from "@/services/api/invoice";
-import { InvoiceStatusEnum } from "@/types/invoice";
+import { InvoiceStatusEnum } from "@qash/types/enums";
 import { CategoryBadge } from "../ContactBook/ContactBookContainer";
 import { useGetAllEmployeeGroups } from "@/services/api/employee";
-import { CategoryShapeEnum } from "@/types/employee";
 
 const ClientInvoiceDetailContainer = () => {
   const router = useRouter();

@@ -1,69 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiServerWithAuth, AuthenticatedApiClient } from "./index";
+import {
+  Company,
+  CreateCompanyDto,
+  UpdateCompanyDto,
+} from "@qash/types/dto/company";
 
-// *************************************************
-// **************** TYPES **************************
-// *************************************************
-
-export enum CompanyTypeEnum {
-  CORPORATION = "CORPORATION",
-  LLC = "LLC",
-  PARTNERSHIP = "PARTNERSHIP",
-  SOLE_PROPRIETORSHIP = "SOLE_PROPRIETORSHIP",
-  OTHER = "OTHER",
-}
-
-export enum CompanyVerificationStatusEnum {
-  PENDING = "PENDING",
-  UNDER_REVIEW = "UNDER_REVIEW",
-  VERIFIED = "VERIFIED",
-  REJECTED = "REJECTED",
-}
-
-export interface Company {
-  uuid: string;
-  id: number;
-  companyName: string;
-  registrationNumber: string;
-  companyType: CompanyTypeEnum;
-  country: string;
-  address1: string;
-  address2?: string;
-  city: string;
-  postalCode: string;
-  verificationStatus: CompanyVerificationStatusEnum;
-  isActive: boolean;
-  createdBy: number;
-  createdAt: Date;
-  updatedAt: Date;
-  metadata?: any;
-}
-
-export interface CreateCompanyDto {
-  companyOwnerFirstName: string;
-  companyOwnerLastName: string;
-  companyName: string;
-  registrationNumber: string;
-  companyType: CompanyTypeEnum;
-  country: string;
-  address1: string;
-  address2?: string;
-  city: string;
-  postalCode: string;
-  metadata?: any;
-}
-
-export interface UpdateCompanyDto {
-  companyName?: string;
-  companyType?: CompanyTypeEnum;
-  notificationEmail?: string;
-  country?: string;
-  address1?: string;
-  address2?: string;
-  city?: string;
-  postalCode?: string;
-  metadata?: any;
-}
 
 // *************************************************
 // **************** API CLIENT SETUP ***************

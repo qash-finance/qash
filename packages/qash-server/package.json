@@ -50,6 +50,7 @@
     "@prisma/adapter-pg": "^7.0.1",
     "@prisma/client": "^7.0.1",
     "@prisma/client-runtime-utils": "^7.0.1",
+    "@qash/types": "workspace:*",
     "@types/ws": "^8.18.1",
     "archiver": "^7.0.1",
     "bcrypt": "^6.0.0",

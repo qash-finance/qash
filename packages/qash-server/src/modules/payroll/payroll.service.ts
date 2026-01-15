@@ -395,7 +395,6 @@ export class PayrollService {
       employeeId,
       network: {
         name: 'Miden Testnet',
-        description: 'Miden Testnet',
         chainId: 1,
       },
       token: {

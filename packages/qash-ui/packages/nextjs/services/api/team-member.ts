@@ -1,7 +1,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiServerWithAuth } from "./index";
-import { TeamMembership, UpdateTeamMemberDto } from "@/types/team-member";
+import { TeamMemberResponseDto as TeamMembership, UpdateTeamMemberDto } from "@qash/types/dto/team-member";
 import { useAuth } from "../auth/context";
 
 // Query params for filtering team members

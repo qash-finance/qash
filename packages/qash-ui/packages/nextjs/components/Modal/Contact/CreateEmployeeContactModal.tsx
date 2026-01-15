@@ -12,7 +12,7 @@ import { useModal } from "@/contexts/ModalManagerProvider";
 import { MODAL_IDS } from "@/types/modal";
 import { AssetWithMetadata } from "@/types/faucet";
 import toast from "react-hot-toast";
-import { CompanyGroupResponseDto, CreateContactDto, NetworkDto, TokenDto } from "@/types/employee";
+import { CompanyGroupResponseDto, CreateContactDto } from "@qash/types/dto/employee";
 import {
   useCheckEmployeeAddressDuplicate,
   useCheckEmployeeNameDuplicate,
@@ -29,6 +29,7 @@ import {
 } from "@/services/utils/constant";
 import { blo } from "blo";
 import { turnBechToHex } from "@/services/utils/turnBechToHex";
+import { NetworkDto, TokenDto } from "@qash/types/dto/shared";
 
 interface CreateContactFormData {
   name: string;

@@ -1,9 +1,16 @@
-// *************************************************
-// **************** TYPES **************************
-// *************************************************
+/**
+ * Shared Client DTOs for Qash monorepo
+ * 
+ * These types define the contract between frontend and backend
+ * for client management.
+ */
 
+import type { PaginationMetaDto } from './common.js';
+
+// Request DTOs
 export interface CreateClientDto {
   email: string;
+  ccEmails?: string[];
   companyName: string;
   companyType?: string;
   country?: string;
@@ -18,6 +25,7 @@ export interface CreateClientDto {
 
 export interface UpdateClientDto {
   email?: string;
+  ccEmails?: string[];
   companyName?: string;
   companyType?: string;
   country?: string;
@@ -30,6 +38,7 @@ export interface UpdateClientDto {
   registrationNumber?: string;
 }
 
+// Response DTOs
 export interface ClientResponseDto {
   id: number;
   uuid: string;
@@ -44,24 +53,17 @@ export interface ClientResponseDto {
   taxId?: string | null;
   postalCode?: string | null;
   registrationNumber?: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | string;
+  updatedAt: Date | string;
 }
 
-export interface PaginationMetaDto {
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-  hasNext: boolean;
-  hasPrev: boolean;
-}
-
+// Pagination DTOs
 export interface PaginatedClientsResponseDto {
   data: ClientResponseDto[];
   pagination: PaginationMetaDto;
 }
 
+// Query DTOs
 export interface ClientQueryParams {
   search?: string;
   page?: number;

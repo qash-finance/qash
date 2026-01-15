@@ -14,7 +14,7 @@ import {
 	CreateB2BScheduleDto,
 	UpdateB2BScheduleDto,
 	B2BScheduleResponseDto,
-} from "@/types/invoice";
+} from "@qash/types/dto/invoice";
 
 // GET: Get all invoices for company with pagination
 export const getInvoices = async (query: InvoiceQueryDto) => {

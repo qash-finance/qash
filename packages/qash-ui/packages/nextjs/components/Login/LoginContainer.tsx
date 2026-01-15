@@ -86,7 +86,7 @@ export default function LoginContainer() {
   // Redirect authenticated users away from login
   useEffect(() => {
     if (!isAuthenticated) return;
-    const hasCompany = !!(user as User)?.teamMembership?.companyId || !!(user as User)?.teamMembership?.company;
+    const hasCompany = !!(user as User)?.teamMembership?.companyId;
     const destination = hasCompany ? "/" : "/onboarding";
 
     router.push(destination);

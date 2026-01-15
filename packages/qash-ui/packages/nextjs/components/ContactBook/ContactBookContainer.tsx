@@ -3,7 +3,7 @@ import { Header } from "./Header";
 import { EmployeeContact } from "./EmployeeContact";
 import { ClientContact } from "./ClientContact";
 import { createShapeElement } from "../Common/ToolTip/ShapeSelectionTooltip";
-import { CategoryShapeEnum } from "@/types/employee";
+import { CategoryShapeEnum } from "@qash/types/enums";
 
 export const CategoryTab = ({ label }: { label: React.ReactNode }) => {
   return (

@@ -13,8 +13,9 @@ import {
   CompanyTypeEnum,
   CompanyVerificationStatusEnum,
 } from '../../database/generated/client';
+import type * as SharedTypes from '@qash/types/dto/company';
 
-export class CreateCompanyDto {
+export class CreateCompanyDto implements SharedTypes.CreateCompanyDto {
   @ApiProperty({
     description: 'First name of the company admin',
     example: 'John',
@@ -112,7 +113,7 @@ export class CreateCompanyDto {
   metadata?: any;
 }
 
-export class UpdateCompanyDto {
+export class UpdateCompanyDto implements SharedTypes.UpdateCompanyDto {
   @ApiPropertyOptional({
     description: 'Company name',
     example: 'Acme Corporation Ltd.',
@@ -199,7 +200,7 @@ export class UpdateCompanyDto {
   metadata?: any;
 }
 
-export class UpdateVerificationStatusDto {
+export class UpdateVerificationStatusDto implements SharedTypes.UpdateVerificationStatusDto {
   @ApiProperty({
     description: 'New verification status',
     enum: CompanyVerificationStatusEnum,
@@ -209,7 +210,7 @@ export class UpdateVerificationStatusDto {
   verificationStatus: CompanyVerificationStatusEnum;
 }
 
-export class CompanyResponseDto {
+export class CompanyResponseDto implements SharedTypes.CompanyResponseDto {
   @ApiProperty({
     description: 'Company UUID',
     example: '123e4567-e89b-12d3-a456-426614174000',
@@ -307,7 +308,7 @@ export class CompanyWithTeamResponseDto extends CompanyResponseDto {
   creator: any;
 }
 
-export class CompanyStatsResponseDto {
+export class CompanyStatsResponseDto implements SharedTypes.CompanyStatsResponseDto {
   @ApiProperty({ description: 'Total companies', example: 10 })
   total: number;
 
@@ -324,7 +325,7 @@ export class CompanyStatsResponseDto {
   rejected: number;
 }
 
-export class CompanySearchQueryDto {
+export class CompanySearchQueryDto implements SharedTypes.CompanySearchQueryDto {
   @ApiPropertyOptional({
     description: 'Verification status filter',
     enum: CompanyVerificationStatusEnum,
@@ -367,7 +368,7 @@ export class CompanySearchQueryDto {
   search?: string;
 }
 
-export class IsEmployeeResponseDto {
+export class IsEmployeeResponseDto implements SharedTypes.IsEmployeeResponseDto {
   @ApiProperty({
     description: 'Whether the user is an employee',
     example: true,

@@ -65,7 +65,6 @@ export const PaymentLinkPreview = ({
   isSending,
 }: PaymentLinkPreviewProps) => {
   const { user, isLoading, isAuthenticated } = useAuth();
-  console.log("🚀 ~ PaymentLinkPreview ~ isAuthenticated:", isAuthenticated);
   const { address: walletAddress } = useMidenProvider();
   const [isQRCodeCollapsed, setIsQRCodeCollapsed] = useState(true);
   const [isWalletAddressCollapsed, setIsWalletAddressCollapsed] = useState(false);

@@ -9,7 +9,7 @@ import {
   AddressBookOrderDto,
   PaginatedContactsResponseDto,
   EmployeeStatisticsDto,
-} from "@/types/employee";
+} from "@qash/types/dto/employee";
 
 // *************************************************
 // **************** GET METHODS *******************

@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { CategoryShapeEnum } from "@/types/employee";
+import { CategoryShapeEnum } from "@qash/types/enums";
 
 interface ShapeOption {
   value: CategoryShapeEnum;

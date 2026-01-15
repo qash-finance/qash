@@ -10,7 +10,7 @@ import {
   createPayrollInvoice,
   getInvoiceStats,
 } from "@/services/api/invoice";
-import { CreateInvoiceDto, InvoiceQueryDto } from "@/types/invoice";
+import { CreateInvoiceDto, InvoiceQueryDto } from "@qash/types/dto/invoice";
 
 export const useInvoice = () => {
   const [isLoading, setIsLoading] = useState(false);

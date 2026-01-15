@@ -8,7 +8,7 @@ import PayrollActionTooltip from "../Common/ToolTip/PayrollActionTooltip";
 import { Tooltip } from "react-tooltip";
 import { CategoryBadge } from "../ContactBook/ContactBookContainer";
 import { useGetAllEmployeeGroups } from "@/services/api/employee";
-import { CategoryShapeEnum } from "@/types/employee";
+import { CategoryShapeEnum } from "@qash/types/enums";
 import { useRouter } from "next/navigation";
 import { useModal } from "@/contexts/ModalManagerProvider";
 

@@ -11,10 +11,11 @@ import { CompanyTypeDropdown } from "../Common/Dropdown/CompanyTypeDropdown";
 import { CountryDropdown } from "../Common/Dropdown/CountryDropdown";
 import { SecondaryButton } from "../Common/SecondaryButton";
 import { FileUpload } from "./FileUpload";
-import { useCreateCompany, CompanyTypeEnum } from "@/services/api/company";
+import { useCreateCompany } from "@/services/api/company";
 import toast from "react-hot-toast";
 import { useAuth } from "@/services/auth/context";
 import { User } from "@/types/user";
+import { CompanyTypeEnum } from "@qash/types/enums";
 
 type Step = "company" | "team" | "complete";
 
@@ -78,7 +79,7 @@ export default function OnboardingContainer() {
   // Redirect authenticated users away from onboarding
   useEffect(() => {
     if (!isAuthenticated) return;
-    const hasCompany = !!(user as User)?.teamMembership?.companyId || !!(user as User)?.teamMembership?.company;
+    const hasCompany = !!(user as User)?.teamMembership?.companyId;
     const destination = hasCompany ? "/" : "/onboarding";
 
     router.push(destination);

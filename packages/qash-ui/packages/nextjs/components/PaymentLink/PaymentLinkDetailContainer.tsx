@@ -3,7 +3,7 @@ import { PrimaryButton } from "../Common/PrimaryButton";
 import { Table } from "../Common/Table";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useGetPaymentLinkByCodeForOwner } from "@/services/api/payment-link";
-import { PaymentLinkStatus } from "@/types/payment-link";
+import { PaymentLinkStatus } from "@qash/types/dto/payment-link";
 import { blo } from "blo";
 import { turnBechToHex } from "@/services/utils/turnBechToHex";
 import toast from "react-hot-toast";

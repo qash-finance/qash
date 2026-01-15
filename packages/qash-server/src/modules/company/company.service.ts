@@ -19,6 +19,7 @@ import { CompanyModel } from 'src/database/generated/models';
 import { PrismaService } from 'src/database/prisma.service';
 import { ErrorCompany } from 'src/common/constants/errors';
 import { handleError } from 'src/common/utils/errors';
+import { TeamMemberStatusEnum } from '@qash/types/enums';
 
 @Injectable()
 export class CompanyService {
@@ -157,6 +158,7 @@ export class CompanyService {
                 id: company.id,
               },
             },
+            status: TeamMemberStatusEnum.ACTIVE,
             user: {
               connect: {
                 id: userId,

@@ -13,7 +13,7 @@ import ShapeSelectionTooltip, { createShapeElement } from "../../Common/ToolTip/
 import { useCreateCategory, useGetCategories } from "@/services/api/address-book";
 import toast from "react-hot-toast";
 import { useCreateEmployeeGroup, useGetAllEmployeeGroups } from "@/services/api/employee";
-import { CategoryShapeEnum } from "@/types/employee";
+import { CategoryShapeEnum } from "@qash/types/enums";
 import { useAuth } from "@/services/auth/context";
 
 interface CategoryFormData {
@@ -32,7 +32,7 @@ const colorOptions = [
 export function CreateGroupModal({ isOpen, onClose, zIndex, onGroupCreated }: ModalProp<CreateGroupModalProps>) {
   const { isAuthenticated } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedShape, setSelectedShape] = useState(CategoryShapeEnum.CIRCLE);
+  const [selectedShape, setSelectedShape] = useState<CategoryShapeEnum>(CategoryShapeEnum.CIRCLE);
   const [selectedShapeElement, setSelectedShapeElement] = useState<React.ReactElement | null>(null);
   const [selectedColor, setSelectedColor] = useState("#35ADE9");
   const { mutateAsync: createGroupAsync } = useCreateEmployeeGroup();

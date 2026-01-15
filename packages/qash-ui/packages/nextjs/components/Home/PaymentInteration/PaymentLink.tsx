@@ -12,7 +12,7 @@ import {
   useActivatePaymentLink,
   useDeactivatePaymentLink,
 } from "@/services/api/payment-link";
-import { PaymentLink as PaymentLinkType, PaymentLinkStatus } from "@/types/payment-link";
+import { PaymentLink as PaymentLinkType, PaymentLinkStatus } from "@qash/types/dto/payment-link";
 import { blo } from "blo";
 import { turnBechToHex } from "@/services/utils/turnBechToHex";
 import toast from "react-hot-toast";
@@ -324,6 +324,7 @@ export const PaymentLink: React.FC<PaymentLinkProps> = ({ checkedRows, setChecke
               <PaymentLinkActionsTooltip
                 link={link}
                 onEdit={() => handleEdit(index)}
+                //@ts-ignore
                 onViewDetail={() => handleViewDetail(index)}
                 onToggleStatus={(isActive: boolean) => handleToggleStatus(index, isActive)}
                 onRemove={() => handleRemove(index)}

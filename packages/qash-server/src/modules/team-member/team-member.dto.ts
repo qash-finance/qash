@@ -16,9 +16,10 @@ import {
 import {
   TeamMemberRoleEnum,
   TeamMemberStatusEnum,
-} from '../../database/generated/client';
+} from '@qash/types/enums';
+import type * as SharedTypes from '@qash/types/dto/team-member';
 
-export class CreateTeamMemberDto {
+export class CreateTeamMemberDto implements SharedTypes.CreateTeamMemberDto {
   @ApiProperty({
     description: 'First name',
     example: 'John',
@@ -87,7 +88,7 @@ export class CreateTeamMemberDto {
   metadata?: any;
 }
 
-export class UpdateTeamMemberDto {
+export class UpdateTeamMemberDto implements SharedTypes.UpdateTeamMemberDto {
   @ApiPropertyOptional({
     description: 'First name',
     example: 'John',
@@ -142,7 +143,7 @@ export class UpdateTeamMemberDto {
   metadata?: any;
 }
 
-export class UpdateTeamMemberRoleDto {
+export class UpdateTeamMemberRoleDto implements SharedTypes.UpdateTeamMemberRoleDto {
   @ApiProperty({
     description: 'New role for team member',
     enum: TeamMemberRoleEnum,
@@ -152,7 +153,7 @@ export class UpdateTeamMemberRoleDto {
   role: TeamMemberRoleEnum;
 }
 
-export class InviteTeamMemberDto {
+export class InviteTeamMemberDto implements SharedTypes.InviteTeamMemberDto {
   @ApiProperty({
     description: 'First name',
     example: 'Jane',
@@ -205,7 +206,7 @@ export class InviteTeamMemberDto {
   metadata?: any;
 }
 
-export class AcceptInvitationByTokenDto {
+export class AcceptInvitationByTokenDto implements SharedTypes.AcceptInvitationByTokenDto {
   @ApiProperty({
     description: 'Invitation token from email link',
     example: '550e8400-e29b-41d4-a716-446655440000',
@@ -216,7 +217,7 @@ export class AcceptInvitationByTokenDto {
   token: string;
 }
 
-export class TeamMemberResponseDto {
+export class TeamMemberResponseDto implements SharedTypes.TeamMemberResponseDto {
   @ApiProperty({ description: 'Team member ID', example: 1 })
   id: number;
 
@@ -310,7 +311,7 @@ export class TeamMemberWithRelationsResponseDto extends TeamMemberResponseDto {
   inviter?: any;
 }
 
-export class TeamMemberStatsResponseDto {
+export class TeamMemberStatsResponseDto implements SharedTypes.TeamMemberStatsResponseDto {
   @ApiProperty({ description: 'Total team members', example: 10 })
   total: number;
 
@@ -336,7 +337,7 @@ export class TeamMemberStatsResponseDto {
   suspended: number;
 }
 
-export class TeamMemberSearchQueryDto {
+export class TeamMemberSearchQueryDto implements SharedTypes.TeamMemberSearchQueryDto {
   @ApiPropertyOptional({
     description: 'Role filter',
     enum: TeamMemberRoleEnum,
@@ -371,7 +372,7 @@ export class TeamMemberSearchQueryDto {
   search?: string;
 }
 
-export class AcceptInvitationDto {
+export class AcceptInvitationDto implements SharedTypes.AcceptInvitationDto {
   @ApiPropertyOptional({
     description: 'Profile picture URL',
     example: 'https://example.com/profile.jpg',
@@ -389,7 +390,7 @@ export class AcceptInvitationDto {
   metadata?: any;
 }
 
-export class BulkInviteTeamMembersDto {
+export class BulkInviteTeamMembersDto implements SharedTypes.BulkInviteTeamMembersDto {
   @ApiProperty({
     description: 'List of team members to invite',
     type: [InviteTeamMemberDto],

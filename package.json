@@ -16,12 +16,14 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     
-    "dev": "pnpm run --parallel dev:*",
+    "dev": "pnpm run build:types && pnpm run --parallel dev:*",
     "dev:web": "pnpm --filter @qash/web dev",
     "dev:server": "pnpm --filter @qash/server start:dev",
     "dev:docs": "pnpm --filter @qash/docs start",
+    "dev:types": "pnpm --filter @qash/types dev",
     
-    "build": "pnpm run -r build",
+    "build": "pnpm run build:types && pnpm run -r build",
+    "build:types": "pnpm --filter @qash/types build",
     "build:web": "pnpm --filter @qash/web build",
     "build:server": "pnpm --filter @qash/server build",
     "build:docs": "pnpm --filter @qash/docs build",

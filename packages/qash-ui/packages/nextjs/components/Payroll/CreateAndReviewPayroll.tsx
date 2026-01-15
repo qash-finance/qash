@@ -8,10 +8,11 @@ import { useModal } from "@/contexts/ModalManagerProvider";
 import { AssetWithMetadata } from "@/types/faucet";
 import { ContractTerm } from "./ContractTerm";
 import { useTitle } from "@/contexts/TitleProvider";
-import { CompanyContactResponseDto } from "@/types/employee";
+import { CompanyContactResponseDto } from "@qash/types/dto/employee";
 import { useCreatePayroll } from "@/services/api/payroll";
-import { Company, useGetMyCompany } from "@/services/api/company";
-import { ContractTermEnum, CreatePayrollDto } from "@/types/payroll";
+import { useGetMyCompany } from "@/services/api/company";
+import { ContractTermEnum } from "@qash/types/enums";
+import { CreatePayrollDto, PayrollModelDto } from "@qash/types/dto/payroll";
 import toast from "react-hot-toast";
 import { SecondaryButton } from "../Common/SecondaryButton";
 import InvoicePreview from "../Common/Invoice/InvoicePreview";
@@ -19,6 +20,7 @@ import { useAuth } from "@/services/auth/context";
 import { AuthMeResponse } from "@/services/auth/api";
 import { blo } from "blo";
 import { turnBechToHex } from "@/services/utils/turnBechToHex";
+import { Company } from "@qash/types/dto/company";
 
 interface CreatePayrollFormData {
   employee: string;
@@ -30,7 +32,7 @@ interface CreatePayrollFormData {
   duration?: string;
   durationUnit?: "month" | "year";
   note?: string;
-  description?: string;
+  description: string;
 }
 
 type Step = "create" | "review";
@@ -143,27 +145,24 @@ const CreatePayroll = ({
       network: {
         name: selectedNetwork.name,
         chainId: parseInt(selectedNetwork.value),
-        description: selectedNetwork.name,
-        metadata: {},
       },
       token: {
         address: selectedToken.faucetId || "", // Use selected token faucetId when available
         symbol: selectedToken.metadata.symbol,
         decimals: selectedToken.metadata.decimals,
         name: selectedToken.metadata.symbol,
-        metadata: {},
       },
       contractTerm: ContractTermEnum.PERMANENT,
       payrollCycle: durationValue,
       amount: monthlyAmount,
-      payStartDate: payStart.toISOString(),
+      payday: selectedPayDay,
       joiningDate: payStart.toISOString(),
-      payEndDate: payEnd.toISOString(),
       description: description,
       note: note,
       metadata: {
-        payDay: selectedPayDay,
         durationUnit,
+        payStartDate: payStart.toISOString(),
+        payEndDate: payEnd.toISOString(),
       },
     };
 
@@ -388,8 +387,13 @@ function createInvoiceDataFromPayroll(
     return null;
   }
 
+  if(!payroll.metadata?.payStartDate) { 
+    console.warn("Missing payStartDate in payroll metadata");
+    return null;
+  }
+
   const employeeName = employee?.name;
-  const dueDate = new Date(payroll.payStartDate);
+  const dueDate = new Date(payroll.metadata?.payStartDate);
   // Invoice date should be 5 days before due date
   const invoiceDate = new Date(dueDate);
   invoiceDate.setDate(dueDate.getDate() - 5);
@@ -399,7 +403,7 @@ function createInvoiceDataFromPayroll(
   return {
     invoiceNumber: `INV0001`,
     date: invoiceDate.toISOString().split("T")[0],
-    dueDate: payroll.payStartDate.split("T")[0],
+    dueDate: payroll.metadata?.payStartDate.split("T")[0],
     from: {
       name: employeeName,
       email: employee?.email,

@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ErrorMail } from '../../common/constants/errors';
 import { MailgunMessageData, MailgunService } from 'nestjs-mailgun';
 import { AppConfigService } from '../shared/config/config.service';
-import { TokenDto } from '../employee/employee.dto';
+import { TokenDto } from '../shared/shared.dto';
 
 @Injectable()
 export class MailService {

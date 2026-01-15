@@ -18,10 +18,11 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { InvoiceStatusEnum } from 'src/database/generated/client';
-import { Currency } from 'src/common/constants/currency';
-import { NetworkDto, TokenDto } from '../employee/employee.dto';
+import { NetworkDto, TokenDto } from '../shared/shared.dto';
+import type * as SharedTypes from '@qash/types/dto/invoice';
+import { Currency } from '@qash/types/dto/invoice';
 
-export class InvoiceItemDto {
+export class InvoiceItemDto implements SharedTypes.InvoiceItemDto {
   @ApiProperty({
     description: 'Description of the invoice item',
     example: 'Software Development Services - December 2024',
@@ -229,7 +230,7 @@ export class ItemOrderDto {
   order: number;
 }
 
-export class FromDetailsDto {
+export class FromDetailsDto implements SharedTypes.FromDetailsDto {
   @ApiProperty({
     description: 'Employee name',
     example: 'John Doe',
@@ -314,7 +315,7 @@ export class FromDetailsDto {
   token: Record<string, any>;
 }
 
-export class BillToDetailsDto {
+export class BillToDetailsDto implements SharedTypes.BillToDetailsDto {
   @ApiProperty({
     description: 'Company name',
     example: 'Acme Corporation',
@@ -379,7 +380,7 @@ export class BillToDetailsDto {
   postalCode: string;
 }
 
-export class CreateInvoiceDto {
+export class CreateInvoiceDto implements SharedTypes.CreateInvoiceDto {
   @ApiProperty({
     description: 'Currency of the invoice',
     example: 'USD',
@@ -506,41 +507,116 @@ export class CreateInvoiceDto {
   metadata?: Record<string, any>;
 }
 
-export class UpdateInvoiceDto {
-  @ApiProperty({
+export class UpdateInvoiceDto implements SharedTypes.UpdateInvoiceDto {
+  @ApiPropertyOptional({
+    description: 'Employee details (from)',
+    type: FromDetailsDto,
+  })
+  @ValidateNested()
+  @Type(() => FromDetailsDto)
+  @IsOptional()
+  fromDetails?: FromDetailsDto;
+
+  @ApiPropertyOptional({
+    description: 'Invoice items',
+    type: [InvoiceItemDto],
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => InvoiceItemDto)
+  @IsOptional()
+  items?: InvoiceItemDto[];
+
+  @ApiPropertyOptional({
+    description: 'Subtotal amount (as string for precision)',
+    example: '5000.00',
+  })
+  @IsString()
+  @Matches(/^\d+(\.\d{1,8})?$/, {
+    message:
+      'Subtotal must be a valid positive number with up to 8 decimal places',
+  })
+  @IsOptional()
+  subtotal?: string;
+
+  @ApiPropertyOptional({
+    description: 'Tax rate as percentage (as string for precision)',
+    example: '10.00',
+  })
+  @IsString()
+  @Matches(/^\d+(\.\d{1,2})?$/, {
+    message: 'Tax rate must be a valid percentage with up to 2 decimal places',
+  })
+  @IsOptional()
+  taxRate?: string;
+
+  @ApiPropertyOptional({
+    description: 'Tax amount (as string for precision)',
+    example: '500.00',
+  })
+  @IsString()
+  @Matches(/^\d+(\.\d{1,8})?$/, {
+    message:
+      'Tax amount must be a valid positive number with up to 8 decimal places',
+  })
+  @IsOptional()
+  taxAmount?: string;
+
+  @ApiPropertyOptional({
+    description: 'Total amount (as string for precision)',
+    example: '5500.00',
+  })
+  @IsString()
+  @Matches(/^\d+(\.\d{1,8})?$/, {
+    message:
+      'Total must be a valid positive number with up to 8 decimal places',
+  })
+  @IsOptional()
+  total?: string;
+
+  @ApiPropertyOptional({
+    description: 'Additional metadata for the invoice',
+  })
+  @IsOptional()
+  @IsObject()
+  metadata?: Record<string, any>;
+
+  @ApiPropertyOptional({
     description: 'Payment token details',
     type: TokenDto,
   })
   @ValidateNested()
   @Type(() => TokenDto)
-  token: TokenDto;
+  @IsOptional()
+  token?: TokenDto;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Payment network details',
     type: NetworkDto,
   })
   @ValidateNested()
   @Type(() => NetworkDto)
-  network: NetworkDto;
+  @IsOptional()
+  network?: NetworkDto;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Employee wallet address',
     example: 'mtst1qzxh4e7uwlu5xyrnms9d5tfm7v2y7u6a',
   })
   @IsString()
-  @IsNotEmpty()
-  walletAddress: string;
+  @IsOptional()
+  walletAddress?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Employee address',
     example: '123 Main Street',
   })
   @IsString()
-  @IsNotEmpty()
-  address: string;
+  @IsOptional()
+  address?: string;
 }
 
-export class InvoiceQueryDto {
+export class InvoiceQueryDto implements SharedTypes.InvoiceQueryDto {
   @ApiPropertyOptional({
     description: 'Page number for pagination',
     example: 1,
@@ -589,7 +665,7 @@ export class InvoiceQueryDto {
   search?: string;
 }
 
-export class InvoiceStatsDto {
+export class InvoiceStatsDto implements SharedTypes.InvoiceStatsDto {
   @ApiProperty({
     description: 'Total number of draft invoices',
     example: 5,
@@ -627,7 +703,7 @@ export class InvoiceStatsDto {
   dueThisMonth: number;
 }
 
-export class CreateInvoiceScheduleDto {
+export class CreateInvoiceScheduleDto implements SharedTypes.CreateInvoiceScheduleDto {
   @ApiProperty({
     description: 'Frequency of invoice generation',
     enum: ['MONTHLY', 'WEEKLY', 'BIWEEKLY', 'QUARTERLY'],
@@ -682,7 +758,7 @@ export class CreateInvoiceScheduleDto {
   metadata?: Record<string, any>;
 }
 
-export class UpdateInvoiceScheduleDto {
+export class UpdateInvoiceScheduleDto implements SharedTypes.UpdateInvoiceScheduleDto {
   @ApiPropertyOptional({
     description: 'Frequency of invoice generation',
     enum: ['MONTHLY', 'WEEKLY', 'BIWEEKLY', 'QUARTERLY'],
@@ -738,7 +814,7 @@ export class UpdateInvoiceScheduleDto {
   metadata?: Record<string, any>;
 }
 
-export class InvoiceScheduleResponseDto {
+export class InvoiceScheduleResponseDto implements SharedTypes.InvoiceScheduleResponseDto {
   @ApiProperty({ description: 'Schedule ID' })
   id: number;
 
@@ -783,7 +859,7 @@ export class InvoiceScheduleResponseDto {
 /**
  * DTO for unregistered company details (when client is not in the system)
  */
-export class UnregisteredCompanyDto {
+export class UnregisteredCompanyDto implements SharedTypes.UnregisteredCompanyDto {
   @ApiProperty({
     description: 'Company name',
     example: 'External Corp Ltd',
@@ -844,7 +920,7 @@ export class UnregisteredCompanyDto {
 /**
  * DTO for B2B invoice sender (from) details
  */
-export class B2BFromDetailsDto {
+export class B2BFromDetailsDto implements SharedTypes.B2BFromDetailsDto {
   @ApiProperty({
     description: 'Company name',
     example: 'My Company Inc',
@@ -929,7 +1005,7 @@ export class B2BFromDetailsDto {
 /**
  * DTO for creating a B2B invoice
  */
-export class CreateB2BInvoiceDto {
+export class CreateB2BInvoiceDto implements SharedTypes.CreateB2BInvoiceDto {
   // Client identification - either clientId OR unregistered company details
   @ApiPropertyOptional({
     description: 'UUID of existing client (from Client model)',
@@ -1101,7 +1177,7 @@ export class CreateB2BInvoiceDto {
 /**
  * DTO for updating a B2B invoice (only for DRAFT status)
  */
-export class UpdateB2BInvoiceDto {
+export class UpdateB2BInvoiceDto implements SharedTypes.UpdateB2BInvoiceDto {
   @ApiPropertyOptional({
     description: 'Invoice due date',
     example: '2024-01-30T23:59:59Z',
@@ -1220,7 +1296,7 @@ export class UpdateB2BInvoiceDto {
 /**
  * Query DTO for B2B invoices
  */
-export class B2BInvoiceQueryDto {
+export class B2BInvoiceQueryDto implements SharedTypes.B2BInvoiceQueryDto {
   @ApiPropertyOptional({
     description: 'Page number for pagination',
     example: 1,
@@ -1288,7 +1364,7 @@ export class B2BInvoiceQueryDto {
 /**
  * Response DTO for B2B invoice statistics
  */
-export class B2BInvoiceStatsDto {
+export class B2BInvoiceStatsDto implements SharedTypes.B2BInvoiceStatsDto {
   @ApiProperty({ description: 'Statistics for sent invoices' })
   sent: {
     totalDraft: number;
@@ -1318,7 +1394,7 @@ export class B2BInvoiceStatsDto {
 /**
  * Invoice template for B2B recurring schedules
  */
-export class B2BInvoiceTemplateDto {
+export class B2BInvoiceTemplateDto implements SharedTypes.B2BInvoiceTemplateDto {
   @ApiProperty({
     description: 'Invoice line items template',
     type: [InvoiceItemDto],
@@ -1411,7 +1487,7 @@ export class B2BInvoiceTemplateDto {
 /**
  * DTO for creating a B2B invoice schedule
  */
-export class CreateB2BScheduleDto {
+export class CreateB2BScheduleDto implements SharedTypes.CreateB2BScheduleDto {
   @ApiProperty({
     description: 'UUID of the client to create invoices for',
     example: 'clx123abc...',
@@ -1496,7 +1572,7 @@ export class CreateB2BScheduleDto {
 /**
  * DTO for updating a B2B invoice schedule
  */
-export class UpdateB2BScheduleDto {
+export class UpdateB2BScheduleDto implements SharedTypes.UpdateB2BScheduleDto {
   @ApiPropertyOptional({
     description: 'Frequency of invoice generation',
     enum: ['MONTHLY', 'WEEKLY', 'BIWEEKLY', 'QUARTERLY'],
@@ -1566,7 +1642,7 @@ export class UpdateB2BScheduleDto {
 /**
  * Response DTO for B2B invoice schedule
  */
-export class B2BScheduleResponseDto {
+export class B2BScheduleResponseDto implements SharedTypes.B2BScheduleResponseDto {
   @ApiProperty({ description: 'Schedule ID' })
   id: number;
 

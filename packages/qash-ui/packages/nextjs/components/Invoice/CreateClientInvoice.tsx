@@ -18,13 +18,12 @@ import {
   CreateB2BScheduleDto,
   Currency,
   InvoiceItemDto,
-  NetworkDto,
-  TokenDto,
   B2BFromDetailsDto,
   UnregisteredCompanyDto,
   InvoiceModel,
-} from "@/types/invoice";
-import { ClientResponseDto } from "@/types/client";
+} from "@qash/types/dto/invoice";
+import { NetworkDto, TokenDto } from "@qash/types/dto/shared";
+import { ClientResponseDto } from "@qash/types/dto/client";
 import { AssetWithMetadata } from "@/types/faucet";
 import { useAuth } from "@/services/auth/context";
 import { AuthMeResponse } from "@/services/auth/api";

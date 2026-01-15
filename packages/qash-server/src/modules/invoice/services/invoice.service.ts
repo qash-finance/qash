@@ -38,7 +38,7 @@ import { PrismaTransactionClient } from 'src/database/base.repository';
 import { EmployeeRepository } from 'src/modules/employee/repositories/employee.repository';
 import { BillService } from 'src/modules/bill/bill.service';
 import { TeamMemberRepository } from 'src/modules/team-member/team-member.repository';
-import { TokenDto } from 'src/modules/employee/employee.dto';
+import { TokenDto } from 'src/modules/shared/shared.dto';
 
 @Injectable()
 export class InvoiceService {

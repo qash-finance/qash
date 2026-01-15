@@ -16,7 +16,7 @@ import { MODAL_IDS } from "@/types/modal";
 import { useModal } from "@/contexts/ModalManagerProvider";
 import { CustomCheckbox } from "../Common/CustomCheckbox";
 import { formatAddress } from "@/services/utils/miden/address";
-import { CategoryShapeEnum } from "@/types/employee";
+import { CategoryShapeEnum } from "@qash/types/enums";
 import { createShapeElement } from "../Common/ToolTip/ShapeSelectionTooltip";
 import { QASH_TOKEN_ADDRESS } from "@/services/utils/constant";
 import { blo } from "blo";

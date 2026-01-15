@@ -8,7 +8,7 @@ import { useGetClients } from "@/services/api/client";
 import { useForm } from "react-hook-form";
 import { useWalletConnect } from "@/hooks/web3/useWalletConnect";
 import { useQueryClient } from "@tanstack/react-query";
-import { ClientResponseDto } from "@/types/client";
+import { ClientResponseDto } from "@qash/types/dto/client";
 import { useAuth } from "@/services/auth/context";
 import toast from "react-hot-toast";
 import { PrimaryButton } from "@/components/Common/PrimaryButton";

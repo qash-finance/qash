@@ -64,14 +64,15 @@ import AddMemberModal from "@/components/Modal/Account/AddMemberModal";
 import DepositModal from "@/components/Modal/DepositModal";
 import InviteTeamMemberModal from "@/components/Modal/TeamMember/InviteTeamMemberModal";
 import { Group } from "./group-payment";
-import { CompanyGroupResponseDto } from "./employee";
+import { CompanyGroupResponseDto, CompanyContactResponseDto } from "@qash/types/dto/employee";
 import { BatchTransaction } from "@/services/store/batchTransactions";
 import { AssetWithMetadata } from "./faucet";
 import { DateRange } from "react-day-picker";
 import { SchedulePaymentFrequency } from "./schedule-payment";
 import { TransactionStatus } from "./transaction";
-import { CompanyContactResponseDto, NetworkDto, TokenDto } from "./employee";
-import { ClientResponseDto } from "@/types/client";
+import { ClientResponseDto } from "@qash/types/dto/client";
+import { TokenDto } from "@qash/types/dto/token";
+import { NetworkDto } from "@qash/types/dto/network";
 
 export const MODAL_IDS = {
   SELECT_TOKEN: "SELECT_TOKEN",

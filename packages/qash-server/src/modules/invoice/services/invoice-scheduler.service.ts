@@ -6,7 +6,7 @@ import { PrismaService } from '../../../database/prisma.service';
 import { InvoiceScheduleModel } from 'src/database/generated/models/InvoiceSchedule';
 import { PayrollStatusEnum } from 'src/database/generated/enums';
 import { MailService } from 'src/modules/mail/mail.service';
-import { TokenDto } from 'src/modules/employee/employee.dto';
+import { TokenDto } from 'src/modules/shared/shared.dto';
 
 @Injectable()
 export class InvoiceSchedulerService {

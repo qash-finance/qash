@@ -1,14 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiServerWithAuth } from "./index";
-import { AuthStorage } from "../auth/storage";
 import {
-  CreatePaymentLink,
-  UpdatePaymentLink,
-  PaymentLinkRecord,
+  CreatePaymentLinkDto,
+  UpdatePaymentLinkDto,
+  PaymentLinkRecordDto,
   PaymentLink,
-  PaymentLinkOrder,
-  PaymentRecordDTO,
-} from "@/types/payment-link";
+  PaymentLinkOrderDto,
+  PaymentRecordDto,
+} from "@qash/types/dto/payment-link";
 
 // *************************************************
 // **************** API CLIENT SETUP ***************
@@ -79,7 +78,7 @@ const useCreatePaymentLink = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: CreatePaymentLink) => {
+    mutationFn: async (data: CreatePaymentLinkDto) => {
       return apiServerWithAuth.postData<PaymentLink>("/payment-link", data);
     },
     onSuccess: (newPaymentLink: PaymentLink) => {
@@ -96,7 +95,7 @@ const useRecordPayment = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ code, data }: { code: string; data: PaymentRecordDTO }) => {
+    mutationFn: async ({ code, data }: { code: string; data: PaymentRecordDto }) => {
       return apiServerWithAuth.postData<PaymentLink>(`/payment-link/${code}/pay`, data);
     },
     onSuccess: (updatedPaymentLink: PaymentLink) => {
@@ -119,7 +118,7 @@ const useUpdatePaymentLink = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ code, data }: { code: string; data: UpdatePaymentLink }) => {
+    mutationFn: async ({ code, data }: { code: string; data: UpdatePaymentLinkDto }) => {
       return apiServerWithAuth.putData<PaymentLink>(`/payment-link/${code}`, data);
     },
     onSuccess: (updatedPaymentLink: PaymentLink) => {
@@ -197,7 +196,7 @@ const useUpdatePaymentLinkOrder = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: PaymentLinkOrder) => {
+    mutationFn: async (data: PaymentLinkOrderDto) => {
       return apiServerWithAuth.patchData<PaymentLink[]>(`/payment-link/update-order`, data);
     },
     onSuccess: () => {

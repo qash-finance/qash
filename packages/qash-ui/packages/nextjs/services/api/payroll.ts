@@ -9,7 +9,7 @@ import {
   PaginatedPayrollsResponseDto,
   PendingInvoiceReviewsDto,
   CreatePayroll,
-} from "@/types/payroll";
+} from "@qash/types/dto/payroll";
 
 // *************************************************
 // **************** GET METHODS ********************

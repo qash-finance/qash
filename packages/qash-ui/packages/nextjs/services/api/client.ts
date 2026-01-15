@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiServerWithAuth } from "./index";
-import { ClientQueryParams, ClientResponseDto, CreateClientDto, PaginatedClientsResponseDto, UpdateClientDto } from "@/types/client";
+import { ClientQueryParams, ClientResponseDto, CreateClientDto, PaginatedClientsResponseDto, UpdateClientDto } from "@qash/types/dto/client";
 
 // *************************************************
 // **************** GET METHODS ********************

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { CategoryShapeEnum } from 'src/database/generated/client';
+import { CategoryShapeEnum } from '@qash/types/enums';
 import {
   IsEnum,
   IsNotEmpty,
@@ -16,60 +16,11 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import type * as SharedTypes from '@qash/types/dto/employee';
+import type { PaginationMetaDto as SharedPaginationMetaDto } from '@qash/types/dto/common';
+import { NetworkDto, TokenDto } from '../shared/shared.dto';
 
-export class TokenDto {
-  @ApiProperty({
-    description: 'The address of the token',
-    example: 'mtst1qzxh4e7uwlu5xyrnms9d5tfm7v2y7u6a',
-  })
-  @IsString()
-  @IsNotEmpty()
-  address: string;
-
-  @ApiProperty({
-    description: 'The symbol of the token',
-    example: 'USDC',
-  })
-  @IsString()
-  @IsNotEmpty()
-  symbol: string;
-
-  @ApiProperty({
-    description: 'The decimals of the token',
-    example: 18,
-  })
-  @IsNumber()
-  @IsNotEmpty()
-  decimals: number;
-
-  @ApiProperty({
-    description: 'The name of the token',
-    example: 'USDC',
-  })
-  @IsString()
-  @IsNotEmpty()
-  name: string;
-}
-
-export class NetworkDto {
-  @ApiProperty({
-    description: 'The name of the network',
-    example: 'Ethereum',
-  })
-  @IsString()
-  @IsNotEmpty()
-  name: string;
-
-  @ApiProperty({
-    description: 'The chain ID of the network',
-    example: 1,
-  })
-  @IsNumber()
-  @IsNotEmpty()
-  chainId: number;
-}
-
-export class CreateCompanyGroupDto {
+export class CreateCompanyGroupDto implements SharedTypes.CreateCompanyGroupDto {
   @ApiProperty({
     description: 'The name of the category',
     example: 'Company',
@@ -104,7 +55,7 @@ export class CreateCompanyGroupDto {
   color: string;
 }
 
-export class CreateContactDto {
+export class CreateContactDto implements SharedTypes.CreateContactDto {
   @ApiProperty({
     description: 'The group information',
     example: 1,
@@ -140,9 +91,10 @@ export class CreateContactDto {
     example: 'user@example.com',
     required: false,
   })
+  @IsOptional()
   @IsEmail({}, { message: 'email must be a valid email address' })
   @MaxLength(255, { message: 'email cannot be longer than 255 characters' })
-  email: string;
+  email?: string;
 
   @ApiProperty({
     description: 'The token information of the address book entry',
@@ -152,9 +104,10 @@ export class CreateContactDto {
     },
     required: false,
   })
-  @IsObject()
-  @IsNotEmpty()
-  token: TokenDto;
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TokenDto)
+  token?: TokenDto;
 
   @ApiProperty({
     description: 'The network information of the address book entry',
@@ -168,7 +121,7 @@ export class CreateContactDto {
   network: NetworkDto;
 }
 
-export class AddressBookNameDuplicateDto {
+export class AddressBookNameDuplicateDto implements SharedTypes.AddressBookNameDuplicateDto {
   @ApiProperty({
     description: 'The name of the address book entry',
     example: 'JuPENG',
@@ -203,7 +156,7 @@ export class AddressBookNameDuplicateDto {
   @MinLength(3, { message: 'userAddress is too short' })
   userAddress: string;
 }
-export class UpdateAddressBookDto {
+export class UpdateAddressBookDto implements SharedTypes.UpdateAddressBookDto {
   @ApiProperty({
     description: 'The name of the address book entry',
     example: 'JuPENG',
@@ -287,7 +240,7 @@ export class UpdateAddressBookDto {
   network?: NetworkDto;
 }
 
-export class DeleteAddressBookDto {
+export class DeleteAddressBookDto implements SharedTypes.DeleteAddressBookDto {
   @ApiProperty({
     description: 'Array of address book entry IDs to delete',
     example: [1, 3, 2, 4],
@@ -299,7 +252,7 @@ export class DeleteAddressBookDto {
   ids: number[];
 }
 
-export class BulkDeleteEmployeesDto {
+export class BulkDeleteEmployeesDto implements SharedTypes.BulkDeleteEmployeesDto {
   @ApiProperty({
     description: 'Array of employee IDs to delete',
     example: [1, 3, 2, 4],
@@ -311,7 +264,7 @@ export class BulkDeleteEmployeesDto {
   ids: number[];
 }
 
-export class AddressBookOrderDto {
+export class AddressBookOrderDto implements SharedTypes.AddressBookOrderDto {
   @ApiProperty({
     description: 'The address book entry ID',
     example: 1,
@@ -329,7 +282,7 @@ export class AddressBookOrderDto {
   order: number;
 }
 
-export class CategoryOrderDto {
+export class CategoryOrderDto implements SharedTypes.CategoryOrderDto {
   @ApiProperty({
     description: 'Array of category IDs in the desired order',
     example: [1, 3, 2, 4],
@@ -341,7 +294,7 @@ export class CategoryOrderDto {
   categoryIds: number[];
 }
 
-export class PaginationMetaDto {
+export class PaginationMetaDto implements SharedPaginationMetaDto {
   @ApiProperty({ description: 'Current page number', example: 1 })
   page: number;
 
@@ -364,7 +317,7 @@ export class PaginationMetaDto {
   hasPrev: boolean;
 }
 
-export class CompanyContactResponseDto {
+export class CompanyContactResponseDto implements SharedTypes.CompanyContactResponseDto {
   @ApiProperty({ description: 'Contact ID', example: 1 })
   id: number;
 
@@ -399,7 +352,7 @@ export class CompanyContactResponseDto {
   updatedAt: Date;
 }
 
-export class PaginatedContactsResponseDto {
+export class PaginatedContactsResponseDto implements SharedTypes.PaginatedContactsResponseDto {
   @ApiProperty({
     description: 'Array of contacts',
     type: [CompanyContactResponseDto],
@@ -413,7 +366,7 @@ export class PaginatedContactsResponseDto {
   pagination: PaginationMetaDto;
 }
 
-export class CompanyGroupResponseDto {
+export class CompanyGroupResponseDto implements SharedTypes.CompanyGroupResponseDto {
   @ApiProperty({ description: 'Group ID', example: 1 })
   id: number;
 
@@ -422,9 +375,10 @@ export class CompanyGroupResponseDto {
 
   @ApiProperty({
     description: 'Group shape',
-    enum: ['CIRCLE', 'DIAMOND', 'SQUARE', 'TRIANGLE'],
+    enum: CategoryShapeEnum,
+    example: CategoryShapeEnum.CIRCLE,
   })
-  shape: string;
+  shape: CategoryShapeEnum;
 
   @ApiProperty({ description: 'Group color', example: '#FF5733' })
   color: string;
@@ -442,7 +396,7 @@ export class CompanyGroupResponseDto {
   updatedAt: Date;
 }
 
-export class PaginatedGroupsResponseDto {
+export class PaginatedGroupsResponseDto implements SharedTypes.PaginatedGroupsResponseDto {
   @ApiProperty({
     description: 'Array of groups',
     type: [CompanyGroupResponseDto],

@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { createShapeElement } from "../ToolTip/ShapeSelectionTooltip";
-import { CompanyGroupResponseDto } from "@/types/employee";
+import { CompanyGroupResponseDto } from "@qash/types/dto/employee";
 import { MODAL_IDS } from "@/types/modal";
 import { useModal } from "@/contexts/ModalManagerProvider";
 

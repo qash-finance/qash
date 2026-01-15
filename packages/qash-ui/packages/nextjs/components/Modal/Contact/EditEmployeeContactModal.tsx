@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { EditEmployeeContactModalProps } from "@/types/modal";
 import { ModalProp } from "@/contexts/ModalManagerProvider";
-import { UpdateAddressBookDto, CompanyGroupResponseDto, TokenDto, NetworkDto } from "@/types/employee";
+import { UpdateAddressBookDto, CompanyGroupResponseDto } from "@qash/types/dto/employee";
 import BaseModal from "../BaseModal";
 import { ModalHeader } from "../../Common/ModalHeader";
 import { PrimaryButton } from "../../Common/PrimaryButton";
@@ -20,6 +20,8 @@ import { AssetWithMetadata } from "@/types/faucet";
 import toast from "react-hot-toast";
 import { EmployeeGroupDropdown } from "@/components/Common/Dropdown/EmployeeGroupDropdown";
 import { useAuth } from "@/services/auth/context";
+import { TokenDto } from "@qash/types/dto/token";
+import { NetworkDto } from "@qash/types/dto/network";
 
 interface EditContactFormData {
   name: string;

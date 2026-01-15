@@ -12,7 +12,7 @@ import {
   useActivatePaymentLink,
   useDeactivatePaymentLink,
 } from "@/services/api/payment-link";
-import { PaymentLink, PaymentLinkStatus } from "@/types/payment-link";
+import { PaymentLink, PaymentLinkStatus } from "@qash/types/dto/payment-link";
 import { blo } from "blo";
 import { turnBechToHex } from "@/services/utils/turnBechToHex";
 import toast from "react-hot-toast";

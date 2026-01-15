@@ -7,7 +7,7 @@ import { SecondaryButton } from "../Common/SecondaryButton";
 import { useInvoice } from "@/hooks/server/useInvoice";
 import { CategoryBadge } from "../ContactBook/ContactBookContainer";
 import { useGetAllEmployeeGroups } from "@/services/api/employee";
-import { CategoryShapeEnum } from "@/types/employee";
+import { CategoryShapeEnum } from "@qash/types/enums";
 import { useModal } from "@/contexts/ModalManagerProvider";
 import { InvoiceModalProps, TransactionOverviewModalProps } from "@/types/modal";
 import { PrimaryButton } from "../Common/PrimaryButton";

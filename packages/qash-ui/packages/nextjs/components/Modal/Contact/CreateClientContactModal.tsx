@@ -13,7 +13,7 @@ import { useModal } from "@/contexts/ModalManagerProvider";
 import { MODAL_IDS } from "@/types/modal";
 import toast from "react-hot-toast";
 import { useCreateClient } from "@/services/api/client";
-import { CreateClientDto } from "@/types/client";
+import { CreateClientDto } from "@qash/types/dto/client";
 import { useAuth } from "@/services/auth/context";
 import { CompanyTypeDropdown } from "@/components/Common/Dropdown/CompanyTypeDropdown";
 import { CountryDropdown } from "@/components/Common/Dropdown/CountryDropdown";

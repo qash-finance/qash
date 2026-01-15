@@ -1,4 +1,4 @@
-import { TeamMembership } from "./team-member";
+import { TeamMemberResponseDto as TeamMembership } from "@qash/types/dto/team-member";
 
 export interface User {
     id: number;

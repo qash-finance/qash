@@ -13,7 +13,7 @@ import toast from "react-hot-toast";
 import { Badge, BadgeStatus } from "../Common/Badge";
 import { QASH_TOKEN_ADDRESS } from "@/services/utils/constant";
 import { useCreatePaymentLink } from "@/services/api/payment-link";
-import { CreatePaymentLink, TokenMetadata } from "@/types/payment-link";
+import { CreatePaymentLinkDto as CreatePaymentLink, TokenMetadata } from "@qash/types/dto/payment-link";
 import { useRouter } from "next/navigation";
 import { PaymentLinkPreview } from "./PaymentLinkPreview";
 import { useMidenProvider } from "@/contexts/MidenProvider";

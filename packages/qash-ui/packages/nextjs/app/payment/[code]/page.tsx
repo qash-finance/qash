@@ -10,7 +10,7 @@ import { formatAddress } from "@/services/utils/miden/address";
 import toast from "react-hot-toast";
 import { QASH_TOKEN_ADDRESS, BLOCK_TIME, REFETCH_DELAY, QASH_TOKEN_DECIMALS } from "@/services/utils/constant";
 import { Badge, BadgeStatus } from "@/components/Common/Badge";
-import { PaymentLinkStatus } from "@/types/payment-link";
+import { PaymentLinkStatus } from "@qash/types/dto/payment-link";
 import { useWalletState } from "@/services/store";
 import { MODAL_IDS, TransactionOverviewModalProps } from "@/types/modal";
 import { useModal } from "@/contexts/ModalManagerProvider";

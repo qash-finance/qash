@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 import { ToggleSwitch } from "../Common/ToggleSwitch";
-import { PaymentLinkRecord, PaymentLink, PaymentLinkStatus } from "@/types/payment-link";
+import { PaymentLinkRecord, PaymentLink, PaymentLinkStatus } from "@qash/types/dto/payment-link";
 import { MIDEN_EXPLORER_URL } from "@/services/utils/constant";
 
 interface PaymentLinkActionsTooltipProps {

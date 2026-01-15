@@ -5,7 +5,7 @@ import {
 	PayBillsDto,
 	BatchPaymentResultDto,
 	BillModel,
-} from "@/types/bill";
+} from "@qash/types/dto/bill";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 // React Query hooks
