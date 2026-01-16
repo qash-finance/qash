@@ -37,10 +37,6 @@ const TeamSettings = () => {
   const { openModal } = useModal();
   const [activeTab, setActiveTab] = useState<"account" | "member">("account");
 
-  const handleAddMembers = () => {
-    console.log("Add new members");
-  };
-
   const handleCreateNewAccount = () => {
     openModal("CREATE_ACCOUNT");
   };
@@ -75,7 +71,7 @@ const TeamSettings = () => {
           text="Add new members"
           icon="/misc/plus-icon.svg"
           iconPosition="left"
-          onClick={handleAddMembers}
+          onClick={() => openModal("INVITE_TEAM_MEMBER")}
           containerClassName="w-[160px]"
         />
       </div>

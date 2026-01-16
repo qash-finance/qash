@@ -1,192 +1,364 @@
 "use client";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { Tooltip } from "react-tooltip";
 import { ValidatingModalProps } from "@/types/modal";
 import { ModalProp } from "@/contexts/ModalManagerProvider";
 import BaseModal from "../BaseModal";
 import { PrimaryButton } from "../../Common/PrimaryButton";
 import { SecondaryButton } from "../../Common/SecondaryButton";
+import { useAuth } from "@/services/auth/context";
+import { useGetCompanyTeamMembers, useInviteTeamMember, useBulkInviteTeamMembers, useUpdateTeamMemberRole } from "@/services/api/team-member";
+import { TeamMemberRoleEnum } from "@qash/types/enums";
+import { InviteTeamMemberDto } from "@qash/types/dto/team-member";
+import { MemberRoleTooltip } from "../../Common/ToolTip/MemberRoleTooltip";
+import toast from "react-hot-toast";
 
-interface TeamMember {
-  id: string;
-  name: string;
-  email: string;
-  avatar?: string;
-  role: "Owner" | "Admin" | "Member";
-  isCurrentUser?: boolean;
-}
-
-interface InvitedEmail {
-  id: string;
-  email: string;
-  displayName: string;
+interface InviteFormData {
+	emailInput: string;
+	invitedEmails: Array<{
+		id: string;
+		email: string;
+		firstName: string;
+		lastName: string;
+		role: TeamMemberRoleEnum;
+	}>;
 }
 
 export function InviteTeamMemberModal({ isOpen, onClose, zIndex }: ModalProp<ValidatingModalProps>) {
-  // Local state
-  const [emailInput, setEmailInput] = useState("");
-  const [invitedEmails, setInvitedEmails] = useState<InvitedEmail[]>([]);
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([
-    {
-      id: "1",
-      name: "Martin Ramos",
-      email: "carlos2000@gmail.com",
-      role: "Owner",
-      isCurrentUser: true,
-    },
-  ]);
+	const { user } = useAuth();
+	const companyId = user?.teamMembership?.companyId;
+	const [selectedMemberIdForRole, setSelectedMemberIdForRole] = useState<number | null>(null);
+	const { control, watch, setValue, handleSubmit, reset, formState: { errors } } = useForm<InviteFormData>({
+		defaultValues: {
+			emailInput: "",
+			invitedEmails: [],
+		},
+	});
 
-  // Handle email input changes
-  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setEmailInput(value);
+	const emailInput = watch("emailInput");
+	const invitedEmails = watch("invitedEmails");
 
-    // Check if user typed comma+space
-    if (value.endsWith(", ")) {
-      const emailToAdd = value.slice(0, -2).trim();
+	// Fetch team members for the company
+	const { data: teamMembers = [], refetch: refetchTeamMembers } = useGetCompanyTeamMembers(companyId);
 
-      // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (emailToAdd && emailRegex.test(emailToAdd)) {
-        // Add email to invited list
-        const newEmail: InvitedEmail = {
-          id: Date.now().toString(),
-          email: emailToAdd,
-          displayName: emailToAdd,
-        };
-        setInvitedEmails([...invitedEmails, newEmail]);
-        setEmailInput("");
-      }
-    }
-  };
+	// Mutation hooks
+	const inviteMutation = useInviteTeamMember();
+	const bulkInviteMutation = useBulkInviteTeamMembers();
+	const updateRoleMutation = useUpdateTeamMemberRole();
 
-  // Remove invited email
-  const handleRemoveEmail = (id: string) => {
-    setInvitedEmails(invitedEmails.filter(item => item.id !== id));
-  };
+	const isLoading = inviteMutation.isPending || bulkInviteMutation.isPending || updateRoleMutation.isPending;
 
-  // Handle invite submission
-  const handleInvite = () => {
-    if (invitedEmails.length === 0 && !emailInput.trim()) return;
-    // TODO: Add invite logic here
-    console.log(
-      "Inviting emails:",
-      invitedEmails.map(e => e.email),
-    );
-    setInvitedEmails([]);
-    setEmailInput("");
-  };
+	// Handle email input - add email on comma or Enter
+	const handleEmailChange = (value: string) => {
+		setValue("emailInput", value);
 
-  // Handle done button
-  const handleDone = () => {
-    onClose();
-  };
+		if (value.endsWith(", ") || value.endsWith(",")) {
+			const emailToAdd = value.slice(0, -1).trim();
+			if (isValidEmail(emailToAdd) && !invitedEmails.find(e => e.email === emailToAdd)) {
+				const newEmail = {
+					id: Date.now().toString(),
+					email: emailToAdd,
+					firstName: emailToAdd.split("@")[0],
+					lastName: "",
+					role: TeamMemberRoleEnum.VIEWER,
+				};
+				setValue("invitedEmails", [...invitedEmails, newEmail]);
+				setValue("emailInput", "");
+			}
+		}
+	};
 
-  return (
-    <BaseModal isOpen={isOpen} onClose={onClose} zIndex={zIndex}>
-      <div className="flex flex-col w-[600px] rounded-3xl overflow-hidden border border-primary-divider bg-background">
-        {/* Header */}
-        <div className="flex justify-between items-center px-6 py-5 border-b border-primary-divider">
-          <h2 className="text-base font-semibold text-text-primary">Invite new member</h2>
-          <button
-            onClick={onClose}
-            className="flex items-center justify-center w-6 h-6 rounded-lg bg-app-background border-b-2 border-secondary-divider hover:opacity-80 transition-opacity"
-          >
-            <img src="/misc/close-icon.svg" alt="close" className="w-4 h-4" />
-          </button>
-        </div>
+	// Remove invited email
+	const handleRemoveEmail = (id: string) => {
+		setValue("invitedEmails", invitedEmails.filter(item => item.id !== id));
+	};
 
-        {/* Content */}
-        <div className="flex flex-col gap-4 px-6 py-5">
-          {/* Email Input Section */}
-          <div className="flex w-full justify-between items-center bg-app-background border-b-2 border-primary-divider py-2 px-3 rounded-xl">
-            <div className="flex-1 flex flex-row gap-3 items-center justify-start flex-wrap">
-              {/* Invited Emails Chips */}
-              {invitedEmails.length > 0 && (
-                <div className="flex flex-row gap-2 flex-wrap">
-                  {invitedEmails.map(invitedEmail => (
-                    <div key={invitedEmail.id} className="flex gap-2 items-center rounded-lg bg-white px-3 py-1">
-                      <p className="font-medium text-sm">{invitedEmail.email}</p>
-                      <button
-                        onClick={() => handleRemoveEmail(invitedEmail.id)}
-                        className="flex items-center justify-center w-4 h-4 hover:opacity-80 transition-opacity"
-                        aria-label={`Remove ${invitedEmail.email}`}
-                      >
-                        <img src="/misc/close-icon.svg" alt="remove" className="w-2" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+	// Validate email format
+	const isValidEmail = (email: string): boolean => {
+		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+		return emailRegex.test(email);
+	};
 
-              <input
-                type="text"
-                value={emailInput}
-                onChange={handleEmailChange}
-                placeholder={invitedEmails.length === 0 ? "Enter email addresses, separated by commas" : "Email"}
-                className="w-fit text-sm text-text-primary placeholder:text-text-secondary outline-none focus:border-primary-blue transition-colors"
-              />
-            </div>
-            <PrimaryButton
-              text="Invite"
-              onClick={handleInvite}
-              disabled={invitedEmails.length === 0 && !emailInput.trim()}
-              containerClassName="w-[80px]"
-            />
-          </div>
+	// Derive first and last name from email when missing
+	const deriveNamesFromEmail = (email: string, first?: string, last?: string) => {
+		const [local, domain] = email.split("@");
+		const domainPart = domain ? domain.split(".")[0] : "";
+		const firstName = (first && first.trim() !== "") ? first : (local || "");
+		const lastName = (last && last.trim() !== "") ? last : (domainPart || "");
+		return { firstName, lastName };
+	};
 
-          {/* Who has access Section */}
-          <div className="flex flex-col gap-3 mt-2">
-            <h3 className="text-sm font-medium text-text-secondary">Who has access</h3>
+	// Handle invite submission
+	const onSubmit = async (data: InviteFormData) => {
+		if (data.invitedEmails.length === 0) return;
+		if (!companyId) return;
 
-            {/* Team Members List */}
-            <div className="flex flex-col gap-3">
-              {teamMembers.map(member => (
-                <div key={member.id} className="flex items-center justify-between">
-                  {/* Member Info */}
-                  <div className="flex items-center gap-3 flex-1">
-                    {/* Avatar */}
-                    {member.avatar ? (
-                      <img src={member.avatar} alt={member.name} className="w-8 h-8 rounded-full" />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-blue to-blue-600 flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs font-semibold text-white">{member.name.charAt(0)}</span>
-                      </div>
-                    )}
+		try {
+			if (data.invitedEmails.length === 1) {
+				// Single invite
+				const candidate = data.invitedEmails[0];
+				const { firstName, lastName } = deriveNamesFromEmail(candidate.email, candidate.firstName, candidate.lastName);
+				const inviteDto: InviteTeamMemberDto = {
+					email: candidate.email,
+					firstName,
+					lastName,
+					role: candidate.role,
+				};
+				await inviteMutation.mutateAsync({
+					companyId,
+					inviteDto,
+				});
 
-                    {/* Name and Email */}
-                    <div className="flex flex-col flex-1 min-w-0">
-                      <div className="flex items-center gap-1">
-                        <p className="text-sm font-medium text-text-primary truncate">
-                          {member.name}
-                          {member.isCurrentUser && " (You)"}
-                        </p>
-                      </div>
-                      <p className="text-xs text-text-secondary truncate">{member.email}</p>
-                    </div>
-                  </div>
+				toast.success(`Invitation sent to ${candidate.email}`);
+			} else {
+				// Bulk invite
+				const bulkInviteDto = {
+					members: data.invitedEmails.map(e => {
+						const { firstName, lastName } = deriveNamesFromEmail(e.email, e.firstName, e.lastName);
+						return {
+							email: e.email,
+							firstName,
+							lastName,
+							role: e.role,
+						};
+					}),
+				};
+				await bulkInviteMutation.mutateAsync({
+					companyId,
+					bulkInviteDto,
+				});
 
-                  {/* Role Badge */}
-                  <div className="flex items-center gap-2 ml-3 flex-shrink-0">
-                    {member.role === "Owner" && (
-                      <img src="/misc/purple-crown-icon.svg" alt="owner" className="w-5 h-5" />
-                    )}
-                    <span className="text-sm font-medium text-text-primary whitespace-nowrap">{member.role}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+				toast.success(`Invitations sent to ${data.invitedEmails.length} members`);
+			}
+			reset();
+			refetchTeamMembers();
+		} catch (error) {
+			console.error("Failed to invite team members:", error);
+		}
+	};
 
-        {/* Footer */}
-        <div className="flex justify-end gap-3 px-6 py-5 border-t border-primary-divider">
-          <div className="w-[120px]">
-            <SecondaryButton text="Done" onClick={handleDone} />
-          </div>
-        </div>
-      </div>
-    </BaseModal>
-  );
+	// Format team members for display
+	const displayTeamMembers = useMemo(() => {
+		return teamMembers.map(member => ({
+			id: member.id,
+			name: `${member.firstName} ${member.lastName}`,
+			email: member.user?.email || "",
+			role: member.role,
+			isCurrentUser: user?.email === member.user?.email,
+		}));
+	}, [teamMembers, user?.email]);
+
+	const renderRoleIcon = (role: TeamMemberRoleEnum) => {
+		if( role === TeamMemberRoleEnum.REVIEWER || role === TeamMemberRoleEnum.VIEWER) {
+			return "/misc/orange-eye-icon.svg";
+		}
+		if (role === TeamMemberRoleEnum.ADMIN) {
+			return "/misc/green-shield-icon.svg";
+		}
+	}
+
+	// Handle role change for team members
+	const handleRoleChange = async (newRole: TeamMemberRoleEnum) => {
+		if (!selectedMemberIdForRole) return;
+
+		try {
+			await updateRoleMutation.mutateAsync({
+				teamMemberId: selectedMemberIdForRole,
+				updateRoleDto: {
+					role: newRole,
+				},
+			});
+			toast.success("Role updated successfully");
+			setSelectedMemberIdForRole(null);
+			refetchTeamMembers();
+		} catch (error) {
+			console.error("Failed to update team member role:", error);
+			toast.error("Failed to update role");
+		}
+	}
+
+	return (
+		<BaseModal isOpen={isOpen} onClose={onClose} zIndex={zIndex}>
+			<form onSubmit={handleSubmit(onSubmit)} className="flex flex-col w-150 rounded-3xl overflow-hidden border border-primary-divider bg-background">
+				{/* Header */}
+				<div className="flex justify-between items-center px-6 py-5 border-b border-primary-divider">
+					<h2 className="text-base font-semibold text-text-primary">Invite new member</h2>
+					<button
+						type="button"
+						onClick={onClose}
+						className="flex items-center justify-center w-6 h-6 rounded-lg bg-app-background border-b-2 border-secondary-divider hover:opacity-80 transition-opacity"
+					>
+						<img src="/misc/close-icon.svg" alt="close" className="w-4 h-4" />
+					</button>
+				</div>
+
+				{/* Content */}
+				<div className="flex flex-col gap-4 px-6 py-5">
+					{/* Email Input Section */}
+					<div className="flex w-full justify-between items-center bg-app-background border-b-2 border-primary-divider py-2 px-3 rounded-xl gap-3">
+						<div className="flex-1 flex flex-row gap-3 items-center justify-start flex-wrap">
+							{/* Invited Emails Chips */}
+							{invitedEmails.length > 0 && (
+								<div className="flex flex-row gap-2 flex-wrap">
+									{invitedEmails.map(invitedEmail => (
+										<div key={invitedEmail.id} className="flex gap-2 items-center rounded-lg bg-white px-3 py-1">
+											<p className="font-medium text-sm">{invitedEmail.email}</p>
+											<button
+												type="button"
+												onClick={() => handleRemoveEmail(invitedEmail.id)}
+												className="flex items-center justify-center w-4 h-4 hover:opacity-80 transition-opacity"
+												aria-label={`Remove ${invitedEmail.email}`}
+											>
+												<img src="/misc/close-icon.svg" alt="remove" className="w-2" />
+											</button>
+										</div>
+									))}
+								</div>
+							)}
+
+							<Controller
+								name="emailInput"
+								control={control}
+								render={({ field }) => (
+									<input
+										type="text"
+										placeholder="Enter email"
+										className="flex-1 min-w-fit text-sm text-text-primary placeholder:text-text-secondary outline-none focus:border-primary-blue transition-colors"
+										{...field}
+										onChange={(e) => handleEmailChange(e.target.value)}
+										disabled={isLoading}
+									/>
+								)}
+							/>
+						</div>
+						<PrimaryButton
+							text="Invite"
+							type="button"
+							onClick={() => {
+								if (emailInput.trim() && isValidEmail(emailInput.trim())) {
+
+									if(!companyId) {
+										console.error("Company ID is missing. Cannot invite team member.");
+										return;
+									}
+
+									if (invitedEmails.length === 0) {
+										// No emails invited yet, submit with the current input directly
+										const { firstName, lastName } = deriveNamesFromEmail(emailInput.trim());
+										const inviteDto: InviteTeamMemberDto = {
+											email: emailInput.trim(),
+											firstName,
+											lastName,
+											role: TeamMemberRoleEnum.VIEWER,
+										};
+										inviteMutation.mutateAsync({
+											companyId,
+											inviteDto,
+										}).then(() => {
+											reset();
+											refetchTeamMembers();
+										}).catch(error => {
+											console.error("Failed to invite team member:", error);
+										});
+									} else {
+										// Already have invited emails, add this one to the list
+										handleEmailChange(emailInput + ", ");
+									}
+								}
+							}}
+							disabled={!emailInput.trim() || !isValidEmail(emailInput.trim()) || isLoading}
+							containerClassName="w-[70px] flex-shrink-0"
+						/>
+					</div>
+
+					{/* Who has access Section */}
+				<div className="flex flex-col gap-3 mt-2 max-h-75 overflow-y-auto">
+						<h3 className="text-sm font-medium text-text-secondary">Who has access</h3>
+
+						{/* Team Members List */}
+						<div className="flex flex-col gap-3">
+							{displayTeamMembers.map(member => (
+								<div key={member.id} className="flex items-center justify-between">
+									{/* Member Info */}
+									<div className="flex items-center gap-3 flex-1">
+										{/* Avatar */}
+									<div className="w-8 h-8 rounded-full bg-linear-to-br from-primary-blue to-blue-600 flex items-center justify-center shrink-0">
+											<span className="text-xs font-semibold text-white">
+												{`${member.name.charAt(0)}`.toUpperCase()}
+											</span>
+										</div>
+
+										{/* Name and Email */}
+										<div className="flex flex-col flex-1 min-w-0">
+											<div className="flex items-center gap-1">
+												<p className="text-sm font-medium text-text-primary truncate">
+													{member.name}
+													{member.isCurrentUser && " (You)"}
+												</p>
+											</div>
+											<p className="text-xs text-text-secondary truncate">{member.email}</p>
+										</div>
+									</div>
+
+									{/* Role Badge */}
+									<div className="flex items-center gap-2 ml-3 shrink-0">
+										{member.role === TeamMemberRoleEnum.OWNER && (
+											<img src="/misc/purple-crown-icon.svg" alt="owner" className="w-5 h-5" />
+										)}
+										{member.role !== TeamMemberRoleEnum.OWNER && (
+											<img src={renderRoleIcon(member.role)} alt={member.role.toLowerCase()} className="w-5 h-5" />
+										)}
+										<span className="text-sm font-medium text-text-primary whitespace-nowrap capitalize">
+											{member.role.toLowerCase()}
+										</span>
+										{user?.email !== member.email && (
+											<>
+												<button
+													type="button"
+													data-tooltip-id={`role-tooltip-${member.id}`}
+													className="flex items-center justify-center hover:opacity-80 transition-opacity cursor-poi"
+													onClick={() => setSelectedMemberIdForRole(member.id)}
+												>
+													<img src="/arrow/chevron-down.svg" alt="chevron right" className="w-5" />
+												</button>
+												<Tooltip
+													id={`role-tooltip-${member.id}`}
+													clickable
+													style={{ zIndex: 20, borderRadius: "16px", padding: "0" }}
+													place="left"
+													noArrow
+													border="none"
+													opacity={1}
+													render={() => (
+														<MemberRoleTooltip
+															currentRole={member.role}
+															onRoleChange={handleRoleChange}
+														/>
+													)}
+												/>
+											</>
+										)}
+									</div>
+								</div>
+							))}
+						</div>
+
+						{displayTeamMembers.length === 0 && (
+							<div className="text-center py-4">
+								<p className="text-sm text-text-secondary">No team members yet</p>
+							</div>
+						)}
+					</div>
+				</div>
+
+				{/* Footer */}
+				<div className="flex justify-end gap-3 px-6 py-5 border-t border-primary-divider">
+						<SecondaryButton text="Done" onClick={onClose} disabled={isLoading} buttonClassName="w-[120px]" />
+				</div>
+			</form>
+		</BaseModal>
+	);
 }
 
 export default InviteTeamMemberModal;

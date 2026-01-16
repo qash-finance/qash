@@ -1,54 +1,74 @@
 "use client";
-import React from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import MemberCard from "./MemberCard";
-
-type Role = "Owner" | "Admin";
+import { useGetCompanyTeamMembers, useRemoveTeamMember } from "@/services/api/team-member";
+import { useAuth } from "@/services/auth/context";
+import { Tooltip } from "react-tooltip";
+import { useModal } from "@/contexts/ModalManagerProvider";
+import { MemberActionTooltip } from "@/components/Common/ToolTip/MemberActionTooltip";
+import toast from "react-hot-toast";
+import type { TeamMemberResponseDto } from "@qash/types/dto/team-member";
+import { TeamMemberStatusEnum } from "@qash/types/enums";
 
 interface Member {
   id: string;
   name: string;
   email: string;
   companyRole: string;
-  role: Role[];
+  role: string[];
 }
-
-const members: Member[] = [
-  {
-    id: "1",
-    name: "Alice Johnson",
-    email: "mail@mail.com",
-    companyRole: "Finance Manager",
-    role: ["Owner", "Admin"],
-  },
-  {
-    id: "2",
-    name: "Bob Smith",
-    email: "mail@mail.com",
-    companyRole: "Accountant",
-    role: ["Admin"],
-  },
-  {
-    id: "3",
-    name: "Charlie Brown",
-    email: "mail@mail.com",
-    companyRole: "HR Specialist",
-    role: ["Admin"],
-  },
-];
-
-const Chip = ({ label }: { label: Role }) => (
-  <div className="px-3 py-1 rounded-full w-fit flex items-center gap-1 border-b border-primary-divider bg-background">
-    {label === "Owner" && <img src="/misc/purple-crown-icon.svg" alt="Owner" className="w-5" />}
-    {label === "Admin" && <img src="/misc/green-shield-icon.svg" alt="Admin" className="w-5" />}
-    <span className="text-sm font-medium">{label}</span>
-  </div>
-);
 
 interface MemberTabProps {
   onMenuClick: (memberId: string) => void;
 }
 
+const roleDisplay = (role?: string) => {
+  if (!role) return "";
+  switch (role) {
+    case "OWNER":
+      return "Owner";
+    case "ADMIN":
+      return "Admin";
+    case "REVIEWER":
+      return "Reviewer";
+    case "VIEWER":
+      return "Viewer";
+    default:
+      return role;
+  }
+};
+
 const MemberTab: React.FC<MemberTabProps> = ({ onMenuClick }) => {
+  const { user } = useAuth();
+  const companyId = user?.teamMembership?.companyId;
+  const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState(query);
+
+  // debounce search
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query), 300);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  const { data: teamMembers = [], isLoading } = useGetCompanyTeamMembers(
+    companyId,
+    { search: debouncedQuery },
+    { enabled: !!companyId },
+  );
+
+  const members = useMemo<Member[]>(() => {
+    return teamMembers.map((m: TeamMemberResponseDto) => ({
+      id: String(m.id),
+      name: `${m.firstName} ${m.lastName}`.trim(),
+      email: m.user?.email || "",
+      companyRole: m.position || "",
+      role: [roleDisplay(m.role)],
+    }));
+  }, [teamMembers]);
+
+  const { openModal } = useModal();
+  const removeTeamMember = useRemoveTeamMember();
+
   return (
     <div className="flex flex-col gap-6 w-full">
       {/* Search and Create Bar */}
@@ -59,6 +79,8 @@ const MemberTab: React.FC<MemberTabProps> = ({ onMenuClick }) => {
             type="text"
             placeholder="Search by name"
             className="text-sm text-text-primary outline-none placeholder-text-secondary w-full"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
           />
           <img src="/misc/blue-search-icon.svg" alt="search" className="w-5 h-5" />
         </section>
@@ -66,10 +88,51 @@ const MemberTab: React.FC<MemberTabProps> = ({ onMenuClick }) => {
 
       {/* Members Cards Grid */}
       <div className="grid grid-cols-3 gap-2 w-full">
+        {isLoading && <p className="text-sm text-text-secondary">Loading...</p>}
+        {!isLoading && members.length === 0 && <p className="text-sm text-text-secondary">No members found</p>}
         {members.map(member => (
           <MemberCard key={member.id} member={member} onMenuClick={onMenuClick} />
         ))}
       </div>
+
+      {/* Member action tooltip (global) */}
+      <Tooltip
+        id="member-action-tooltip"
+        clickable
+        style={{ zIndex: 20, borderRadius: "16px", padding: "0" }}
+        place="left"
+        openOnClick
+        noArrow
+        border="none"
+        opacity={1}
+        render={({ content }) => {
+          if (!content) return null;
+          const id = content.toString();
+          const m = teamMembers.find(tm => String(tm.id) === id);
+          if (!m) return null;
+
+          const handleEdit = () => {
+            openModal("EDIT_TEAM_MEMBER", { id: Number(m.id) });
+          };
+
+          const handleRemove = () => {
+            openModal("REMOVE_TEAM_MEMBER", {
+              name: `${m.firstName} ${m.lastName}`.trim(),
+              onRemove: async () => {
+                try {
+                  await removeTeamMember.mutateAsync({ teamMemberId: Number(m.id), companyId: Number(companyId) });
+                  toast.success("Team member removed");
+                } catch (err) {
+                  console.error("Failed to remove team member", err);
+                  toast.error("Failed to remove member");
+                }
+              },
+            });
+          };
+
+          return <MemberActionTooltip onEdit={handleEdit} onRemove={handleRemove} />;
+        }}
+      />
     </div>
   );
 };

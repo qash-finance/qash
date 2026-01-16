@@ -161,7 +161,7 @@ export class TeamMemberRepository extends BaseRepository<
     companyId: number,
     filters?: TeamMemberFilters,
     tx?: PrismaTransactionClient,
-  ): Promise<TeamMemberModel[]> {
+  ): Promise<TeamMemberWithRelations[]> {
     const whereClause: any = {
       companyId,
     };
@@ -180,8 +180,13 @@ export class TeamMemberRepository extends BaseRepository<
         whereClause.OR = [
           { firstName: { contains: filters.search, mode: 'insensitive' } },
           { lastName: { contains: filters.search, mode: 'insensitive' } },
-          { email: { contains: filters.search, mode: 'insensitive' } },
           { position: { contains: filters.search, mode: 'insensitive' } },
+          // Include user email search
+          {
+            user: {
+              email: { contains: filters.search, mode: 'insensitive' },
+            },
+          },
         ];
       }
     }
@@ -190,6 +195,14 @@ export class TeamMemberRepository extends BaseRepository<
       whereClause,
       {
         orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+            },
+          },
+        },
       },
       tx,
     );

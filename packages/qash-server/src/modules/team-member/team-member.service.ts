@@ -206,7 +206,10 @@ export class TeamMemberService {
           // Don't throw error, invitation is created but email failed
         }
 
-        return teamMember;
+        return {
+          ...teamMember,
+          email: inviteDto.email,
+        };
       });
     } catch (error) {
       this.logger.error('Failed to invite team member:', error);
@@ -236,31 +239,35 @@ export class TeamMemberService {
         );
       }
 
-      const results = [];
-      const errors = [];
+      // Execute invites in parallel and collect results
+      const settled = await Promise.allSettled(
+        bulkInviteDto.members.map((member) =>
+          this.inviteTeamMember(userId, companyId, member),
+        ),
+      );
 
-      for (const memberDto of bulkInviteDto.members) {
-        try {
-          const result = await this.inviteTeamMember(
-            userId,
-            companyId,
-            memberDto,
-          );
-          results.push(result);
-        } catch (error) {
-          errors.push({
-            email: memberDto.email,
-            error: error.message,
-          });
+      const successful: any[] = [];
+      const failed: Array<{ email: string; error: string }> = [];
+
+      for (let i = 0; i < settled.length; i++) {
+        const res = settled[i];
+        const member = bulkInviteDto.members[i];
+
+        if (res.status === 'fulfilled') {
+          successful.push(res.value);
+        } else {
+          const err = res.reason;
+          const message = err instanceof Error ? err.message : JSON.stringify(err);
+          failed.push({ email: member.email, error: message });
         }
       }
 
       return {
-        successful: results,
-        failed: errors,
+        successful,
+        failed,
         totalProcessed: bulkInviteDto.members.length,
-        successCount: results.length,
-        failureCount: errors.length,
+        successCount: successful.length,
+        failureCount: failed.length,
       };
     } catch (error) {
       this.logger.error('Failed to bulk invite team members:', error);
@@ -459,7 +466,7 @@ export class TeamMemberService {
   }
 
   /**
-   * Remove team member (suspend)
+   * Remove team member
    */
   async removeTeamMember(teamMemberId: number, userId: number) {
     try {
@@ -506,7 +513,22 @@ export class TeamMemberService {
           throw new ForbiddenException(ErrorTeamMember.InsufficientPermissions);
         }
 
-        return this.teamMemberRepository.suspend(teamMemberId, tx);
+        // Permanently delete the team member (not just suspend)
+        const deletedTeamMember = await this.teamMemberRepository.delete({ id: teamMemberId }, tx);
+
+        // Nullify any invitedBy references from this user on other team members to avoid FK constraint
+        if (deletedTeamMember.userId) {
+          const model = tx.teamMember;
+          await model.updateMany({
+            where: { invitedBy: deletedTeamMember.userId },
+            data: { invitedBy: null },
+          });
+
+          // Also delete the associated User account (1:1 relationship)
+          await this.userRepository.delete({ id: deletedTeamMember.userId }, tx);
+        }
+
+        return deletedTeamMember;
       });
     } catch (error) {
       this.logger.error(`Failed to remove team member ${teamMemberId}:`, error);

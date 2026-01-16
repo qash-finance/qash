@@ -259,6 +259,9 @@ export class TeamMemberResponseDto implements SharedTypes.TeamMemberResponseDto 
   @ApiPropertyOptional({ description: 'User ID if linked', example: 1 })
   userId?: number;
 
+  @ApiPropertyOptional({ description: 'Email address for the team member', example: 'user@example.com' })
+  email?: string;
+
   @ApiPropertyOptional({ description: 'Invited by user ID', example: 1 })
   invitedBy?: number;
 

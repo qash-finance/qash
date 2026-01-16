@@ -1,6 +1,6 @@
 import React from "react";
 
-type Role = "Owner" | "Admin";
+type Role = string;
 
 interface Member {
   id: string;
@@ -61,6 +61,8 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, onMenuClick }) => {
           alt="Menu"
           className="w-6 cursor-pointer"
           onClick={handleMenuClick}
+          data-tooltip-id="member-action-tooltip"
+          data-tooltip-content={member.id}
         />
       </div>
     </div>

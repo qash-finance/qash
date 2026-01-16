@@ -1,9 +1,10 @@
 "use client";
+import { TeamMemberRoleEnum } from "@qash/types/enums";
 import React from "react";
 
 interface MemberRoleTooltipProps {
-  currentRole: "Admin" | "Viewer";
-  onRoleChange: (role: "Admin" | "Viewer") => void;
+  currentRole: TeamMemberRoleEnum;
+  onRoleChange: (role: TeamMemberRoleEnum) => void;
 }
 
 const RoleItem = ({
@@ -13,15 +14,18 @@ const RoleItem = ({
   isFirst = false,
   isLast = false,
 }: {
-  role: "Admin" | "Viewer";
+  role: TeamMemberRoleEnum;
   isActive: boolean;
   onClick: () => void;
   isFirst?: boolean;
   isLast?: boolean;
 }) => {
   const getRoleIcon = () => {
-    if (role === "Admin") {
+    if (role === TeamMemberRoleEnum.ADMIN) {
       return "/misc/green-shield-icon.svg";
+    }
+    if (role === TeamMemberRoleEnum.REVIEWER) {
+      return "/misc/orange-eye-icon.svg";
     }
     return "/misc/orange-eye-icon.svg";
   };
@@ -39,7 +43,7 @@ const RoleItem = ({
     >
       <img src={getRoleIcon()} alt={role} className="w-5 h-5" />
       <span className={`text-sm font-medium ${isActive ? "text-text-primary font-semibold" : "text-text-secondary"}`}>
-        {role}
+        {role.toLowerCase().charAt(0).toUpperCase() + role.slice(1).toLowerCase()}
       </span>
     </div>
   );
@@ -49,13 +53,19 @@ export const MemberRoleTooltip = ({ currentRole, onRoleChange }: MemberRoleToolt
   return (
     <div className="bg-background border border-primary-divider rounded-2xl shadow-lg w-[160px]">
       {/* Admin Role */}
-      <RoleItem role="Admin" isActive={currentRole === "Admin"} onClick={() => onRoleChange("Admin")} isFirst />
+      <RoleItem role={TeamMemberRoleEnum.ADMIN} isActive={currentRole === TeamMemberRoleEnum.ADMIN} onClick={() => onRoleChange(TeamMemberRoleEnum.ADMIN)} isFirst />
+
+      {/* Divider */}
+      <div className="border-t w-full border-primary-divider" />
+
+      {/* Reviewer Role */}
+      <RoleItem role={TeamMemberRoleEnum.REVIEWER} isActive={currentRole === TeamMemberRoleEnum.REVIEWER} onClick={() => onRoleChange(TeamMemberRoleEnum.REVIEWER)} />
 
       {/* Divider */}
       <div className="border-t w-full border-primary-divider" />
 
       {/* Viewer Role */}
-      <RoleItem role="Viewer" isActive={currentRole === "Viewer"} onClick={() => onRoleChange("Viewer")} isLast />
+      <RoleItem role={TeamMemberRoleEnum.VIEWER} isActive={currentRole === TeamMemberRoleEnum.VIEWER} onClick={() => onRoleChange(TeamMemberRoleEnum.VIEWER)} isLast />
     </div>
   );
 };

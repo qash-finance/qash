@@ -73,6 +73,11 @@ export interface TeamMemberResponseDto {
   role: TeamMemberRoleEnum;
   status: TeamMemberStatusEnum;
   companyId: number;
+  user?: {
+    id: number;
+    email: string;
+    [key: string]: any;
+  };
   userId?: number;
   invitedBy?: number;
   invitedAt?: Date | string;

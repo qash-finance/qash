@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { BaseContainer } from "../Common/BaseContainer";
 import { TabContainer } from "../Common/TabContainer";
 import { Table } from "../Common/Table";
-import { MoreActionsTooltip } from "../Common/ToolTip/MoreActionsTooltip";
+import { MoreActionsTooltip } from "../Common/ToolTip/MemberActionTooltip";
 import { MultipleContactActionsTooltip } from "../Common/ToolTip/MultipleContactActionsTooltip";
 import {
   useGetAllEmployeeGroups,

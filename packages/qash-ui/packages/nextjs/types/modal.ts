@@ -63,6 +63,8 @@ import CreateAccountModal from "@/components/Modal/Account/CreateAccountModal";
 import AddMemberModal from "@/components/Modal/Account/AddMemberModal";
 import DepositModal from "@/components/Modal/DepositModal";
 import InviteTeamMemberModal from "@/components/Modal/TeamMember/InviteTeamMemberModal";
+import RemoveTeamMember from "@/components/Modal/TeamMember/RemoveTeamMember";
+import EditTeamMember from "@/components/Modal/TeamMember/EditTeamMember";
 import { Group } from "./group-payment";
 import { CompanyGroupResponseDto, CompanyContactResponseDto } from "@qash/types/dto/employee";
 import { BatchTransaction } from "@/services/store/batchTransactions";
@@ -139,6 +141,8 @@ export const MODAL_IDS = {
   ADD_MEMBER: "ADD_MEMBER",
   DEPOSIT: "DEPOSIT",
   INVITE_TEAM_MEMBER: "INVITE_TEAM_MEMBER",
+  REMOVE_TEAM_MEMBER: "REMOVE_TEAM_MEMBER",
+  EDIT_TEAM_MEMBER: "EDIT_TEAM_MEMBER",
 } as const;
 
 export type ModalId = keyof typeof MODAL_IDS;
@@ -506,6 +510,15 @@ export interface DepositModalProps extends BaseModalProps {}
 
 export interface InviteTeamMemberModalProps extends BaseModalProps {}
 
+export interface RemoveTeamMemberProps extends BaseModalProps {
+  name: string;
+  onRemove: () => Promise<void>;
+}
+
+export interface EditTeamMemberProps extends BaseModalProps {
+  id: number;
+}
+
 export type ModalPropsMap = {
   [MODAL_IDS.SELECT_TOKEN]: SelectTokenModalProps;
   [MODAL_IDS.EDIT_TRANSACTION]: EditTransactionModalProps;
@@ -569,6 +582,8 @@ export type ModalPropsMap = {
   [MODAL_IDS.ADD_MEMBER]: AddMemberModalProps;
   [MODAL_IDS.DEPOSIT]: DepositModalProps;
   [MODAL_IDS.INVITE_TEAM_MEMBER]: InviteTeamMemberModalProps;
+  [MODAL_IDS.REMOVE_TEAM_MEMBER]: RemoveTeamMemberProps;
+  [MODAL_IDS.EDIT_TEAM_MEMBER]: EditTeamMemberProps;
 };
 
 export type ModalProps = ModalPropsMap[keyof ModalPropsMap];
@@ -637,4 +652,6 @@ export const modalRegistry = {
   [MODAL_IDS.ADD_MEMBER]: AddMemberModal,
   [MODAL_IDS.DEPOSIT]: DepositModal,
   [MODAL_IDS.INVITE_TEAM_MEMBER]: InviteTeamMemberModal,
+  [MODAL_IDS.REMOVE_TEAM_MEMBER]: RemoveTeamMember,
+  [MODAL_IDS.EDIT_TEAM_MEMBER]: EditTeamMember,
 } as const;
