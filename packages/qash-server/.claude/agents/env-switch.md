@@ -137,6 +137,10 @@ Check if docker-compose.yaml needs port updates. For GCP VM setup, ensure:
 - pgAdmin: ports: `4003:80`
 - redis: ports: `4004:6379`
 
+Also ensure container names are prefixed with `jupeng-` to avoid conflicts with teammates:
+- postgres: container_name: `jupeng-postgres-app`
+- pgAdmin: container_name: `jupeng-pgAdmin`
+
 These should already be configured correctly in the existing docker-compose.yaml.
 
 ### Step 6: Restart Services (optional)

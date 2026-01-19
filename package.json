@@ -21,6 +21,7 @@
     "dev:server": "pnpm --filter @qash/server start:dev",
     "dev:docs": "pnpm --filter @qash/docs start",
     "dev:types": "pnpm --filter @qash/types dev",
+    "dev:multisig-server": "cd packages/stateless-multisig-server && cargo run",
     
     "build": "pnpm run build:types && pnpm run -r build",
     "build:types": "pnpm --filter @qash/types build",

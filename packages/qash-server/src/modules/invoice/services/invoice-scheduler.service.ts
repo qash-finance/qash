@@ -28,7 +28,6 @@ export class InvoiceSchedulerService {
       const now = new Date();
       const schedules =
         await this.scheduleService.getSchedulesDueForGeneration(now);
-
       if (schedules.length === 0) {
         this.logger.debug('No invoices scheduled for generation');
         return;

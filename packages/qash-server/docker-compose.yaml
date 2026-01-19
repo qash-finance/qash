@@ -2,7 +2,7 @@ version: '3'
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: postgres-app
+    container_name: jupeng-postgres-app
     volumes:
       - progresDB:/var/lib/postgresql
     environment:
@@ -14,7 +14,7 @@ services:
       - '${POSTGRES_PORT}:5432'
   pgAdmin:
     image: dpage/pgadmin4
-    container_name: pgAdmin
+    container_name: jupeng-pgAdmin
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}

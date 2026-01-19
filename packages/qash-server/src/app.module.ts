@@ -27,6 +27,7 @@ import { InvoiceModule } from './modules/invoice/invoice.module';
 import { BillModule } from './modules/bill/bill.module';
 import { ClientModule } from './modules/client/client.module';
 import { ActivityLogModule } from './modules/activity-log/activity-log.module';
+import { MultisigModule } from './modules/multisig/multisig.module';
 import { envValidator } from './common/validators/env.validation';
 import { HttpValidationPipe } from './modules/shared/pipes/http-validation';
 
@@ -63,6 +64,7 @@ import { HttpValidationPipe } from './modules/shared/pipes/http-validation';
     BillModule,
     ClientModule,
     ActivityLogModule,
+    MultisigModule,
   ],
   controllers: [AppController],
   providers: [

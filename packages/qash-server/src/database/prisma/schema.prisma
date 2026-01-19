@@ -118,6 +118,7 @@ model Company {
   paymentLinks     PaymentLink[]
   invoiceSchedules InvoiceSchedule[]
   activityLogs     ActivityLog[]
+  multisigAccounts MultisigAccount[] // Miden multisig accounts owned by this company
 
   @@index([registrationNumber])
   @@index([companyName])
@@ -734,4 +735,124 @@ enum GenderEnum {
   FEMALE
   PREFER_NOT_TO_SAY
   OTHER
+}
+
+// ============================================================================
+// Multisig Models (for Miden integration)
+// ============================================================================
+
+model MultisigAccount {
+  id   Int    @id @default(autoincrement())
+  uuid String @unique @default(cuid()) @map("uuid")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  // The Miden account ID (bech32 format from Rust server)
+  accountId String @unique @map("account_id") @db.VarChar(255)
+
+  // Approver public keys (hex-encoded, uncompressed format)
+  publicKeys String[] @map("public_keys") @db.VarChar(255)
+
+  // Number of signatures required
+  threshold Int
+
+  // Link to company that owns this multisig account
+  companyId Int     @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Additional metadata
+  metadata Json? @db.Json
+
+  // Relations
+  proposals MultisigProposal[]
+
+  @@index([companyId])
+  @@index([accountId])
+  @@map("multisig_accounts")
+}
+
+model MultisigProposal {
+  id   Int    @id @default(autoincrement())
+  uuid String @unique @default(cuid()) @map("uuid")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  // Link to multisig account
+  accountId String          @map("account_id") @db.VarChar(255)
+  account   MultisigAccount @relation(fields: [accountId], references: [accountId], onDelete: Cascade)
+
+  // Proposal details
+  description  String                   @db.Text
+  proposalType MultisigProposalTypeEnum @default(CONSUME) @map("proposal_type")
+
+  // Transaction data from Miden (hex-encoded)
+  summaryCommitment String @map("summary_commitment") @db.VarChar(255)
+  summaryBytesHex   String @map("summary_bytes_hex") @db.Text
+  requestBytesHex   String @map("request_bytes_hex") @db.Text
+
+  // For CONSUME proposals: note IDs being consumed
+  noteIds String[] @map("note_ids") @db.VarChar(255)
+
+  // For SEND proposals: recipient and amount details
+  recipientId String? @map("recipient_id") @db.VarChar(255)
+  faucetId    String? @map("faucet_id") @db.VarChar(255)
+  amount      String? @db.VarChar(50)
+
+  // Proposal status
+  status MultisigProposalStatusEnum @default(PENDING)
+
+  // Transaction ID after execution
+  transactionId String? @map("transaction_id") @db.VarChar(255)
+
+  // Signatures collected
+  signatures MultisigSignature[]
+
+  // Additional metadata
+  metadata Json? @db.Json
+
+  @@index([accountId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("multisig_proposals")
+}
+
+model MultisigSignature {
+  id   Int    @id @default(autoincrement())
+  uuid String @unique @default(cuid()) @map("uuid")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  // Link to proposal
+  proposalId Int              @map("proposal_id")
+  proposal   MultisigProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  // Approver information
+  approverIndex     Int    @map("approver_index")
+  approverPublicKey String @map("approver_public_key") @db.VarChar(255)
+
+  // Signature (hex-encoded, from Para wallet)
+  signatureHex String @map("signature_hex") @db.Text
+
+  // Additional metadata
+  metadata Json? @db.Json
+
+  @@unique([proposalId, approverIndex])
+  @@index([proposalId])
+  @@map("multisig_signatures")
+}
+
+enum MultisigProposalTypeEnum {
+  CONSUME // Consume incoming notes
+  SEND // Send funds to another account
+}
+
+enum MultisigProposalStatusEnum {
+  PENDING // Waiting for signatures
+  READY // Has enough signatures, ready to execute
+  EXECUTED // Transaction executed successfully
+  FAILED // Transaction failed
+  CANCELLED // Proposal cancelled
 }
