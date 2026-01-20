@@ -27,7 +27,6 @@ export default function SettingContainer() {
   const [activeTab, setActiveTab] = useState<TabType>("account");
   const searchParams = useSearchParams();
   const teamAccountParam = searchParams.get("team-account");
-  console.log("🚀 ~ SettingContainer ~ teamAccountParam:", teamAccountParam);
 
   useEffect(() => {
     if (teamAccountParam) {

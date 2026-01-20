@@ -29,6 +29,7 @@ import { PrismaService } from 'src/database/prisma.service';
 import { handleError } from 'src/common/utils/errors';
 import { randomUUID } from 'crypto';
 import { ConfigService } from '@nestjs/config';
+import { CompanyModel } from 'src/database/generated/models';
 
 @Injectable()
 export class TeamMemberService {
@@ -200,7 +201,17 @@ export class TeamMemberService {
 
         // Send invitation email
         try {
-          await this.sendInvitationEmail(teamMember, company, invitationToken);
+          const stats = await this.teamMemberRepository.getCompanyStats(
+            companyId,
+            tx,
+          );
+          await this.sendInvitationEmail(
+            teamMember,
+            company,
+            invitationToken,
+            inviteDto.email,
+            stats.total,
+          );
         } catch (error) {
           this.logger.error('Failed to send invitation email:', error);
           // Don't throw error, invitation is created but email failed
@@ -742,10 +753,16 @@ export class TeamMemberService {
         }
 
         // Send invitation email
+        const stats = await this.teamMemberRepository.getCompanyStats(
+          teamMember.companyId,
+          tx,
+        );
         await this.sendInvitationEmail(
           { ...teamMember, invitationToken },
           company,
           invitationToken,
+          teamMember.user?.email,
+          stats.total,
         );
 
         return { message: 'Invitation resent successfully' };
@@ -905,24 +922,31 @@ export class TeamMemberService {
    */
   private async sendInvitationEmail(
     teamMember: any,
-    company: any,
+    company: CompanyModel,
     invitationToken: string,
+    toEmail: string,
+    teamMemberCount: number,
   ) {
     const subject = `Invitation to join ${company.companyName}`;
     const html = this.getInvitationEmailTemplate(
       teamMember,
       company,
       invitationToken,
+      teamMemberCount,
     );
 
-    // Get email from user relation
-    const email = teamMember.user?.email || teamMember.email;
+    const mailgunDomain = this.configService.get<string>('MAILGUN_DOMAIN');
 
-    await this.mailService.sendEmail({
-      to: email,
+    const fromEmail = 'noreply@' + mailgunDomain;
+
+    const emailData = {
+      to: toEmail,
+      fromEmail,
       subject,
       html,
-    });
+    };
+
+    await this.mailService.sendEmail(emailData);
   }
 
   /**
@@ -930,13 +954,14 @@ export class TeamMemberService {
    */
   private getInvitationEmailTemplate(
     teamMember: any,
-    company: any,
+    company: CompanyModel,
     invitationToken: string,
+    teamMemberCount: number,
   ): string {
     const frontendUrl =
       this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
-    const acceptUrl = `${frontendUrl}/invite/accept?token=${invitationToken}`;
-    const email = teamMember.user?.email || teamMember.email;
+    const acceptUrl = `${frontendUrl}/team-invite?token=${invitationToken}&company=${encodeURIComponent(company.companyName)}&teamMemberCount=${teamMemberCount}`;
+    const firstName = teamMember.firstName || 'there';
 
     return `
       <!DOCTYPE html>
@@ -945,98 +970,32 @@ export class TeamMemberService {
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Team Invitation</title>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { text-align: center; margin-bottom: 30px; }
-          .invitation-box { 
-            background: #f8f9fa; 
-            border: 2px solid #007bff; 
-            border-radius: 8px; 
-            padding: 20px; 
-            margin: 20px 0; 
-          }
-          .company-info {
-            background: #e9ecef;
-            padding: 15px;
-            border-radius: 4px;
-            margin: 15px 0;
-          }
-          .role-badge {
-            display: inline-block;
-            background: #007bff;
-            color: white;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: bold;
-          }
-          .cta-button {
-            display: inline-block;
-            background: #007bff;
-            color: white;
-            padding: 12px 24px;
-            text-decoration: none;
-            border-radius: 4px;
-            margin: 20px 0;
-          }
-          .footer { 
-            text-align: center; 
-            margin-top: 30px; 
-            font-size: 14px; 
-            color: #666; 
-          }
-          .expiry-notice {
-            background: #fff3cd;
-            border: 1px solid #ffc107;
-            padding: 10px;
-            border-radius: 4px;
-            margin: 15px 0;
-            font-size: 14px;
-          }
-        </style>
       </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>You're Invited to Join a Team!</h1>
-          </div>
-          
-          <p>Hello ${teamMember.firstName} ${teamMember.lastName},</p>
-          
-          <p>You have been invited to join <strong>${company.companyName}</strong> as a team member.</p>
-          
-          <div class="invitation-box">
-            <h3>Invitation Details</h3>
-            <div class="company-info">
-              <strong>Company:</strong> ${company.companyName}<br>
-              <strong>Registration:</strong> ${company.registrationNumber}<br>
-              <strong>Your Role:</strong> <span class="role-badge">${teamMember.role}</span><br>
-              ${teamMember.position ? `<strong>Position:</strong> ${teamMember.position}<br>` : ''}
+      <body style="margin: 0; padding: 0; background: #0e3ee0; font-family: 'Barlow', Arial, sans-serif; color: #0f172a;">
+        <img src="https://raw.githubusercontent.com/qash-finance/qash-server/refs/heads/main/images/top.png" style="height: 50px; width: 100%; display: block;" alt=""/>
+        <div style="width: 100%; background: #0e3ee0; padding: 32px 12px; box-sizing: border-box;">
+          <div style="max-width: 720px; margin: 0 auto; background: #f5f7fb; overflow: hidden;">
+            <div style="padding: 24px 24px 0 24px; text-align: left; border-bottom: 1px solid rgba(153, 160, 174, 0.24);">
+              <p style="font-size: 24px; font-weight: 600; margin: 0 0 16px 0; color: #1b1b1b; line-height: 1;">Your invitation to join ${company.companyName}</p>
             </div>
-          </div>
-          
-          <div class="expiry-notice">
-            ⏰ This invitation expires in 7 days. Please accept it before it expires.
-          </div>
-          
-          <div style="text-align: center;">
-            <a href="${acceptUrl}" class="cta-button">Accept Invitation</a>
-          </div>
-          
-          <p><strong>What you'll be able to do:</strong></p>
-          <ul>
-            ${teamMember.role === 'OWNER' ? '<li>Full company management access</li><li>Manage all team members including admins</li><li>Create and manage payroll, invoices, and clients</li>' : ''}
-            ${teamMember.role === 'ADMIN' ? '<li>Manage reviewers and viewers</li><li>Create and manage payroll, invoices, and clients</li><li>View all company data</li>' : ''}
-            ${teamMember.role === 'REVIEWER' ? '<li>Review and approve transactions</li><li>View all company data</li>' : ''}
-            ${teamMember.role === 'VIEWER' ? '<li>View company information</li><li>Access team directory</li><li>View reports and dashboards</li>' : ''}
-          </ul>
-          
-          <p>If you have any questions, please contact the person who invited you.</p>
-          
-          <div class="footer">
-            <p>This invitation was sent to ${email}</p>
-            <p>If you didn't expect this invitation, you can safely ignore this email.</p>
+            <div style="padding: 24px 24px 0 24px;">
+              <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px;">
+                <p style="font-size: 14px; font-weight: 600; margin: 0; color: #1b1b1b; line-height: 20px;">Hi ${firstName},</p>
+                <p style="font-size: 14px; font-weight: 500; margin: 0; color: #848484; line-height: 20px;">You've been invited to join the ${company.companyName} on Qash. Please click the button below to accept the invitation.</p>
+              </div>
+            </div>
+            <div style="padding: 24px 24px; border-top: 1px dashed rgba(153, 160, 174, 0.4); text-align: center;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(0deg, #002c69 0%, #0061e7 100%); border-radius: 10px; padding: 2px; margin: 0;">
+                <tr>
+                  <td align="center" style="background: #066eff; border-top: 2px solid #4888ff; border-radius: 8px; padding: 8px 12px;">
+                    <a href="${acceptUrl}" style="color: white; font-size: 14px; text-decoration: none; font-weight: 500; display: block; line-height: 20px;">Join now</a>
+                  </td>
+                </tr>
+              </table>
+            </div>
+            <div style="padding: 0 24px 28px 24px; font-size: 13px; color: #6b7280; line-height: 1.5;">
+              <p style="margin: 0;">This is an automated message, please do not reply to this email.</p>
+            </div>
           </div>
         </div>
       </body>

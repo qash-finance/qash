@@ -1,7 +1,8 @@
 import { IsString, IsInt, IsArray, IsOptional, Min, ArrayMinSize, IsEnum } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import type * as SharedTypes from '@qash/types/dto/multisig';
 
-export class CreateMultisigAccountDto {
+export class CreateMultisigAccountDto implements SharedTypes.CreateMultisigAccountDto {
   @ApiProperty({
     description: 'Array of approver public keys (hex-encoded, uncompressed format)',
     example: ['0x04...', '0x04...'],
@@ -27,9 +28,19 @@ export class CreateMultisigAccountDto {
   @IsInt()
   @Min(1)
   companyId: number;
+
+  @ApiProperty({
+    description: 'Additional team member IDs to add to the account (owner is added automatically)',
+    example: [2, 3],
+    required: false,
+  })
+  @IsArray()
+  @IsInt({ each: true })
+  @IsOptional()
+  teamMemberIds?: number[];
 }
 
-export class CreateConsumeProposalDto {
+export class CreateConsumeProposalDto implements SharedTypes.CreateConsumeProposalDto {
   @ApiProperty({
     description: 'Multisig account ID (bech32 format)',
     example: 'mtst1abc123...',
@@ -54,7 +65,7 @@ export class CreateConsumeProposalDto {
   noteIds: string[];
 }
 
-export class CreateSendProposalDto {
+export class CreateSendProposalDto implements SharedTypes.CreateSendProposalDto {
   @ApiProperty({
     description: 'Multisig account ID (bech32 format)',
     example: 'mtst1abc123...',
@@ -92,7 +103,7 @@ export class CreateSendProposalDto {
   amount: number;
 }
 
-export class SubmitSignatureDto {
+export class SubmitSignatureDto implements SharedTypes.SubmitSignatureDto {
   @ApiProperty({
     description: 'Index of the approver in the approvers array',
     example: 0,
@@ -116,7 +127,7 @@ export class SubmitSignatureDto {
   signatureHex: string;
 }
 
-export class MultisigAccountResponseDto {
+export class MultisigAccountResponseDto implements SharedTypes.MultisigAccountResponseDto {
   @ApiProperty()
   id: number;
 
@@ -135,6 +146,16 @@ export class MultisigAccountResponseDto {
   @ApiProperty()
   companyId: number;
 
+  @ApiProperty({ type: [Object], required: false })
+  teamMembers?: Array<{
+    id: number;
+    uuid: string;
+    multisigAccountId: number;
+    teamMemberId: number;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
+
   @ApiProperty()
   createdAt: Date;
 
@@ -142,7 +163,7 @@ export class MultisigAccountResponseDto {
   updatedAt: Date;
 }
 
-export class MultisigProposalResponseDto {
+export class MultisigProposalResponseDto implements SharedTypes.MultisigProposalResponseDto {
   @ApiProperty()
   id: number;
 
@@ -197,7 +218,7 @@ export class MultisigProposalResponseDto {
   updatedAt: Date;
 }
 
-export class ExecuteTransactionResponseDto {
+export class ExecuteTransactionResponseDto implements SharedTypes.ExecuteTransactionResponseDto {
   @ApiProperty()
   success: boolean;
 

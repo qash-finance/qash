@@ -9,7 +9,7 @@ import InputOutlined from "../Common/Input/InputOutlined";
 import { useAuth } from "@/services/auth/context";
 import toast from "react-hot-toast";
 import { User } from "@/types/user";
-import { useModal as useParaModal } from "@getpara/react-sdk";
+import { useModal as useParaModal, useWallet } from "@getpara/react-sdk";
 import { useParaMiden } from "miden-para-react";
 import { useAccount as useParaAccount } from "@getpara/react-sdk";
 import { PrimaryButton } from "../Common/PrimaryButton";
@@ -27,6 +27,7 @@ export default function LoginContainer() {
   const { openModal: openParaModal } = useParaModal();
   const { para } = useParaMiden("https://rpc.testnet.miden.io");
   const { isConnected } = useParaAccount();
+  const { data: wallet } = useWallet();
   const isAuthenticatingRef = useRef(false);
 
   // Handle Para authentication after connection
@@ -53,8 +54,11 @@ export default function LoginContainer() {
 
       console.log("Para JWT issued:", { keyId: jwtResult.keyId });
 
-      // Send JWT to backend
-      const userData = await loginWithPara(jwtResult.token);
+      // Extract wallet public key
+      const publicKey = wallet?.publicKey;
+
+      // Send JWT and publicKey to backend
+      const userData = await loginWithPara(jwtResult.token, publicKey);
 
       toast.success("Successfully authenticated");
 

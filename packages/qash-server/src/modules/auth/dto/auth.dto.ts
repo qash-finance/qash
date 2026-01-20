@@ -207,6 +207,13 @@ export class SetJwtCookieDto {
   @IsString({ message: 'JWT token must be a string' })
   @IsNotEmpty({ message: 'JWT token is required' })
   token: string;
+
+  @ApiPropertyOptional({
+    description: 'Wallet public key from Para wallet',
+    example: '0x04a1b2c3...',
+  })
+  @IsString({ message: 'Public key must be a string' })
+  publicKey?: string;
 }
 
 export class SetJwtCookieResponseDto {

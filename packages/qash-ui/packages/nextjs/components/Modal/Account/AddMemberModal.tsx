@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
 import { Tooltip } from "react-tooltip";
-import { SelectClientModalProps } from "@/types/modal";
+import { AddMemberModalProps, SelectClientModalProps } from "@/types/modal";
 import { ModalProp } from "@/contexts/ModalManagerProvider";
 import { ModalHeader } from "../../Common/ModalHeader";
 import BaseModal from "../BaseModal";
@@ -9,68 +9,20 @@ import { CustomCheckbox } from "@/components/Common/CustomCheckbox";
 import { SecondaryButton } from "@/components/Common/SecondaryButton";
 import { CustomBlueCheckbox } from "@/components/Common/Checkbox/CustomBlueCheckbox";
 import { MemberRoleTooltip } from "@/components/Common/ToolTip/MemberRoleTooltip";
+import { TeamMemberRoleEnum } from "@qash/types/enums";
+import { useGetCompanyTeamMembers } from "@/services/api/team-member";
+import { useGetMyCompany } from "@/services/api/company";
+import { useAuth } from "@/services/auth/context";
 
 interface MemberData {
-  id: string;
+  id: number;
   name: string;
   email: string;
-  role: "Admin" | "Viewer" | "Owner";
+  role: TeamMemberRoleEnum;
   companyRole?: string;
   avatar?: string;
   isSelected?: boolean;
 }
-
-// Mock data for members - replace with real data from API
-const mockMembers: MemberData[] = [
-  {
-    id: "1",
-    name: "Kaito Yamamoto",
-    email: "kaitoyamato@gmail.com",
-    role: "Admin",
-    companyRole: "CFO",
-    isSelected: true,
-  },
-  {
-    id: "2",
-    name: "Yuki Nakamura",
-    email: "yuki@gmail.com",
-    role: "Admin",
-    companyRole: "CTO",
-    isSelected: true,
-  },
-  {
-    id: "3",
-    name: "Kristin Watson",
-    email: "yuki@gmail.com",
-    role: "Admin",
-    companyRole: "HR",
-    isSelected: true,
-  },
-  {
-    id: "4",
-    name: "Jacob Jones",
-    email: "yuki@gmail.com",
-    role: "Viewer",
-    companyRole: "Employee",
-    isSelected: true,
-  },
-  {
-    id: "5",
-    name: "Albert Flores",
-    email: "yuki@gmail.com",
-    role: "Viewer",
-    companyRole: "Employee",
-    isSelected: true,
-  },
-  {
-    id: "6",
-    name: "Cody Fisher",
-    email: "yuki@gmail.com",
-    role: "Viewer",
-    companyRole: "Employee",
-    isSelected: false,
-  },
-];
 
 const MemberRow = ({
   member,
@@ -78,32 +30,35 @@ const MemberRow = ({
   onRoleChange,
 }: {
   member: MemberData;
-  onSelect: (id: string) => void;
-  onRoleChange: (id: string, role: "Admin" | "Viewer") => void;
+  onSelect: (id: number) => void;
+  onRoleChange: (id: number, role: TeamMemberRoleEnum) => void;
 }) => {
-  const getRoleIcon = (role: string) => {
+  const getRoleIcon = (role: TeamMemberRoleEnum) => {
     switch (role) {
-      case "Admin":
+      case "ADMIN":
         return "/misc/green-shield-icon.svg";
-      case "Viewer":
+      case "VIEWER":
         return "/misc/orange-eye-icon.svg";
-      case "Owner":
+      case "REVIEWER":
+        return "/misc/blue-note-icon.svg";
+      case "OWNER":
         return "/misc/purple-crown-icon.svg";
-      default:
-        return "";
     }
   };
 
-  const tooltipId = `role-tooltip-${member.id}`;
-
   return (
-    <div className="flex items-center justify-between py-3 px-2 hover:bg-app-background rounded-lg transition-colors w-full">
-      <div className="flex gap-2 items-center flex-1">
+    <div
+      className="flex items-center justify-between p-2 hover:bg-app-background rounded-lg transition-colors w-full cursor-pointer"
+      onClick={() => onSelect(member.id)}
+    >
+      <div className="flex gap-3 items-center flex-1">
         <CustomBlueCheckbox checked={member.isSelected ?? false} onChange={() => onSelect(member.id)} />
-        <div className="flex gap-3 items-center flex-1">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-xs font-bold">
-            {member.name.charAt(0)}
-          </div>
+        <div className="flex gap-1 items-center flex-1">
+          <img
+            src={member.avatar || "/misc/default-team-member-avatar.svg"}
+            alt="avatar"
+            className="w-8 h-8 rounded-full"
+          />
           <div className="flex flex-col gap-1">
             <div className="flex gap-2 items-center">
               <p className="text-sm font-medium text-text-primary leading-none">{member.name}</p>
@@ -116,50 +71,47 @@ const MemberRow = ({
         </div>
       </div>
       <div className="flex gap-2 items-center">
-        <div
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg cursor-pointer hover:bg-app-background transition-colors"
-          data-tooltip-id={tooltipId}
-          data-tooltip-place="top"
-        >
+        <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg cursor-pointer hover:bg-app-background transition-colors">
           {getRoleIcon(member.role) && <img src={getRoleIcon(member.role)} alt={member.role} className="w-5 h-5" />}
-          <p className="text-sm font-medium text-text-primary">{member.role}</p>
-          <img src="/arrow/chevron-down.svg" alt="expand" className="w-4 rotate-180" />
+          <p className="text-sm font-medium text-text-primary leading-none">{member.role}</p>
         </div>
-        <Tooltip
-          id={tooltipId}
-          clickable
-          style={{
-            zIndex: 20,
-            borderRadius: "16px",
-            padding: "0",
-          }}
-          place="bottom"
-          noArrow
-          border="none"
-          opacity={1}
-          render={({ content }) => (
-            <MemberRoleTooltip
-              currentRole={member.role as "Admin" | "Viewer"}
-              onRoleChange={role => {
-                onRoleChange(member.id, role);
-              }}
-            />
-          )}
-        />
       </div>
     </div>
   );
 };
 
-interface AddMemberModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onMembersSelected?: (members: MemberData[]) => void;
-}
+export function AddMemberModal({
+  isOpen,
+  onClose,
+  onMembersSelected,
+  selectedMembers = [],
+}: ModalProp<AddMemberModalProps>) {
+  const { data: company } = useGetMyCompany();
+  const { data: teamMembersData, isLoading } = useGetCompanyTeamMembers(company?.id);
+  const { user } = useAuth();
 
-export function AddMemberModal({ isOpen, onClose, onMembersSelected }: AddMemberModalProps) {
-  const [members, setMembers] = useState<MemberData[]>(mockMembers);
+  const [members, setMembers] = useState<MemberData[]>([]);
   const [search, setSearch] = useState("");
+
+  // Map API response to local state when data loads
+  useEffect(() => {
+    if (teamMembersData && user && selectedMembers.length > 0) {
+      const mappedMembers: MemberData[] = teamMembersData
+        .filter(tm => tm.user!.email !== user?.email)
+        .map(tm => {
+          const isSelected = selectedMembers.some(sm => sm.id === tm.id);
+          return {
+            id: tm.id,
+            name: `${tm.firstName} ${tm.lastName}`,
+            email: tm.user!.email,
+            role: tm.role,
+            companyRole: tm.position,
+            isSelected: isSelected,
+          };
+        });
+      setMembers(mappedMembers);
+    }
+  }, [teamMembersData, selectedMembers]);
 
   const selectedCount = members.filter(m => m.isSelected).length;
   const totalCount = members.length;
@@ -172,11 +124,11 @@ export function AddMemberModal({ isOpen, onClose, onMembersSelected }: AddMember
     );
   }, [members, search]);
 
-  const handleSelectMember = (id: string) => {
+  const handleSelectMember = (id: number) => {
     setMembers(prev => prev.map(m => (m.id === id ? { ...m, isSelected: !m.isSelected } : m)));
   };
 
-  const handleRoleChange = (id: string, role: "Admin" | "Viewer") => {
+  const handleRoleChange = (id: number, role: TeamMemberRoleEnum) => {
     setMembers(prev => prev.map(m => (m.id === id ? { ...m, role } : m)));
   };
 
@@ -218,7 +170,11 @@ export function AddMemberModal({ isOpen, onClose, onMembersSelected }: AddMember
 
         {/* Members list */}
         <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto px-6">
-          {filteredMembers.length > 0 ? (
+          {isLoading ? (
+            <div className="flex items-center justify-center h-32">
+              <p className="text-text-secondary">Loading members...</p>
+            </div>
+          ) : filteredMembers.length > 0 ? (
             filteredMembers.map(member => (
               <MemberRow
                 key={member.id}

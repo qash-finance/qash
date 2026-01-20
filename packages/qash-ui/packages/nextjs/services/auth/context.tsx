@@ -13,7 +13,7 @@ export interface AuthState {
 }
 
 export interface AuthContextValue extends AuthState {
-  loginWithPara: (paraJwtToken: string) => Promise<AuthMeResponse["user"] | null>;
+  loginWithPara: (paraJwtToken: string, publicKey?: string) => Promise<AuthMeResponse["user"] | null>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   clearError: () => void;
@@ -72,11 +72,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setError(null);
   };
 
-  const loginWithPara = async (paraJwtToken: string): Promise<AuthMeResponse["user"] | null> => {
+  const loginWithPara = async (paraJwtToken: string, publicKey?: string): Promise<AuthMeResponse["user"] | null> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     try {
-      // Send Para JWT to backend to set cookie
-      const response = await api.setParaJwtCookie(paraJwtToken);
+      // Send Para JWT and publicKey to backend to set cookie
+      const response = await api.setParaJwtCookie(paraJwtToken, publicKey);
 
       const userData: UserData = response.user ?? null;
 

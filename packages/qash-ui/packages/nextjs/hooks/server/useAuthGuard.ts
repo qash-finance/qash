@@ -3,8 +3,7 @@
 import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/services/auth/context";
-
-const PUBLIC_ROUTES = ["/login", "/onboarding", "/payment", "/invoice-review", "/mobile"];
+import { PUBLIC_ROUTES } from "@/services/utils/constant";
 
 export function useAuthGuard(redirectTo: string = "/login") {
   const { isAuthenticated, isLoading } = useAuth();

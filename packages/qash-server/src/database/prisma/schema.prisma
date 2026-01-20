@@ -18,6 +18,7 @@ model User {
   role      UserRoleEnum @default(USER)
   isActive  Boolean      @default(true) @map("is_active")
   lastLogin DateTime?    @map("last_login") @db.Timestamp(6)
+  publicKey String?      @map("public_key") @db.Text
 
   teamMembership TeamMember? // 1:1 relationship, each user is a company team member
   invitedMembers TeamMember[] @relation("TeamMemberInviter")
@@ -60,19 +61,20 @@ model TeamMember {
   metadata Json? @db.Json
 
   // Audit trail - created entities
-  createdEmployees    Employee[]    @relation("EmployeeCreatedBy")
-  updatedEmployees    Employee[]    @relation("EmployeeUpdatedBy")
-  createdClients      Client[]      @relation("ClientCreatedBy")
-  updatedClients      Client[]      @relation("ClientUpdatedBy")
-  createdPayrolls     Payroll[]     @relation("PayrollCreatedBy")
-  updatedPayrolls     Payroll[]     @relation("PayrollUpdatedBy")
-  createdInvoices     Invoice[]     @relation("InvoiceCreatedBy")
-  updatedInvoices     Invoice[]     @relation("InvoiceUpdatedBy")
-  createdBills        Bill[]        @relation("BillCreatedBy")
-  updatedBills        Bill[]        @relation("BillUpdatedBy")
-  createdPaymentLinks PaymentLink[] @relation("PaymentLinkCreatedBy")
-  updatedPaymentLinks PaymentLink[] @relation("PaymentLinkUpdatedBy")
+  createdEmployees    Employee[]              @relation("EmployeeCreatedBy")
+  updatedEmployees    Employee[]              @relation("EmployeeUpdatedBy")
+  createdClients      Client[]                @relation("ClientCreatedBy")
+  updatedClients      Client[]                @relation("ClientUpdatedBy")
+  createdPayrolls     Payroll[]               @relation("PayrollCreatedBy")
+  updatedPayrolls     Payroll[]               @relation("PayrollUpdatedBy")
+  createdInvoices     Invoice[]               @relation("InvoiceCreatedBy")
+  updatedInvoices     Invoice[]               @relation("InvoiceUpdatedBy")
+  createdBills        Bill[]                  @relation("BillCreatedBy")
+  updatedBills        Bill[]                  @relation("BillUpdatedBy")
+  createdPaymentLinks PaymentLink[]           @relation("PaymentLinkCreatedBy")
+  updatedPaymentLinks PaymentLink[]           @relation("PaymentLinkUpdatedBy")
   activityLogs        ActivityLog[]
+  multisigAccounts    MultisigAccountMember[]
 
   @@index([companyId])
   @@index([role])
@@ -633,6 +635,8 @@ enum ActivityEntityTypeEnum {
   PAYMENT_LINK
   EMPLOYEE_GROUP
   COMPANY
+  MULTISIG_ACCOUNT
+  MULTISIG_PROPOSAL
 }
 
 enum ContractTermEnum {
@@ -765,7 +769,8 @@ model MultisigAccount {
   metadata Json? @db.Json
 
   // Relations
-  proposals MultisigProposal[]
+  proposals   MultisigProposal[]
+  teamMembers MultisigAccountMember[]
 
   @@index([companyId])
   @@index([accountId])
@@ -842,6 +847,30 @@ model MultisigSignature {
   @@unique([proposalId, approverIndex])
   @@index([proposalId])
   @@map("multisig_signatures")
+}
+
+model MultisigAccountMember {
+  id   Int    @id @default(autoincrement())
+  uuid String @unique @default(cuid()) @map("uuid")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  // Link to multisig account
+  multisigAccountId Int             @map("multisig_account_id")
+  multisigAccount   MultisigAccount @relation(fields: [multisigAccountId], references: [id], onDelete: Cascade)
+
+  // Link to team member
+  teamMemberId Int        @map("team_member_id")
+  teamMember   TeamMember @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
+
+  // Additional metadata (e.g., role, permissions, joined date)
+  metadata Json? @db.Json
+
+  @@unique([multisigAccountId, teamMemberId])
+  @@index([multisigAccountId])
+  @@index([teamMemberId])
+  @@map("multisig_account_members")
 }
 
 enum MultisigProposalTypeEnum {

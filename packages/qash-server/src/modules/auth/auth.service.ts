@@ -144,7 +144,10 @@ export class AuthService {
    * Sync user from Para JWT token to our database
    * Creates user if doesn't exist, updates last login if exists
    */
-  async syncUserFromParaToken(paraPayload: ParaJwtPayload): Promise<UserModel> {
+  async syncUserFromParaToken(
+    paraPayload: ParaJwtPayload,
+    publicKey?: string,
+  ): Promise<UserModel> {
     try {
       const email = paraPayload.email || paraPayload.data.identifier;
 
@@ -156,11 +159,12 @@ export class AuthService {
       let user = await this.userRepository.findByEmail(email);
 
       if (!user) {
-        // Create new user
+        // Create new user with publicKey
         this.logger.log(`Creating new user from Para token: ${email}`);
         user = await this.userRepository.create({
           email,
           isActive: true,
+          publicKey,
         });
       } else {
         // Update last login for existing user
@@ -168,6 +172,12 @@ export class AuthService {
           await this.userRepository.activate(user.id);
         }
         await this.userRepository.updateLastLogin(user.id);
+        
+        // Update publicKey if provided and different from existing
+        if (publicKey && user.publicKey !== publicKey) {
+          await this.userRepository.updateById(user.id, { publicKey });
+        }
+        
         // Refresh user data
         user = await this.userRepository.findById(user.id);
       }
@@ -185,12 +195,14 @@ export class AuthService {
    * @param token - JWT token from Para
    * @param response - Express Response object to set cookie
    * @param request - Express Request object to check protocol
+   * @param publicKey - Optional wallet public key from Para
    * @returns Success message
    */
   async validateAndSetJwtCookie(
     token: string,
     response: Response,
     request?: Request,
+    publicKey?: string,
   ): Promise<{ message: string }> {
     try {
       this.logger.log(
@@ -207,9 +219,9 @@ export class AuthService {
           `Email: ${paraPayload.email || 'unknown'}`,
       );
 
-      // Sync user to database
+      // Sync user to database with publicKey
       this.logger.log(`🔄 Syncing user to database...`);
-      await this.syncUserFromParaToken(paraPayload);
+      await this.syncUserFromParaToken(paraPayload, publicKey);
       this.logger.log(`✅ User synced successfully`);
 
       // Simple detection: Check if behind proxy (GCP load balancer sets X-Forwarded-Proto)

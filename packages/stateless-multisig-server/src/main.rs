@@ -48,7 +48,7 @@ async fn main() -> anyhow::Result<()> {
     let port = std::env::var("PORT")
         .ok()
         .and_then(|p| p.parse::<u16>().ok())
-        .unwrap_or(4010);
+        .unwrap_or(3005);
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     tracing::info!("Server listening on {}", addr);
 

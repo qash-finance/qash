@@ -20,5 +20,6 @@ export * from './dto/payment-link.js';
 export * from './dto/payroll.js';
 export * from './dto/invoice.js';
 export * from './dto/bill.js';
+export * from './dto/multisig.js';
 export * from './dto/token.js';
 export * from './dto/network.js';

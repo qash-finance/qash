@@ -504,6 +504,7 @@ export interface CreateAccountModalProps extends BaseModalProps {
 
 export interface AddMemberModalProps extends BaseModalProps {
   onMembersSelected?: (members: any[]) => void;
+  selectedMembers?: any[];
 }
 
 export interface DepositModalProps extends BaseModalProps {}

@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
+import { PUBLIC_ROUTES } from "../utils/constant";
 
 // Extract user-friendly error message from API response
 function extractErrorMessage(errorData: any): string {
@@ -152,12 +153,7 @@ const apiServerWithAuth = new AuthenticatedApiClient(
   () => {
     if (typeof window === "undefined") return;
     const currentPath = window.location.pathname || "";
-    const isPublic =
-      currentPath.startsWith("/login") ||
-      currentPath.startsWith("/onboarding") ||
-      currentPath.startsWith("/payment") ||
-      currentPath.startsWith("/invoice-review") ||
-      currentPath.startsWith("/mobile");
+    const isPublic = PUBLIC_ROUTES.some(route => currentPath.startsWith(route));
     if (!isPublic) {
       console.log("🔐 Redirecting to login due to 401 error");
       window.location.href = "/login";

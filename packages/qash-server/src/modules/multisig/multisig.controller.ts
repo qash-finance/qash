@@ -20,12 +20,13 @@ import {
 } from './dto/multisig.dto';
 import { ParaJwtAuthGuard } from '../auth/guards/para-jwt-auth.guard';
 import { Public } from '../auth/decorators/public.decorator';
+import { CompanyAuth } from '../auth/decorators/company-auth.decorator';
+import { CurrentUser, UserWithCompany } from '../auth/decorators/current-user.decorator';
 
 @ApiTags('Multisig')
 @Controller('multisig')
 @UseGuards(ParaJwtAuthGuard)
 @ApiBearerAuth()
-@Public()  // Temporarily make all multisig endpoints public for testing
 export class MultisigController {
   constructor(private readonly multisigService: MultisigService) {}
 
@@ -34,6 +35,7 @@ export class MultisigController {
   // ============================================================================
 
   @Post('accounts')
+  @CompanyAuth()
   @ApiOperation({ summary: 'Create a new multisig account' })
   @ApiResponse({
     status: 201,
@@ -42,8 +44,9 @@ export class MultisigController {
   })
   async createAccount(
     @Body() dto: CreateMultisigAccountDto,
+    @CurrentUser('withCompany') user: UserWithCompany,
   ): Promise<MultisigAccountResponseDto> {
-    return this.multisigService.createAccount(dto);
+    return this.multisigService.createAccount(dto, user);
   }
 
   @Get('accounts/:accountId')

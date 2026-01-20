@@ -50,6 +50,7 @@ const fullscreenPages = new Set([
   "/payment/",
   "/invoice-review",
   "/invoice/create",
+  "/team-invite",
 ]);
 
 const TestnetBanner = () => (

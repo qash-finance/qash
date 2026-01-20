@@ -10,11 +10,13 @@ import { Prisma, PrismaClient } from 'src/database/generated/client';
 export interface CreateUserData {
   email: string;
   isActive?: boolean;
+  publicKey?: string;
 }
 
 export interface UpdateUserData {
   isActive?: boolean;
   lastLogin?: Date;
+  publicKey?: string;
 }
 
 @Injectable()
@@ -68,6 +70,7 @@ export class UserRepository extends BaseRepository<
       data: {
         email: data.email,
         isActive: data.isActive ?? true,
+        publicKey: data.publicKey,
       },
     });
   }

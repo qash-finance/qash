@@ -15,7 +15,7 @@ export class MidenClientService {
   constructor(private configService: ConfigService) {
     this.midenServerUrl =
       this.configService.get<string>('MIDEN_SERVER_URL') ||
-      'http://localhost:4001';
+      'http://localhost:3005';
 
     this.client = axios.create({
       baseURL: this.midenServerUrl,

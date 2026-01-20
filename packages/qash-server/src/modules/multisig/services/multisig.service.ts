@@ -15,6 +15,9 @@ import {
   MultisigProposalResponseDto,
   ExecuteTransactionResponseDto,
 } from '../dto/multisig.dto';
+import { UserWithCompany } from '../../auth/decorators/current-user.decorator';
+import { ActivityActionEnum, ActivityEntityTypeEnum } from '../../../database/generated/client';
+import { ActivityLogService } from 'src/modules/activity-log/activity-log.service';
 
 @Injectable()
 export class MultisigService {
@@ -23,6 +26,7 @@ export class MultisigService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly midenClient: MidenClientService,
+    private readonly activityLogService: ActivityLogService,
   ) {}
 
   /**
@@ -30,10 +34,18 @@ export class MultisigService {
    */
   async createAccount(
     dto: CreateMultisigAccountDto,
+    user: UserWithCompany,
   ): Promise<MultisigAccountResponseDto> {
     this.logger.log(
       `Creating multisig account for company ${dto.companyId} with threshold ${dto.threshold}`,
     );
+
+    // Verify company matches authenticated user's company
+    if (dto.companyId !== user.company.id) {
+      throw new BadRequestException(
+        'Cannot create multisig account for a different company',
+      );
+    }
 
     // Validate company exists
     const company = await this.prisma.company.findUnique({
@@ -53,23 +65,78 @@ export class MultisigService {
       );
     }
 
+    // Get team member (owner/creator)
+    const creatorTeamMember = await this.prisma.teamMember.findUnique({
+      where: { userId: user.internalUserId },
+    });
+
+    if (!creatorTeamMember) {
+      throw new NotFoundException(
+        `Team member not found for user ${user.internalUserId}`,
+      );
+    }
+
+    // Prepare team member IDs (always include creator)
+    const memberIds = new Set([creatorTeamMember.id]);
+    if (dto.teamMemberIds) {
+      dto.teamMemberIds.forEach(id => memberIds.add(id));
+    }
+
+    // Verify all team members exist and belong to the company
+    const teamMembers = await this.prisma.teamMember.findMany({
+      where: {
+        id: { in: Array.from(memberIds) },
+        companyId: dto.companyId,
+      },
+    });
+
+    if (teamMembers.length !== memberIds.size) {
+      throw new BadRequestException(
+        'One or more team members do not exist or do not belong to this company',
+      );
+    }
+
     // Create account via Miden client
     const { accountId } = await this.midenClient.createMultisigAccount(
       dto.publicKeys,
       dto.threshold,
     );
 
-    // Store in database
+    // Store in database with team members
     const account = await this.prisma.multisigAccount.create({
       data: {
         accountId,
         publicKeys: dto.publicKeys,
         threshold: dto.threshold,
         companyId: dto.companyId,
+        teamMembers: {
+          create: Array.from(memberIds).map(teamMemberId => ({
+            teamMemberId,
+          })),
+        },
+      },
+      include: {
+        teamMembers: true,
       },
     });
 
-    this.logger.log(`Multisig account created: ${accountId}`);
+    this.logger.log(`Multisig account created: ${accountId} with ${memberIds.size} team members`);
+
+    // Log activity
+    await this.activityLogService.logActivity({
+      companyId: dto.companyId,
+      teamMemberId: creatorTeamMember.id,
+      action: ActivityActionEnum.CREATE,
+      entityType: ActivityEntityTypeEnum.MULTISIG_ACCOUNT,
+      entityId: account.id,
+      entityUuid: account.uuid,
+      description: `Created multisig account ${accountId} with ${memberIds.size} members and threshold ${dto.threshold}`,
+      metadata: {
+        accountId,
+        threshold: dto.threshold,
+        memberCount: memberIds.size,
+      },
+    });
 
     return account;
   }
@@ -80,6 +147,9 @@ export class MultisigService {
   async getAccount(accountId: string): Promise<MultisigAccountResponseDto> {
     const account = await this.prisma.multisigAccount.findUnique({
       where: { accountId },
+      include: {
+        teamMembers: true,
+      },
     });
 
     if (!account) {
@@ -99,6 +169,9 @@ export class MultisigService {
   ): Promise<MultisigAccountResponseDto[]> {
     return this.prisma.multisigAccount.findMany({
       where: { companyId },
+      include: {
+        teamMembers: true,
+      },
       orderBy: { createdAt: 'desc' },
     });
   }

@@ -151,6 +151,7 @@ export class AuthController {
         setJwtCookieDto.token,
         response,
         request,
+        setJwtCookieDto.publicKey,
       );
     } finally {
       // Restore original authorization header

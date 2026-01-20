@@ -1,3 +1,12 @@
+export const PUBLIC_ROUTES = [
+  "/login",
+  "/onboarding",
+  "/payment",
+  "/invoice-review",
+  "/mobile",
+  "/team-invite",
+];
+
 // **************** LOCAL STORAGE *******************
 export const TOUR_SKIPPED_KEY = "tour_skipped";
 export const BALANCE_VISIBILITY_KEY = "balance_visibility";

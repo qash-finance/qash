@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { CreateAccountModalProps } from "@/types/modal";
 import { ModalProp, useModal } from "@/contexts/ModalManagerProvider";
 import { ModalHeader } from "../../Common/ModalHeader";
@@ -7,12 +7,18 @@ import BaseModal from "../BaseModal";
 import InputFilled from "@/components/Common/Input/InputFilled";
 import { SecondaryButton } from "@/components/Common/SecondaryButton";
 import { PrimaryButton } from "@/components/Common/PrimaryButton";
+import { useCreateMultisigAccount } from "@/services/api/multisig";
+import { useGetMyCompany } from "@/services/api/company";
+import { useGetCompanyTeamMembers } from "@/services/api/team-member";
+import { useAuth } from "@/services/auth/context";
+import { TeamMemberRoleEnum } from "@qash/types/enums";
 
 interface MemberItem {
   id: string;
   name: string;
   email: string;
-  role: "Admin" | "Viewer" | "Owner";
+  role: TeamMemberRoleEnum;
+  publicKey: string;
   companyRole?: string;
   avatar?: string;
 }
@@ -72,7 +78,7 @@ const MemberRow = ({
   name: string;
   email: string;
   companyRole: string;
-  role: "Owner" | "Admin" | "Viewer";
+  role: TeamMemberRoleEnum;
 }) => {
   return (
     <div className="flex items-center justify-between py-2">
@@ -91,9 +97,10 @@ const MemberRow = ({
         </div>
       </div>
       <div className="flex items-center gap-1">
-        {role === "Owner" && <img src="/misc/purple-crown-icon.svg" alt="Owner" className="w-5" />}
-        {role === "Admin" && <img src="/misc/green-shield-icon.svg" alt="Admin" className="w-5" />}
-        {role === "Viewer" && <img src="/misc/orange-eye-icon.svg" alt="Viewer" className="w-5" />}
+        {role === "OWNER" && <img src="/misc/purple-crown-icon.svg" alt="Owner" className="w-5" />}
+        {role === "ADMIN" && <img src="/misc/green-shield-icon.svg" alt="Admin" className="w-5" />}
+        {role === "VIEWER" && <img src="/misc/orange-eye-icon.svg" alt="Viewer" className="w-5" />}
+        {role === "REVIEWER" && <img src="/misc/blue-note-icon.svg" alt="Reviewer" className="w-5" />}
         {role && <p className="text-sm font-medium text-text-primary">{role}</p>}
       </div>
     </div>
@@ -102,12 +109,42 @@ const MemberRow = ({
 
 export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountModalProps>) {
   const { openModal } = useModal();
+  const { data: company } = useGetMyCompany();
+  const { data: teamMembersData } = useGetCompanyTeamMembers(company?.id);
+  const { user } = useAuth();
+  const createAccountMutation = useCreateMultisigAccount();
+
   const [isSuccess, setIsSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState<"detail" | "member" | "review">("detail");
   const [thresholdDropdownOpen, setThresholdDropdownOpen] = useState(false);
   const [thresholdValue, setThresholdValue] = useState(1);
   const [selectedMembers, setSelectedMembers] = useState<MemberItem[]>([]);
+  const [accountName, setAccountName] = useState("");
+  const [accountDescription, setAccountDescription] = useState("");
+  const [createdAccountId, setCreatedAccountId] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   const tabOrder = ["detail", "member", "review"] as const;
+
+  // Auto-fill current user in selectedMembers
+  useEffect(() => {
+    if (teamMembersData && user && !isInitialized) {
+      const currentUserMember = teamMembersData.find(tm => tm.user?.email === user.email);
+      if (currentUserMember) {
+        setSelectedMembers([
+          {
+            id: currentUserMember.id.toString(),
+            name: `${currentUserMember.firstName} ${currentUserMember.lastName}`,
+            email: currentUserMember.user!.email,
+            role: currentUserMember.role,
+            companyRole: currentUserMember.position,
+            publicKey: currentUserMember.user!.publicKey,
+          },
+        ]);
+        setIsInitialized(true);
+      }
+    }
+  }, [teamMembersData, user, isInitialized]);
 
   const goNext = () => {
     const idx = tabOrder.indexOf(activeTab);
@@ -128,25 +165,65 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
   const handleOpenAddMemberModal = () => {
     openModal("ADD_MEMBER", {
       onMembersSelected: (members: any) => {
-        setSelectedMembers(members as MemberItem[]);
+        // Merge new members with existing ones, avoiding duplicates
+        const newMembers = members as MemberItem[];
+        const mergedMembers = [
+          ...selectedMembers,
+          ...newMembers.filter(nm => !selectedMembers.some(sm => sm.id === nm.id)),
+        ];
+        setSelectedMembers(mergedMembers);
       },
+      selectedMembers: selectedMembers,
     });
   };
 
   const handleRemoveMember = (id: string) => {
+    // Prevent removing the current user (auto-filled member)
+    if (user && selectedMembers.length > 0) {
+      const memberToRemove = selectedMembers.find(m => m.id === id);
+      if (memberToRemove && memberToRemove.email === user.email) {
+        return; // Don't allow removal of current user
+      }
+    }
     setSelectedMembers(prev => prev.filter(m => m.id !== id));
   };
 
-  const getRoleIcon = (role: string) => {
+  const handleCreateAccount = async () => {
+    if (!company || selectedMembers.length === 0) {
+      console.error("Missing company or members");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      // Extract member IDs as public keys (server will map these to actual public keys)
+      const publicKeys = selectedMembers.map(m => m.id);
+
+      const response = await createAccountMutation.mutateAsync({
+        publicKeys,
+        threshold: thresholdValue,
+        companyId: company.id as number,
+      });
+
+      setCreatedAccountId(response.accountId);
+      setIsSuccess(true);
+    } catch (error) {
+      console.error("Failed to create multisig account:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getRoleIcon = (role: TeamMemberRoleEnum) => {
     switch (role) {
-      case "Admin":
+      case "ADMIN":
         return "/misc/green-shield-icon.svg";
-      case "Viewer":
+      case "VIEWER":
         return "/misc/orange-eye-icon.svg";
-      case "Owner":
+      case "REVIEWER":
+        return "/misc/blue-note-icon.svg";
+      case "OWNER":
         return "/misc/purple-crown-icon.svg";
-      default:
-        return "";
     }
   };
 
@@ -162,8 +239,20 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
             </div>
 
             <div className="w-[600px] flex flex-col gap-2">
-              <InputFilled label="Set account name" placeholder="Enter account name" />
-              <InputFilled label="Description" placeholder="Enter description" optional type="textarea" />
+              <InputFilled
+                label="Set account name"
+                placeholder="Enter account name"
+                value={accountName}
+                onChange={(e: any) => setAccountName(e.target.value)}
+              />
+              <InputFilled
+                label="Description"
+                placeholder="Enter description"
+                optional
+                type="textarea"
+                value={accountDescription}
+                onChange={(e: any) => setAccountDescription(e.target.value)}
+              />
             </div>
           </>
         );
@@ -205,16 +294,18 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
                       <p className="text-sm font-semibold text-text-secondary text-center">Choose members from Qash</p>
                     </div>
                   ) : (
-                    <div className="flex flex-col">
+                    <div className="flex flex-col h-[250px] overflow-y-auto">
                       {selectedMembers.map(member => (
                         <div
                           key={member.id}
-                          className="flex items-center justify-between py-3 px-2 hover:bg-background rounded-lg transition-colors"
+                          className="flex items-center justify-between p-2 hover:bg-background rounded-lg transition-colors"
                         >
-                          <div className="flex gap-3 items-center flex-1">
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-xs font-bold">
-                              {member.name.charAt(0)}
-                            </div>
+                          <div className="flex gap-2 items-center flex-1">
+                            <img
+                              src="/misc/default-team-member-avatar.svg"
+                              alt="avatar"
+                              className="w-8 h-8 rounded-full"
+                            />
                             <div className="flex flex-col gap-1 flex-1">
                               <div className="flex gap-2 items-center">
                                 <p className="text-sm font-medium text-text-primary leading-none">{member.name}</p>
@@ -230,14 +321,25 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
                               {getRoleIcon(member.role) && (
                                 <img src={getRoleIcon(member.role)} alt={member.role} className="w-5 h-5" />
                               )}
-                              <p className="text-sm font-medium text-text-primary">{member.role}</p>
+                              <p className="text-sm font-medium text-text-primary capitalize">
+                                {member.role.toLowerCase()}
+                              </p>
                             </div>
-                            <button
-                              onClick={() => handleRemoveMember(member.id)}
-                              className="px-3 py-2 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 transition-colors"
-                            >
-                              Remove
-                            </button>
+                            {user?.email === member.email ? (
+                              <button
+                                disabled
+                                className="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 cursor-not-allowed"
+                              >
+                                You
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleRemoveMember(member.id)}
+                                className="px-3 py-2 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                              >
+                                Remove
+                              </button>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -258,7 +360,7 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
                   <div className="relative">
                     <button
                       onClick={() => setThresholdDropdownOpen(!thresholdDropdownOpen)}
-                      className="bg-background border border-primary-divider border-solid flex gap-2 items-center px-4 py-2 relative rounded-lg cursor-pointer"
+                      className="bg-background border border-primary-divider border-solid flex gap-2 items-center px-4 py-1 relative rounded-lg cursor-pointer"
                     >
                       <p className="font-medium leading-6 text-base text-text-primary">{thresholdValue}</p>
                       <img alt="dropdown" className="w-4" src="/arrow/chevron-down.svg" />
@@ -272,7 +374,7 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
                             onClick={() => handleThresholdChange(option)}
                             className={`w-full text-left px-4 py-2 hover:bg-gray-100 cursor-pointer ${
                               option === thresholdValue ? "bg-blue-50 font-medium" : ""
-                            } ${index === 0 ? "rounded-t-lg" : ""}`}
+                            } ${index === 0 ? "rounded-t-lg" : ""} ${index === selectedMembers.length - 1 ? "rounded-b-lg" : ""}`}
                           >
                             {option}
                           </button>
@@ -317,7 +419,7 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
               <div className="flex gap-2.5 py-1">
                 {/* Members Card */}
                 <div className="flex-1 bg-background rounded-lg px-4 py-2 flex flex-col gap-1 justify-center shadow-sm">
-                  <p className="text-2xl font-semibold text-text-primary">30</p>
+                  <p className="text-2xl font-semibold text-text-primary">{selectedMembers.length}</p>
                   <p className="text-base font-medium text-text-secondary">Members</p>
                 </div>
 
@@ -347,7 +449,7 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
                       name={member.name}
                       companyRole={member.companyRole || ""}
                       email={member.email}
-                      role={member.role as "Owner" | "Admin" | "Viewer"}
+                      role={member.role}
                     />
                   ))
                 ) : (
@@ -383,12 +485,18 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
                 text={activeTab === "review" ? "Create" : "Next"}
                 onClick={() => {
                   if (activeTab === "review") {
-                    setIsSuccess(true);
+                    handleCreateAccount();
                     return;
                   }
 
                   goNext();
                 }}
+                loading={isLoading}
+                disabled={
+                  isLoading ||
+                  (activeTab === "member" && selectedMembers.length === 0) ||
+                  (activeTab === "detail" && accountName.trim() === "")
+                }
                 containerClassName={`flex-1`}
               />
             </div>
@@ -414,9 +522,16 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
               </div>
 
               <div className="w-fit bg-background rounded-xl border border-primary-divider shadow-md px-2 py-4 flex flex-row items-center justify-between gap-2 ">
-                <span className="text-text-secondary text-sm">Wallet address:</span>
-                <span>0x3aF91b27dC8E44E5f0C8D1A7F5B923cA7F1E9dB2</span>
-                <img src="/misc/copy-icon.svg" alt="Copy" className="w-4 cursor-pointer" />
+                <span className="text-text-secondary text-sm">Account ID:</span>
+                <span className="text-xs font-mono">{createdAccountId.substring(0, 20)}...</span>
+                <img
+                  src="/misc/copy-icon.svg"
+                  alt="Copy"
+                  className="w-4 cursor-pointer"
+                  onClick={() => {
+                    navigator.clipboard.writeText(createdAccountId);
+                  }}
+                />
               </div>
 
               <div className="w-full flex items-center justify-center gap-2 flex-row px-20">

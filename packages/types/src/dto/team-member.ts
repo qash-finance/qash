@@ -76,6 +76,7 @@ export interface TeamMemberResponseDto {
   user?: {
     id: number;
     email: string;
+    publicKey: string;
     [key: string]: any;
   };
   userId?: number;
@@ -97,6 +98,7 @@ export interface TeamMemberWithRelationsResponseDto extends TeamMemberResponseDt
   user?: {
     id: number;
     email: string;
+    publicKey: string;
     [key: string]: any;
   };
   inviter?: {
