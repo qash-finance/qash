@@ -41,6 +41,9 @@ coverage/
 .docusaurus/
 *.tsbuildinfo
 
+# Rust
+target/
+
 # Misc
 *.pem
 *.local

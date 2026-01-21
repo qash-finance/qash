@@ -9,14 +9,6 @@ const nextConfig: NextConfig = {
     };
     return config;
   },
-  async rewrites() {
-    return [
-      {
-        source: "/docs/:path*",
-        destination: "http://localhost:3001/:path*",
-      },
-    ];
-  },
   transpilePackages: ["@getpara/web-sdk", "@getpara/react-sdk", "miden-para", "miden-para-react"],
   // async headers() {
   //   return [

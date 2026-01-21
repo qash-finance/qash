@@ -1,45 +1,66 @@
-FROM node:20-alpine AS builder
+# Base stage
+FROM node:20-alpine AS base
+RUN apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
 
-# Copy package files
-COPY package*.json pnpm-lock.yaml ./
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
-# Install pnpm and dependencies
-RUN npm install -g pnpm
-RUN pnpm install
+# Dependencies stage
+FROM base AS deps
+WORKDIR /app
 
-# Copy source code
-COPY . .
+# Copy workspace root files
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY packages/qash-server/package.json ./packages/qash-server/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Builder stage
+FROM base AS builder
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/packages/qash-server/node_modules ./packages/qash-server/node_modules
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY packages/qash-server ./packages/qash-server
+
+WORKDIR /app/packages/qash-server
 
 # Rebuild native dependencies
 RUN pnpm rebuild bcrypt
 
-# Generate Prisma client with v7 config
+# Generate Prisma client
 RUN pnpm run prisma:generate
 
 # Build the application
 RUN pnpm run build
 
-FROM node:20-alpine
+# Runner stage
+FROM node:20-alpine AS runner
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install pnpm for production dependencies
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
-# Copy package files
-COPY --from=builder /app/package*.json /app/pnpm-lock.yaml ./
+# Copy workspace files
+COPY --from=builder /app/pnpm-lock.yaml /app/pnpm-workspace.yaml /app/package.json ./
+COPY --from=builder /app/packages/qash-server/package.json ./packages/qash-server/
 
-# Install production dependencies
+# Install production dependencies only
 RUN pnpm install --prod --frozen-lockfile
 
+WORKDIR /app/packages/qash-server
+
 # Copy built application
-COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/packages/qash-server/dist ./dist
 
 # Copy Prisma files (schema and config)
-COPY --from=builder /app/src/database/prisma ./src/database/prisma
+COPY --from=builder /app/packages/qash-server/src/database/prisma ./src/database/prisma
 
 # Copy generated Prisma client
-COPY --from=builder /app/src/database/generated ./src/database/generated
+COPY --from=builder /app/packages/qash-server/src/database/generated ./src/database/generated
 
 # Rebuild native dependencies for production
 RUN pnpm rebuild bcrypt
@@ -47,7 +68,6 @@ RUN pnpm rebuild bcrypt
 ARG PORT=3001
 ENV NODE_ENV=production
 ENV PORT=$PORT
-ENV GENERATE_SOURCEMAP=false
 EXPOSE $PORT
 
 CMD ["node", "dist/main"]
