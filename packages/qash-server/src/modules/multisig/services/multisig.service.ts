@@ -58,13 +58,6 @@ export class MultisigService {
       );
     }
 
-    // Validate threshold
-    if (dto.threshold > dto.publicKeys.length) {
-      throw new BadRequestException(
-        `Threshold (${dto.threshold}) cannot be greater than number of approvers (${dto.publicKeys.length})`,
-      );
-    }
-
     // Get team member (owner/creator)
     const creatorTeamMember = await this.prisma.teamMember.findUnique({
       where: { userId: user.internalUserId },
@@ -76,29 +69,62 @@ export class MultisigService {
       );
     }
 
-    // Prepare team member IDs (always include creator)
-    const memberIds = new Set([creatorTeamMember.id]);
+    // Prepare team member IDs (always include creator) and convert to numbers
+    const memberIds = new Set<number>([creatorTeamMember.id]);
     if (dto.teamMemberIds) {
-      dto.teamMemberIds.forEach(id => memberIds.add(id));
+      dto.teamMemberIds.forEach((idStr) => {
+        const idNum = Number(idStr);
+        if (Number.isNaN(idNum)) {
+          throw new BadRequestException(`Invalid team member ID: ${idStr}`);
+        }
+        memberIds.add(idNum);
+      });
     }
 
-    // Verify all team members exist and belong to the company
+    // Verify all team members exist, belong to the company, and fetch related user (for publicKey)
+    const memberIdArray = Array.from(memberIds);
     const teamMembers = await this.prisma.teamMember.findMany({
       where: {
-        id: { in: Array.from(memberIds) },
+        id: { in: memberIdArray },
         companyId: dto.companyId,
       },
+      include: { user: true },
     });
 
-    if (teamMembers.length !== memberIds.size) {
+    if (teamMembers.length !== memberIdArray.length) {
       throw new BadRequestException(
         'One or more team members do not exist or do not belong to this company',
       );
     }
 
+    // Preserve ordering (creator first, then any others in provided order)
+    const orderedTeamMembers = memberIdArray.map((id) => {
+      const tm = teamMembers.find((t) => t.id === id);
+      if (!tm) {
+        throw new BadRequestException(`Team member ${id} not found`);
+      }
+      return tm;
+    });
+
+    // Extract public keys and validate presence
+    const publicKeys = orderedTeamMembers.map((tm) => {
+      const pk = tm.user?.publicKey;
+      if (!pk) {
+        throw new BadRequestException(`Missing public key for team member ${tm.id}`);
+      }
+      return pk;
+    });
+
+    // Validate threshold against number of approvers
+    if (dto.threshold > publicKeys.length) {
+      throw new BadRequestException(
+        `Threshold (${dto.threshold}) cannot be greater than number of approvers (${publicKeys.length})`,
+      );
+    }
+
     // Create account via Miden client
     const { accountId } = await this.midenClient.createMultisigAccount(
-      dto.publicKeys,
+      publicKeys,
       dto.threshold,
     );
 
@@ -106,11 +132,13 @@ export class MultisigService {
     const account = await this.prisma.multisigAccount.create({
       data: {
         accountId,
-        publicKeys: dto.publicKeys,
+        name: dto.name,
+        description: dto.description,
+        publicKeys,
         threshold: dto.threshold,
         companyId: dto.companyId,
         teamMembers: {
-          create: Array.from(memberIds).map(teamMemberId => ({
+          create: memberIdArray.map((teamMemberId) => ({
             teamMemberId,
           })),
         },
@@ -130,9 +158,11 @@ export class MultisigService {
       entityType: ActivityEntityTypeEnum.MULTISIG_ACCOUNT,
       entityId: account.id,
       entityUuid: account.uuid,
-      description: `Created multisig account ${accountId} with ${memberIds.size} members and threshold ${dto.threshold}`,
+      description: `Created multisig account "${dto.name}" (${accountId}) with ${memberIds.size} members and threshold ${dto.threshold}`,
       metadata: {
         accountId,
+        name: dto.name,
+        description: dto.description,
         threshold: dto.threshold,
         memberCount: memberIds.size,
       },
@@ -196,6 +226,47 @@ export class MultisigService {
 
     // Get balances from Miden client
     return this.midenClient.getAccountBalances(accountId);
+  }
+
+  /**
+   * List all team members associated with a multisig account (by accountId)
+   */
+  async listAccountMembers(accountId: string): Promise<any[]> {
+    // Verify account exists (using external accountId)
+    const account = await this.prisma.multisigAccount.findUnique({
+      where: { accountId },
+    });
+
+    if (!account) {
+      throw new NotFoundException(`Multisig account ${accountId} not found`);
+    }
+
+    // Fetch account members by joining on multisig.accountId and include team member + user relations
+    const members = await this.prisma.multisigAccountMember.findMany({
+      where: { multisigAccount: { accountId } },
+      include: {
+        teamMember: {
+          include: {
+            user: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // Map to a simple response shape for the API
+    return members.map((m) => ({
+      id: m.teamMember.id,
+      uuid: m.teamMember.uuid,
+      name: `${m.teamMember.firstName || ''} ${m.teamMember.lastName || ''}`.trim(),
+      firstName: m.teamMember.firstName,
+      lastName: m.teamMember.lastName,
+      email: m.teamMember.user?.email,
+      role: m.teamMember.role,
+      position: m.teamMember.position,
+      publicKey: m.teamMember.user?.publicKey,
+      joinedAt: m.createdAt,
+    }));
   }
 
   /**

@@ -1,4 +1,6 @@
 import React from "react";
+import { Tooltip } from "react-tooltip";
+import { MemberActionTooltip } from "@/components/Common/ToolTip/MemberActionTooltip";
 
 type Role = string;
 
@@ -12,7 +14,9 @@ interface Member {
 
 interface MemberCardProps {
   member: Member;
-  onMenuClick: (memberId: string) => void;
+  onMenuClick?: (memberId: string) => void;
+  onEdit?: () => void;
+  onRemove?: () => void;
 }
 
 const Chip = ({ label }: { label: Role }) => (
@@ -23,11 +27,13 @@ const Chip = ({ label }: { label: Role }) => (
   </div>
 );
 
-const MemberCard: React.FC<MemberCardProps> = ({ member, onMenuClick }) => {
+const MemberCard: React.FC<MemberCardProps> = ({ member, onMenuClick, onEdit, onRemove }) => {
   const handleMenuClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onMenuClick(member.id);
+    if (onMenuClick) onMenuClick(member.id);
   };
+
+  const tooltipId = `member-action-tooltip-${member.id}`;
 
   return (
     <div className="border border-primary-divider rounded-[16px] p-4 flex flex-col gap-4 bg-app-background">
@@ -61,10 +67,27 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, onMenuClick }) => {
           alt="Menu"
           className="w-6 cursor-pointer"
           onClick={handleMenuClick}
-          data-tooltip-id="member-action-tooltip"
+          data-tooltip-id={tooltipId}
           data-tooltip-content={member.id}
         />
       </div>
+
+      {/* Per-card tooltip (if handlers provided) */}
+      {(onEdit || onRemove) && (
+        <Tooltip
+          id={tooltipId}
+          clickable
+          style={{ zIndex: 20, borderRadius: "16px", padding: "0" }}
+          place="left"
+          openOnClick
+          noArrow
+          border="none"
+          opacity={1}
+          render={() => {
+            return <MemberActionTooltip onEdit={onEdit} onRemove={onRemove} />;
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -58,8 +58,8 @@ const BalanceOverviewHeader = () => {
   };
 
   return (
-    <div className="w-full p-5 bg-background rounded-2xl border border-primary-divider flex flex-row ">
-      <div className="space-y-4">
+    <div className="w-full p-5 bg-background rounded-2xl border border-primary-divider flex flex-row py-8">
+      <div className="space-y-6">
         <div className="space-y-2">
           <p className="text-sm text-text-secondary">Total Balance</p>
           <div className="flex items-start gap-1">
@@ -87,7 +87,7 @@ const BalanceOverviewHeader = () => {
           <p className="text-sm font-semibold text-green-500 leading-none">+$750.20</p>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex gap-3 mt-4">
           <button className="px-6 py-2.5 bg-black text-white font-semibold rounded-xl border border-primary-divider transition-colors">
             Deposit
           </button>

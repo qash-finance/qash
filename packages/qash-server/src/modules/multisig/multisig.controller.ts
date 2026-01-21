@@ -97,6 +97,17 @@ export class MultisigController {
     return { balances };
   }
 
+  @Get('accounts/:accountId/members')
+  @ApiOperation({ summary: 'List all team members for a multisig account' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of account members',
+  })
+  async listAccountMembers(@Param('accountId') accountId: string): Promise<{ members: any[] }> {
+    const members = await this.multisigService.listAccountMembers(accountId);
+    return { members };
+  }
+
   // ============================================================================
   // Proposal Endpoints
   // ============================================================================

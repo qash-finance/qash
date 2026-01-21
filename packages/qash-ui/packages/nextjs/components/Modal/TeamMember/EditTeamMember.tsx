@@ -8,23 +8,38 @@ import { SecondaryButton } from "@/components/Common/SecondaryButton";
 import { PrimaryButton } from "@/components/Common/PrimaryButton";
 import { ModalHeader } from "@/components/Common/ModalHeader";
 import InputFilled from "@/components/Common/Input/InputFilled";
-import { useGetTeamMemberById, useUpdateTeamMember } from "@/services/api/team-member";
+import { useGetTeamMemberById, useUpdateTeamMember, useUpdateTeamMemberRole } from "@/services/api/team-member";
 import toast from "react-hot-toast";
+import { TeamMemberRoleDropdown } from "@/components/Common/Dropdown/TeamMemberRoleDropdown";
+import { TeamMemberRoleEnum } from "@qash/types/enums";
+import { useAuth } from "@/services/auth/context";
 
 export function EditTeamMember({ isOpen, onClose, zIndex, id }: ModalProp<EditTeamMemberProps>) {
+  const { user } = useAuth();
   const { register, handleSubmit, reset } = useForm<{ position: string }>({ defaultValues: { position: "" } });
   const { data: teamMember, isLoading } = useGetTeamMemberById(id, { enabled: !!id });
   const updateTeamMember = useUpdateTeamMember();
+  const updateRoleMutation = useUpdateTeamMemberRole();
+  const [selectedRole, setSelectedRole] = React.useState<TeamMemberRoleEnum | undefined>(undefined);
 
   // Initialize form values from fetched data
   useEffect(() => {
     reset({ position: teamMember?.position ?? "" });
-  }, [teamMember, reset]);
+    setSelectedRole((teamMember?.role as TeamMemberRoleEnum) ?? TeamMemberRoleEnum.VIEWER);
+  }, [teamMember]);
 
   const onSubmit = async (values: { position: string }) => {
     if (!id) return;
 
     try {
+      // Update role if changed
+      if (selectedRole && selectedRole !== teamMember?.role) {
+        await updateRoleMutation.mutateAsync({
+          teamMemberId: id,
+          updateRoleDto: { role: selectedRole },
+        });
+      }
+
       await updateTeamMember.mutateAsync({ teamMemberId: id, updateDto: { position: values.position || undefined } });
       toast.success("Team member updated successfully");
       onClose();
@@ -55,11 +70,16 @@ export function EditTeamMember({ isOpen, onClose, zIndex, id }: ModalProp<EditTe
               </div>
 
               {/* Position Input */}
-              <InputFilled
-                label="Position"
-                placeholder="Enter position"
-                {...register("position", { maxLength: 100 })}
-              />
+              {user?.teamMembership?.role === TeamMemberRoleEnum.OWNER && user?.email !== teamMember?.user?.email && (
+                <TeamMemberRoleDropdown
+                  selectedRole={selectedRole as TeamMemberRoleEnum}
+                  onRoleSelect={role => setSelectedRole(role)}
+                  variant="filled"
+                />
+              )}
+
+              {/* Position Input */}
+              <InputFilled label="Label" placeholder="Enter position" {...register("position", { maxLength: 100 })} />
 
               {/* Footer Buttons */}
               <div className="flex gap-3 items-center w-full">
@@ -74,8 +94,8 @@ export function EditTeamMember({ isOpen, onClose, zIndex, id }: ModalProp<EditTe
                   containerClassName="flex-1"
                   text="Save changes"
                   type="submit"
-                  loading={updateTeamMember.isPending}
-                  disabled={updateTeamMember.isPending}
+                  loading={updateTeamMember.isPending || updateRoleMutation.isPending}
+                  disabled={updateTeamMember.isPending || updateRoleMutation.isPending}
                 />
               </div>
             </form>

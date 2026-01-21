@@ -19,7 +19,7 @@ export const createMultisigAccount = async (
   data: CreateMultisigAccountDto
 ): Promise<MultisigAccountResponseDto> => {
   return apiServerWithAuth.postData<MultisigAccountResponseDto>(
-    `/api/v1/multisig/accounts`,
+    `/multisig/accounts`,
     data
   );
 };
@@ -29,7 +29,7 @@ export const getMultisigAccount = async (
   accountId: string
 ): Promise<MultisigAccountResponseDto> => {
   return apiServerWithAuth.getData<MultisigAccountResponseDto>(
-    `/api/v1/multisig/accounts/${accountId}`
+    `/multisig/accounts/${accountId}`
   );
 };
 
@@ -38,21 +38,28 @@ export const listAccountsByCompany = async (
   companyId: number
 ): Promise<MultisigAccountResponseDto[]> => {
   return apiServerWithAuth.getData<MultisigAccountResponseDto[]>(
-    `/api/v1/multisig/companies/${companyId}/accounts`
+    `/multisig/companies/${companyId}/accounts`
   );
 };
 
 // GET: Get consumable notes for an account
 export const getConsumableNotes = async (accountId: string) => {
   return apiServerWithAuth.getData<{ notes: any[] }>(
-    `/api/v1/multisig/accounts/${accountId}/notes`
+    `/multisig/accounts/${accountId}/notes`
   );
 };
 
 // GET: Get account balances for an account
 export const getAccountBalances = async (accountId: string) => {
   return apiServerWithAuth.getData<{ balances: any[] }>(
-    `/api/v1/multisig/accounts/${accountId}/balances`
+    `/multisig/accounts/${accountId}/balances`
+  );
+};
+
+// GET: List members for a multisig account
+export const getAccountMembers = async (accountId: string) => {
+  return apiServerWithAuth.getData<{ members: any[] }>(
+    `/multisig/accounts/${accountId}/members`
   );
 };
 
@@ -65,7 +72,7 @@ export const createConsumeProposal = async (
   data: CreateConsumeProposalDto
 ): Promise<MultisigProposalResponseDto> => {
   return apiServerWithAuth.postData<MultisigProposalResponseDto>(
-    `/api/v1/multisig/proposals/consume`,
+    `/multisig/proposals/consume`,
     data
   );
 };
@@ -75,7 +82,7 @@ export const createSendProposal = async (
   data: CreateSendProposalDto
 ): Promise<MultisigProposalResponseDto> => {
   return apiServerWithAuth.postData<MultisigProposalResponseDto>(
-    `/api/v1/multisig/proposals/send`,
+    `/multisig/proposals/send`,
     data
   );
 };
@@ -85,7 +92,7 @@ export const getProposal = async (
   proposalId: number
 ): Promise<MultisigProposalResponseDto> => {
   return apiServerWithAuth.getData<MultisigProposalResponseDto>(
-    `/api/v1/multisig/proposals/${proposalId}`
+    `/multisig/proposals/${proposalId}`
   );
 };
 
@@ -94,7 +101,7 @@ export const listProposals = async (
   accountId: string
 ): Promise<MultisigProposalResponseDto[]> => {
   return apiServerWithAuth.getData<MultisigProposalResponseDto[]>(
-    `/api/v1/multisig/accounts/${accountId}/proposals`
+    `/multisig/accounts/${accountId}/proposals`
   );
 };
 
@@ -104,7 +111,7 @@ export const submitSignature = async (
   data: SubmitSignatureDto
 ): Promise<MultisigProposalResponseDto> => {
   return apiServerWithAuth.postData<MultisigProposalResponseDto>(
-    `/api/v1/multisig/proposals/${proposalId}/signatures`,
+    `/multisig/proposals/${proposalId}/signatures`,
     data
   );
 };
@@ -114,7 +121,7 @@ export const executeProposal = async (
   proposalId: number
 ): Promise<ExecuteTransactionResponseDto> => {
   return apiServerWithAuth.postData<ExecuteTransactionResponseDto>(
-    `/api/v1/multisig/proposals/${proposalId}/execute`
+    `/multisig/proposals/${proposalId}/execute`
   );
 };
 
@@ -124,7 +131,7 @@ export const executeProposal = async (
 
 // POST: Create a test company (development only)
 export const createTestCompany = async () => {
-  return apiServerWithAuth.postData<any>(`/api/v1/multisig/test/create-company`);
+  return apiServerWithAuth.postData<any>(`/multisig/test/create-company`);
 };
 
 // ==========================================================================
@@ -232,6 +239,25 @@ export function useGetAccountBalances(
   });
 }
 
+/**
+ * React Query hook to list account members
+ */
+export function useGetAccountMembers(
+  accountId?: string,
+  options?: { enabled?: boolean }
+) {
+  return useQuery<{ members: any[] }>({
+    queryKey: ["multisig", "accounts", accountId, "members"],
+    queryFn: () => {
+      if (!accountId) throw new Error("accountId is required");
+      return getAccountMembers(accountId);
+    },
+    enabled: !!accountId && (options?.enabled !== false),
+    staleTime: 10000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+  });
+}
 /**
  * React Query hook to create a consume proposal
  */

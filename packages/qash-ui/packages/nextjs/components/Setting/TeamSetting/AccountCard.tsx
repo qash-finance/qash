@@ -19,31 +19,31 @@ const AccountCard: React.FC<AccountCardProps> = ({ account, onClick, onMenuClick
       onClick={() => onClick(account.id)}
     >
       {/* Card Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between flex-col gap-2">
         {/* Account Info */}
-        <div className="flex flex-col gap-4 flex-1">
+        <div className="flex flex-col gap-4 h-full w-full">
           {/* Avatar */}
           <img src={account.icon} alt={account.name} className="w-10" />
 
           {/* Account Details */}
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 h-20">
             <h3 className="text-xl font-medium">{account.name}</h3>
             <p className="text-sm font-normal text-text-secondary leading-5">{account.description}</p>
           </div>
+        </div>
 
-          {/* Team Members */}
-          <div className="flex gap-2 items-center">
-            <span className="text-xs font-medium text-text-secondary">{account.memberCount} members</span>
-          </div>
+        {/* Team Members */}
+        <div className="flex gap-2 items-center flex-1 h-full">
+          <span className="text-xs font-medium text-text-secondary">{account.memberCount} members</span>
         </div>
 
         {/* Menu Button */}
-        <img
+        {/* <img
           src="/misc/vertical-three-dot-icon.svg"
           alt="Menu"
           className="w-6 cursor-pointer"
           onClick={handleMenuClick}
-        />
+        /> */}
       </div>
     </div>
   );

@@ -65,6 +65,7 @@ import DepositModal from "@/components/Modal/DepositModal";
 import InviteTeamMemberModal from "@/components/Modal/TeamMember/InviteTeamMemberModal";
 import RemoveTeamMember from "@/components/Modal/TeamMember/RemoveTeamMember";
 import EditTeamMember from "@/components/Modal/TeamMember/EditTeamMember";
+import ChooseAccountModal from "@/components/Modal/Account/ChooseAccountModal";
 import { Group } from "./group-payment";
 import { CompanyGroupResponseDto, CompanyContactResponseDto } from "@qash/types/dto/employee";
 import { BatchTransaction } from "@/services/store/batchTransactions";
@@ -75,6 +76,7 @@ import { TransactionStatus } from "./transaction";
 import { ClientResponseDto } from "@qash/types/dto/client";
 import { TokenDto } from "@qash/types/dto/token";
 import { NetworkDto } from "@qash/types/dto/network";
+import { MultisigAccountResponseDto } from "@qash/types/dto/multisig";
 
 export const MODAL_IDS = {
   SELECT_TOKEN: "SELECT_TOKEN",
@@ -143,6 +145,7 @@ export const MODAL_IDS = {
   INVITE_TEAM_MEMBER: "INVITE_TEAM_MEMBER",
   REMOVE_TEAM_MEMBER: "REMOVE_TEAM_MEMBER",
   EDIT_TEAM_MEMBER: "EDIT_TEAM_MEMBER",
+  CHOOSE_ACCOUNT: "CHOOSE_ACCOUNT",
 } as const;
 
 export type ModalId = keyof typeof MODAL_IDS;
@@ -520,6 +523,10 @@ export interface EditTeamMemberProps extends BaseModalProps {
   id: number;
 }
 
+export interface ChooseAccountModalProps extends BaseModalProps {
+  onSelectAccount?: (accountId: MultisigAccountResponseDto) => void;
+}
+
 export type ModalPropsMap = {
   [MODAL_IDS.SELECT_TOKEN]: SelectTokenModalProps;
   [MODAL_IDS.EDIT_TRANSACTION]: EditTransactionModalProps;
@@ -585,6 +592,7 @@ export type ModalPropsMap = {
   [MODAL_IDS.INVITE_TEAM_MEMBER]: InviteTeamMemberModalProps;
   [MODAL_IDS.REMOVE_TEAM_MEMBER]: RemoveTeamMemberProps;
   [MODAL_IDS.EDIT_TEAM_MEMBER]: EditTeamMemberProps;
+  [MODAL_IDS.CHOOSE_ACCOUNT]: ChooseAccountModalProps;
 };
 
 export type ModalProps = ModalPropsMap[keyof ModalPropsMap];
@@ -655,4 +663,5 @@ export const modalRegistry = {
   [MODAL_IDS.INVITE_TEAM_MEMBER]: InviteTeamMemberModal,
   [MODAL_IDS.REMOVE_TEAM_MEMBER]: RemoveTeamMember,
   [MODAL_IDS.EDIT_TEAM_MEMBER]: EditTeamMember,
+  [MODAL_IDS.CHOOSE_ACCOUNT]: ChooseAccountModal,
 } as const;

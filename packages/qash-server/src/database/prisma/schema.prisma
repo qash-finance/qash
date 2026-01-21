@@ -749,6 +749,9 @@ model MultisigAccount {
   id   Int    @id @default(autoincrement())
   uuid String @unique @default(cuid()) @map("uuid")
 
+  name        String  @db.VarChar(255)
+  description String? @db.Text
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
 

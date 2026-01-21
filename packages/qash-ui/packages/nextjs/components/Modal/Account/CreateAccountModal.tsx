@@ -12,6 +12,8 @@ import { useGetMyCompany } from "@/services/api/company";
 import { useGetCompanyTeamMembers } from "@/services/api/team-member";
 import { useAuth } from "@/services/auth/context";
 import { TeamMemberRoleEnum } from "@qash/types/enums";
+import { MIDEN_EXPLORER_URL } from "@/services/utils/constant";
+import toast from "react-hot-toast";
 
 interface MemberItem {
   id: string;
@@ -197,10 +199,12 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
     try {
       setIsLoading(true);
       // Extract member IDs as public keys (server will map these to actual public keys)
-      const publicKeys = selectedMembers.map(m => m.id);
+      const teamMemberIds = selectedMembers.map(member => member.id.toString());
 
       const response = await createAccountMutation.mutateAsync({
-        publicKeys,
+        name: accountName,
+        description: accountDescription,
+        teamMemberIds,
         threshold: thresholdValue,
         companyId: company.id as number,
       });
@@ -530,6 +534,7 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
                   className="w-4 cursor-pointer"
                   onClick={() => {
                     navigator.clipboard.writeText(createdAccountId);
+                    toast.success("Address copied to clipboard");
                   }}
                 />
               </div>
@@ -541,6 +546,9 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
                   icon="/misc/globe.svg"
                   variant="light"
                   iconPosition="left"
+                  onClick={() => {
+                    window.open(`${MIDEN_EXPLORER_URL}/account/${createdAccountId}`, "_blank");
+                  }}
                 />
                 <PrimaryButton
                   text="View Account"

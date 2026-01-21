@@ -107,6 +107,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.multisigSignature;
   }
 
+  get multisigAccountMember() {
+    return this.client.multisigAccountMember;
+  }
+
   get $transaction() {
     return this.client.$transaction.bind(this.client);
   }

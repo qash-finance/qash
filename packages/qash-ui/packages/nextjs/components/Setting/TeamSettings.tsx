@@ -5,37 +5,28 @@ import Card from "../Common/Card";
 import AccountTab, { Account } from "./TeamSetting/AccountTab";
 import MemberTab from "./TeamSetting/MemberTab";
 import { useModal } from "@/contexts/ModalManagerProvider";
-
-const accounts: Account[] = [
-  {
-    id: "payroll",
-    name: "Payroll",
-    description: "Handles salary distribution and automates payroll transactions.",
-    backgroundColor: "#6895ff",
-    memberCount: 30,
-    icon: "/client-invoice/payroll-icon.svg",
-  },
-  {
-    id: "earning",
-    name: "Earning",
-    description: "Tracks all income, including bonuses and commissions.",
-    backgroundColor: "#ff9a68",
-    memberCount: 4,
-    icon: "/client-invoice/earning-icon.svg",
-  },
-  {
-    id: "accounting",
-    name: "Accounting",
-    description: "Handles salary distribution and automates payroll transactions.",
-    backgroundColor: "#7d52f4",
-    memberCount: 4,
-    icon: "/client-invoice/accounting-icon.svg",
-  },
-];
+import { useGetMyCompany } from "@/services/api/company";
+import { useListAccountsByCompany } from "@/services/api/multisig";
+import { useGetTeamStats } from "@/services/api/team-member";
 
 const TeamSettings = () => {
   const { openModal } = useModal();
   const [activeTab, setActiveTab] = useState<"account" | "member">("account");
+  // Fetch the current company and list its multisig accounts
+  const { data: myCompany } = useGetMyCompany();
+  const { data: multisigAccounts, isLoading: accountsLoading } = useListAccountsByCompany(myCompany?.id, {
+    enabled: !!myCompany?.id,
+  });
+  const { data: teamStats } = useGetTeamStats(myCompany?.id);
+
+  const accounts: Account[] = (multisigAccounts || []).map(a => ({
+    id: a.accountId,
+    name: a.name,
+    description: a.description || `Threshold ${a.threshold} · ${a.publicKeys.length} approvers`,
+    backgroundColor: "#6895ff",
+    memberCount: a.publicKeys.length,
+    icon: "/client-invoice/payroll-icon.svg",
+  }));
 
   const handleCreateNewAccount = () => {
     openModal("CREATE_ACCOUNT");
@@ -64,7 +55,7 @@ const TeamSettings = () => {
           <img src="/logo/qash-icon-dark.svg" alt="Team Avatar" className="w-12" />
           <div className="flex flex-col gap-1">
             <h1 className="text-2xl font-semibold text-text-primary leading-none">Qash Team</h1>
-            <p className="text-xs font-medium text-text-secondary leading-none">30 members</p>
+            <p className="text-xs font-medium text-text-secondary leading-none">{teamStats?.total} members</p>
           </div>
         </div>
         <PrimaryButton
@@ -79,10 +70,10 @@ const TeamSettings = () => {
       {/* Stats Cards */}
       <div className="flex gap-4 w-full">
         {/* Account Stats Card */}
-        <Card title="Accounts" amount="3" info="Admins can submit proposals and cast votes." />
+        <Card title="Accounts" amount={accounts.length.toString()} info="Admins can submit proposals and cast votes." />
 
         {/* Member Stats Card */}
-        <Card title="Members" amount="30" />
+        <Card title="Members" amount={teamStats?.total.toString() || "0"} />
       </div>
 
       {/* Tabs */}

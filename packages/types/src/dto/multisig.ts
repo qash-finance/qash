@@ -7,7 +7,9 @@
 
 // Request DTOs
 export interface CreateMultisigAccountDto {
-  publicKeys: string[];
+  name: string;
+  description?: string;
+  teamMemberIds: string[];
   threshold: number;
   companyId: number;
 }
@@ -37,6 +39,8 @@ export interface MultisigAccountResponseDto {
   id: number;
   uuid: string;
   accountId: string;
+  name: string;
+  description?: string;
   publicKeys: string[];
   threshold: number;
   companyId: number;

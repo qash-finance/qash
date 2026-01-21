@@ -1,16 +1,37 @@
-import { IsString, IsInt, IsArray, IsOptional, Min, ArrayMinSize, IsEnum } from 'class-validator';
+import { IsString, IsInt, IsArray, IsOptional, IsNotEmpty, MaxLength, Min, ArrayMinSize, IsEnum } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import type * as SharedTypes from '@qash/types/dto/multisig';
 
 export class CreateMultisigAccountDto implements SharedTypes.CreateMultisigAccountDto {
   @ApiProperty({
-    description: 'Array of approver public keys (hex-encoded, uncompressed format)',
-    example: ['0x04...', '0x04...'],
+    description: 'Name of the multisig account',
+    example: 'Company Treasury',
+    maxLength: 255,
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255, { message: 'name cannot be longer than 255 characters' })
+  name: string;
+
+  @ApiProperty({
+    description: 'Optional description of the multisig account',
+    example: 'Multi-signature account for treasury management',
+    maxLength: 1000,
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000, { message: 'description cannot be longer than 1000 characters' })
+  description?: string;
+
+  @ApiProperty({
+    description: 'Array of team member IDs to include as approvers (owner is auto-included). IDs should be strings.',
+    example: ['1', '2'],
   })
   @IsArray()
   @ArrayMinSize(1)
   @IsString({ each: true })
-  publicKeys: string[];
+  teamMemberIds: string[];
 
   @ApiProperty({
     description: 'Number of signatures required to execute transactions',
@@ -28,16 +49,6 @@ export class CreateMultisigAccountDto implements SharedTypes.CreateMultisigAccou
   @IsInt()
   @Min(1)
   companyId: number;
-
-  @ApiProperty({
-    description: 'Additional team member IDs to add to the account (owner is added automatically)',
-    example: [2, 3],
-    required: false,
-  })
-  @IsArray()
-  @IsInt({ each: true })
-  @IsOptional()
-  teamMemberIds?: number[];
 }
 
 export class CreateConsumeProposalDto implements SharedTypes.CreateConsumeProposalDto {
@@ -136,6 +147,12 @@ export class MultisigAccountResponseDto implements SharedTypes.MultisigAccountRe
 
   @ApiProperty()
   accountId: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty({ required: false })
+  description?: string;
 
   @ApiProperty()
   publicKeys: string[];

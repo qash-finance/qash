@@ -89,31 +89,17 @@ const MemberTab: React.FC<MemberTabProps> = ({ onMenuClick }) => {
       {/* Members Cards Grid */}
       <div className="grid grid-cols-3 gap-2 w-full">
         {isLoading && <p className="text-sm text-text-secondary">Loading...</p>}
-        {!isLoading && members.length === 0 && <p className="text-sm text-text-secondary">No members found</p>}
-        {members.map(member => (
-          <MemberCard key={member.id} member={member} onMenuClick={onMenuClick} />
-        ))}
-      </div>
-
-      {/* Member action tooltip (global) */}
-      <Tooltip
-        id="member-action-tooltip"
-        clickable
-        style={{ zIndex: 20, borderRadius: "16px", padding: "0" }}
-        place="left"
-        openOnClick
-        noArrow
-        border="none"
-        opacity={1}
-        render={({ content }) => {
-          if (!content) return null;
-          const id = content.toString();
-          const m = teamMembers.find(tm => String(tm.id) === id);
-          if (!m) return null;
-
-          const handleEdit = () => {
-            openModal("EDIT_TEAM_MEMBER", { id: Number(m.id) });
+        {!isLoading && teamMembers.length === 0 && <p className="text-sm text-text-secondary">No members found</p>}
+        {teamMembers.map((m: TeamMemberResponseDto) => {
+          const member = {
+            id: String(m.id),
+            name: `${m.firstName} ${m.lastName}`.trim(),
+            email: m.user?.email || "",
+            companyRole: m.position || "",
+            role: [roleDisplay(m.role)],
           };
+
+          const handleEdit = () => openModal("EDIT_TEAM_MEMBER", { id: Number(m.id) });
 
           const handleRemove = () => {
             openModal("REMOVE_TEAM_MEMBER", {
@@ -130,9 +116,17 @@ const MemberTab: React.FC<MemberTabProps> = ({ onMenuClick }) => {
             });
           };
 
-          return <MemberActionTooltip onEdit={handleEdit} onRemove={handleRemove} />;
-        }}
-      />
+          return (
+            <MemberCard
+              key={member.id}
+              member={member}
+              onMenuClick={onMenuClick}
+              onEdit={handleEdit}
+              onRemove={handleRemove}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 };

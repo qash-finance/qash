@@ -21,13 +21,16 @@ const RoleItem = ({
   isLast?: boolean;
 }) => {
   const getRoleIcon = () => {
-    if (role === TeamMemberRoleEnum.ADMIN) {
-      return "/misc/green-shield-icon.svg";
+    switch (role) {
+      case TeamMemberRoleEnum.ADMIN:
+        return "/misc/green-shield-icon.svg";
+      case TeamMemberRoleEnum.VIEWER:
+        return "/misc/orange-eye-icon.svg";
+      case TeamMemberRoleEnum.REVIEWER:
+        return "/misc/blue-note-icon.svg";
+      case TeamMemberRoleEnum.OWNER:
+        return "/misc/purple-crown-icon.svg";
     }
-    if (role === TeamMemberRoleEnum.REVIEWER) {
-      return "/misc/orange-eye-icon.svg";
-    }
-    return "/misc/orange-eye-icon.svg";
   };
 
   return (
@@ -53,19 +56,33 @@ export const MemberRoleTooltip = ({ currentRole, onRoleChange }: MemberRoleToolt
   return (
     <div className="bg-background border border-primary-divider rounded-2xl shadow-lg w-[160px]">
       {/* Admin Role */}
-      <RoleItem role={TeamMemberRoleEnum.ADMIN} isActive={currentRole === TeamMemberRoleEnum.ADMIN} onClick={() => onRoleChange(TeamMemberRoleEnum.ADMIN)} isFirst />
+      <RoleItem
+        role={TeamMemberRoleEnum.ADMIN}
+        isActive={currentRole === TeamMemberRoleEnum.ADMIN}
+        onClick={() => onRoleChange(TeamMemberRoleEnum.ADMIN)}
+        isFirst
+      />
 
       {/* Divider */}
       <div className="border-t w-full border-primary-divider" />
 
       {/* Reviewer Role */}
-      <RoleItem role={TeamMemberRoleEnum.REVIEWER} isActive={currentRole === TeamMemberRoleEnum.REVIEWER} onClick={() => onRoleChange(TeamMemberRoleEnum.REVIEWER)} />
+      <RoleItem
+        role={TeamMemberRoleEnum.REVIEWER}
+        isActive={currentRole === TeamMemberRoleEnum.REVIEWER}
+        onClick={() => onRoleChange(TeamMemberRoleEnum.REVIEWER)}
+      />
 
       {/* Divider */}
       <div className="border-t w-full border-primary-divider" />
 
       {/* Viewer Role */}
-      <RoleItem role={TeamMemberRoleEnum.VIEWER} isActive={currentRole === TeamMemberRoleEnum.VIEWER} onClick={() => onRoleChange(TeamMemberRoleEnum.VIEWER)} isLast />
+      <RoleItem
+        role={TeamMemberRoleEnum.VIEWER}
+        isActive={currentRole === TeamMemberRoleEnum.VIEWER}
+        onClick={() => onRoleChange(TeamMemberRoleEnum.VIEWER)}
+        isLast
+      />
     </div>
   );
 };

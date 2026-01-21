@@ -1,7 +1,9 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { BaseContainer } from "../Common/BaseContainer";
 import { TransactionRow } from "./TransactionRow";
+import { useGetMyCompany } from "@/services/api/company";
+import { useListAccountsByCompany } from "@/services/api/multisig";
 
 interface PayrollTransaction {
   id: string;
@@ -38,21 +40,51 @@ const mockTransactions: PayrollTransaction[] = [
   },
 ];
 
-type TabType = "payroll" | "earning" | "accounting" | "marketing";
+// Previously a fixed enum - we now allow any multisig account id
 type SubTabType = "pending" | "history";
 
 export function TransactionsContainer() {
-  const [activeTab, setActiveTab] = useState<TabType>("payroll");
+  const [activeTab, setActiveTab] = useState<string>("payroll");
   const [activeSubTab, setActiveSubTab] = useState<SubTabType>("pending");
   const [underlineStyle, setUnderlineStyle] = useState({ left: "0px", width: "200px" });
   const [subTabUnderlineStyle, setSubTabUnderlineStyle] = useState({ left: "0px", width: "180px" });
 
-  const tabs: { id: TabType; label: string }[] = [
-    { id: "payroll", label: "Payroll Account" },
-    { id: "earning", label: "Earning Account" },
-    { id: "accounting", label: "Accounting Account" },
-    { id: "marketing", label: "Marketing Account" },
-  ];
+  const { data: myCompany } = useGetMyCompany();
+  const { data: multisigAccounts = [], isLoading: accountsLoading } = useListAccountsByCompany(myCompany?.id, {
+    enabled: !!myCompany?.id,
+  });
+
+  // Build tabs from accounts (fallback to some defaults if no accounts yet)
+  const tabs =
+    multisigAccounts.length > 0
+      ? multisigAccounts.map(a => ({ id: a.accountId, label: a.name }))
+      : [
+          { id: "payroll", label: "Payroll Account" },
+          { id: "earning", label: "Earning Account" },
+          { id: "accounting", label: "Accounting Account" },
+          { id: "marketing", label: "Marketing Account" },
+        ];
+
+  // If accounts load and no activeTab matches, set first account as active
+  useEffect(() => {
+    if (multisigAccounts.length > 0) {
+      setActiveTab(prev => {
+        const exists = multisigAccounts.some(a => a.accountId === prev);
+        return exists ? prev : multisigAccounts[0].accountId;
+      });
+      setUnderlineStyle({ left: "0px", width: "200px" });
+    }
+  }, [multisigAccounts]);
+
+  // Keep underline in sync when activeTab changes (use index of tabs)
+  // useEffect(() => {
+  //   const idx = tabs.findIndex(t => t.id === activeTab);
+  //   if (idx >= 0) {
+  //     setUnderlineStyle({ left: `${idx * 200}px`, width: "200px" });
+  //   }
+  // }, [activeTab, tabs]);
+
+  const currentAccount = multisigAccounts.find(a => a.accountId === activeTab);
 
   const subTabs: { id: SubTabType; label: string }[] = [
     { id: "pending", label: "Pending to approve" },
@@ -103,15 +135,15 @@ export function TransactionsContainer() {
 
       <BaseContainer
         header={
-          <div className="flex w-full justify-center items-start py-3 px-5 flex-col">
-            <span className="text-2xl">Payroll</span>
+          <div className="flex w-full justify-center items-start py-4 flex-col">
+            <span className="text-2xl">{currentAccount ? currentAccount.name : "Payroll"}</span>
             <p className="text-xs font-medium text-text-secondary max-w-2xl">
               Since you are a member in this account, below are the transactions that need to be confirmed by you
             </p>
           </div>
         }
         childrenClassName="!bg-background"
-        containerClassName="w-full h-full bg-[#F6F6F6]"
+        containerClassName="w-full h-full !px-8 !pb-6 !bg-app-background"
       >
         {/* Sub Tabs */}
         <div className="px-6 flex gap-8 border-b border-primary-divider relative">
@@ -143,6 +175,7 @@ export function TransactionsContainer() {
 
         {/* Transactions List */}
         <div className="p-4 flex flex-col w-full h-full overflow-y-auto">
+          {/* For now we show mocked transactions; in the future this will fetch transactions for `currentAccount` */}
           {mockTransactions.map(transaction => (
             <TransactionRow
               key={transaction.id}
