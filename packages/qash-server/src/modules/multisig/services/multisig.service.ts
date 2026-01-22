@@ -3,6 +3,7 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { MidenClientService } from './miden-client.service';
@@ -10,13 +11,15 @@ import {
   CreateMultisigAccountDto,
   CreateConsumeProposalDto,
   CreateSendProposalDto,
+  CreateBatchSendProposalDto,
+  CreateProposalFromBillsDto,
   SubmitSignatureDto,
   MultisigAccountResponseDto,
   MultisigProposalResponseDto,
   ExecuteTransactionResponseDto,
 } from '../dto/multisig.dto';
 import { UserWithCompany } from '../../auth/decorators/current-user.decorator';
-import { ActivityActionEnum, ActivityEntityTypeEnum } from '../../../database/generated/client';
+import { ActivityActionEnum, ActivityEntityTypeEnum, BillStatusEnum } from '../../../database/generated/client';
 import { ActivityLogService } from 'src/modules/activity-log/activity-log.service';
 
 @Injectable()
@@ -341,9 +344,6 @@ export class MultisigService {
         summaryBytesHex,
         requestBytesHex,
         noteIds: [],
-        recipientId: dto.recipientId,
-        faucetId: dto.faucetId,
-        amount: dto.amount.toString(),
         status: 'PENDING',
       },
       include: {
@@ -357,6 +357,405 @@ export class MultisigService {
   }
 
   /**
+   * Create a batch send funds proposal with multiple recipients
+   */
+  async createBatchSendProposal(
+    dto: CreateBatchSendProposalDto,
+  ): Promise<MultisigProposalResponseDto> {
+    this.logger.log(
+      `Creating batch send proposal for account ${dto.accountId} with ${dto.payments.length} payments`,
+    );
+
+    // Verify account exists
+    const account = await this.getAccount(dto.accountId);
+
+    // Validate batch has at least one payment
+    if (!dto.payments || dto.payments.length === 0) {
+      throw new BadRequestException(
+        'Batch send proposal must have at least one payment',
+      );
+    }
+
+    // Validate batch doesn't exceed UI limit (50 recipients)
+    if (dto.payments.length > 50) {
+      throw new BadRequestException(
+        'Batch send proposal cannot exceed 50 recipients per proposal. Please split into multiple proposals.',
+      );
+    }
+
+    //TODO: Implement this
+    // Create proposal via Miden client with batch payments
+    // const { summaryCommitment, summaryBytesHex, requestBytesHex } =
+    //   await this.midenClient.createBatchSendProposal(
+    //     dto.accountId,
+    //     dto.payments,
+    //   );
+
+    // Store proposal in database with payments stored as JSON
+    const proposal = await this.prisma.multisigProposal.create({
+      data: {
+        accountId: dto.accountId,
+        description: dto.description,
+        proposalType: 'SEND',
+        summaryCommitment: 'placeholder-commitment',
+        summaryBytesHex: 'placeholder-bytes-hex',
+        requestBytesHex: 'placeholder-bytes-hex',
+        noteIds: [],
+        status: 'PENDING',
+      },
+      include: {
+        signatures: true,
+      },
+    });
+
+    this.logger.log(
+      `Batch send proposal created with ${dto.payments.length} payments: ${proposal.uuid}`,
+    );
+
+    return this.mapProposalToDto(proposal, account.threshold);
+  }
+
+  /**
+   * Create a proposal from bills (for multi-signature bill payments)
+   */
+  async createProposalFromBills(
+    dto: CreateProposalFromBillsDto,
+    user: UserWithCompany,
+  ): Promise<MultisigProposalResponseDto> {
+    this.logger.log(
+      `Creating proposal from ${dto.billUUIDs.length} bills for account ${dto.accountId}`,
+    );
+
+    // Verify account exists and belongs to user's company
+    const account = await this.prisma.multisigAccount.findUnique({
+      where: { accountId: dto.accountId },
+    });
+
+    if (!account) {
+      throw new NotFoundException(`Multisig account ${dto.accountId} not found`);
+    }
+
+    if (account.companyId !== user.company.id) {
+      throw new BadRequestException(
+        'Cannot create proposal for a multisig account from a different company',
+      );
+    }
+
+    // Fetch bills with their invoices
+    this.logger.debug(`Searching for bills with UUIDs: ${dto.billUUIDs.join(', ')} in company ${user.company.id}`);
+    
+    const bills = await this.prisma.bill.findMany({
+      where: {
+        uuid: { in: dto.billUUIDs },
+        companyId: user.company.id,
+      },
+      include: {
+        invoice: {
+          include: {
+            employee: true,
+            items: true,
+          },
+        },
+      },
+    });
+
+    if (bills.length === 0) {
+      this.logger.error(`No bills found with UUIDs: ${dto.billUUIDs.join(', ')} in company ${user.company.id}. Available bills in this company:`, 
+        await this.prisma.bill.findMany({ where: { companyId: user.company.id }, select: { uuid: true } }));
+      throw new NotFoundException('No valid bills found for the provided UUIDs');
+    }
+
+    this.logger.debug(`Found ${bills.length} bills out of ${dto.billUUIDs.length} requested`);
+
+    // Validate all bills are in payable status (PENDING or OVERDUE)
+    const invalidBills = bills.filter(
+      (b) => b.status !== BillStatusEnum.PENDING && b.status !== BillStatusEnum.OVERDUE,
+    );
+    if (invalidBills.length > 0) {
+      throw new BadRequestException(
+        `Bills with status other than PENDING or OVERDUE cannot be paid: ${invalidBills.map((b) => b.uuid).join(', ')}`,
+      );
+    }
+
+    // Check that bills are not already linked to another proposal
+    const linkedBills = bills.filter((b) => b.multisigProposalId !== null);
+    if (linkedBills.length > 0) {
+      throw new BadRequestException(
+        `Bills are already linked to another proposal: ${linkedBills.map((b) => b.uuid).join(', ')}`,
+      );
+    }
+
+    // For now, create a placeholder proposal (Miden client integration for multi-bill payment TBD)
+    // The actual summaryCommitment, summaryBytesHex, requestBytesHex would come from Miden
+    const proposal = await this.prisma.$transaction(async (tx) => {
+      // Group bills by faucet (token type) to determine how many proposals we need
+      const billsByFaucet = new Map<
+        string,
+        (typeof bills)[0][]
+      >();
+
+      for (const bill of bills) {
+        // Extract faucetId from payment_token JSON
+        const paymentToken = bill.invoice?.paymentToken as any;
+        const faucetId = paymentToken?.address || 'default-qash'; // Default to main token if not specified
+        if (!billsByFaucet.has(faucetId)) {
+          billsByFaucet.set(faucetId, []);
+        }
+        billsByFaucet.get(faucetId)!.push(bill);
+      }
+
+      this.logger.debug(
+        `Bills grouped by faucet: ${Array.from(billsByFaucet.keys()).join(', ')}`,
+      );
+
+      // For now, create a single proposal for the first faucet group (multi-currency can be handled later)
+      // In future, we can create multiple proposals (one per faucet) and link them together
+      const firstFaucetId = Array.from(billsByFaucet.keys())[0];
+      const billsForProposal = billsByFaucet.get(firstFaucetId)!;
+
+      // Build batch payments from bills
+      const payments = billsForProposal.map((bill) => {
+        const paymentToken = bill.invoice?.paymentToken as any;
+        const decimals = paymentToken?.decimals ?? 6;
+        const amount = Math.floor(Number(bill.invoice?.total) * Math.pow(10, decimals));
+        
+        return {
+          recipientId:
+            bill.invoice?.employee?.walletAddress || `employee-${bill.invoice?.employeeId}`,
+          faucetId: firstFaucetId,
+          amount,
+        };
+      });
+
+      this.logger.debug(`Creating batch proposal with ${payments.length} payments`);
+
+
+
+      //TODO: Integrate with Miden client to create batch proposal
+      // Create batch proposal via Miden client
+      // const { summaryCommitment, summaryBytesHex, requestBytesHex } =
+      //   await this.midenClient.createBatchSendProposal(dto.accountId, payments);
+
+      const summaryCommitment = 'placeholder-commitment';
+      const summaryBytesHex = 'placeholder-bytes-hex';
+      const requestBytesHex = 'placeholder-bytes-hex';
+
+      // Create the proposal
+      const newProposal = await tx.multisigProposal.create({
+        data: {
+          accountId: dto.accountId,
+          description: dto.description,
+          proposalType: 'SEND',
+          summaryCommitment,
+          summaryBytesHex,
+          requestBytesHex,
+          noteIds: [],
+          status: 'PENDING',
+          metadata: {
+            billUUIDs: dto.billUUIDs,
+            totalBills: bills.length,
+            billsInProposal: billsForProposal.length,
+            faucetId: firstFaucetId,
+            // Note: Multi-currency payments would require additional proposals
+            multiCurrencyNote:
+              billsByFaucet.size > 1
+                ? `${billsByFaucet.size} different faucets detected - additional proposals needed for other currencies`
+                : undefined,
+          },
+        },
+        include: {
+          signatures: true,
+        },
+      });
+
+      // Link bills to the proposal
+      await tx.bill.updateMany({
+        where: {
+          uuid: { in: billsForProposal.map((b) => b.uuid) },
+        },
+        data: {
+          multisigProposalId: newProposal.id,
+        },
+      });
+
+      // Re-fetch the proposal including linked bills and signatures so callers receive updated relations
+      const proposalWithBills = await tx.multisigProposal.findUnique({
+        where: { id: newProposal.id },
+        include: {
+          signatures: true,
+          bills: {
+            include: {
+              invoice: true,
+            },
+          },
+        },
+      });
+
+      return proposalWithBills!;
+    });
+
+    // Get team member for activity log
+    const teamMember = await this.prisma.teamMember.findUnique({
+      where: { userId: user.internalUserId },
+    });
+
+    // Log activity
+    if (teamMember) {
+      await this.activityLogService.logActivity({
+        companyId: user.company.id,
+        teamMemberId: teamMember.id,
+        action: ActivityActionEnum.CREATE,
+        entityType: ActivityEntityTypeEnum.MULTISIG_PROPOSAL,
+        entityId: proposal.id,
+        entityUuid: proposal.uuid,
+        description: `Created payment proposal for ${bills.length} bills`,
+        metadata: {
+          accountId: dto.accountId,
+          billUUIDs: dto.billUUIDs,
+          billCount: bills.length,
+        },
+      });
+    }
+
+    this.logger.log(`Proposal created from bills: ${proposal.uuid}`);
+
+    return this.mapProposalToDto(proposal, account.threshold);
+  }
+
+  /**
+   * Cancel a proposal (deletes signatures, unlinks bills, sets status to CANCELLED)
+   * Uses optimistic locking via status validation
+   */
+  async cancelProposal(
+    proposalUuid: string,
+    user: UserWithCompany,
+  ): Promise<MultisigProposalResponseDto> {
+    this.logger.log(`Cancelling proposal ${proposalUuid}`);
+
+    // Get proposal with all data
+    const proposal = await this.prisma.multisigProposal.findUnique({
+      where: { uuid: proposalUuid },
+      include: {
+        account: true,
+        signatures: true,
+        bills: true,
+      },
+    });
+
+    if (!proposal) {
+      throw new NotFoundException(`Proposal ${proposalUuid} not found`);
+    }
+
+    // Verify company ownership
+    if (proposal.account.companyId !== user.company.id) {
+      throw new BadRequestException(
+        'Cannot cancel a proposal from a different company',
+      );
+    }
+
+    // Validate status - only allow cancellation of PENDING or READY proposals
+    if (proposal.status !== 'PENDING' && proposal.status !== 'READY') {
+      throw new ConflictException(
+        `Cannot cancel proposal with status ${proposal.status}. Only PENDING or READY proposals can be cancelled.`,
+      );
+    }
+
+    // Use transaction for atomic operation with optimistic locking
+    const updatedProposal = await this.prisma.$transaction(async (tx) => {
+      // Re-check status to prevent race conditions (optimistic locking)
+      const currentProposal = await tx.multisigProposal.findUnique({
+        where: { uuid: proposalUuid },
+        select: { status: true },
+      });
+
+      if (currentProposal?.status !== 'PENDING' && currentProposal?.status !== 'READY') {
+        throw new ConflictException(
+          `Proposal status changed to ${currentProposal?.status}. Cannot cancel.`,
+        );
+      }
+
+      // Delete all signatures
+      await tx.multisigSignature.deleteMany({
+        where: { proposalId: proposal.id },
+      });
+
+      // Unlink bills and reset their status to PENDING
+      if (proposal.bills.length > 0) {
+        await tx.bill.updateMany({
+          where: { multisigProposalId: proposal.id },
+          data: {
+            multisigProposalId: null,
+            status: BillStatusEnum.PENDING,
+          },
+        });
+      }
+
+      // Update proposal status to CANCELLED
+      return tx.multisigProposal.update({
+        where: { uuid: proposalUuid },
+        data: { status: 'CANCELLED' },
+        include: {
+          account: true,
+          signatures: true,
+          bills: true,
+        },
+      });
+    });
+
+    // Get team member for activity log
+    const teamMember = await this.prisma.teamMember.findUnique({
+      where: { userId: user.internalUserId },
+    });
+
+    // Log activity
+    if (teamMember) {
+      await this.activityLogService.logActivity({
+        companyId: user.company.id,
+        teamMemberId: teamMember.id,
+        action: ActivityActionEnum.CANCEL,
+        entityType: ActivityEntityTypeEnum.MULTISIG_PROPOSAL,
+        entityId: proposal.id,
+        entityUuid: proposal.uuid,
+        description: `Cancelled payment proposal (${proposal.bills.length} bills unlinked, ${proposal.signatures.length} signatures deleted)`,
+        metadata: {
+          accountId: proposal.accountId,
+          billUUIDs: proposal.bills.map((b) => b.uuid),
+          signaturesDeleted: proposal.signatures.length,
+        },
+      });
+    }
+
+    this.logger.log(
+      `Proposal ${proposalUuid} cancelled: ${proposal.bills.length} bills unlinked, ${proposal.signatures.length} signatures deleted`,
+    );
+
+    return this.mapProposalToDto(updatedProposal, updatedProposal.account.threshold);
+  }
+
+  /**
+   * List all proposals for a company (across all multisig accounts)
+   */
+  async listProposalsByCompany(
+    companyId: number,
+  ): Promise<MultisigProposalResponseDto[]> {
+    const proposals = await this.prisma.multisigProposal.findMany({
+      where: {
+        account: {
+          companyId,
+        },
+      },
+      include: {
+        account: true,
+        signatures: true,
+        bills: true
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return proposals.map((p) => this.mapProposalToDto(p, p.account.threshold));
+  }
+
+  /**
    * Get a proposal by ID
    */
   async getProposal(proposalId: number): Promise<MultisigProposalResponseDto> {
@@ -365,6 +764,11 @@ export class MultisigService {
       include: {
         account: true,
         signatures: true,
+        bills: {
+          include: {
+            invoice: true,
+          },
+        },
       },
     });
 
@@ -387,6 +791,11 @@ export class MultisigService {
       where: { accountId },
       include: {
         signatures: true,
+        bills: {
+          include: {
+            invoice: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -409,6 +818,11 @@ export class MultisigService {
       include: {
         account: true,
         signatures: true,
+        bills: {
+          include: {
+            invoice: true,
+          },
+        },
       },
     });
 
@@ -482,18 +896,24 @@ export class MultisigService {
 
   /**
    * Execute a proposal
+   * Handles linked bills: validates, filters invalid, updates status on success/failure
    */
   async executeProposal(
     proposalId: number,
   ): Promise<ExecuteTransactionResponseDto> {
     this.logger.log(`Executing proposal ${proposalId}`);
 
-    // Get proposal with all data
+    // Get proposal with all data including linked bills
     const proposal = await this.prisma.multisigProposal.findUnique({
       where: { id: proposalId },
       include: {
         account: true,
         signatures: true,
+        bills: {
+          include: {
+            invoice: true,
+          },
+        },
       },
     });
 
@@ -512,6 +932,23 @@ export class MultisigService {
     if (proposal.signatures.length < proposal.account.threshold) {
       throw new BadRequestException(
         `Not enough signatures (${proposal.signatures.length}/${proposal.account.threshold})`,
+      );
+    }
+
+    // Filter valid bills (those with valid invoices and payable status)
+    const validBills = proposal.bills.filter(
+      (b) =>
+        b.invoice !== null &&
+        (b.status === BillStatusEnum.PENDING || b.status === BillStatusEnum.OVERDUE),
+    );
+
+    const invalidBillIds = proposal.bills
+      .filter((b) => !validBills.includes(b))
+      .map((b) => b.uuid);
+
+    if (invalidBillIds.length > 0) {
+      this.logger.warn(
+        `Skipping ${invalidBillIds.length} invalid bills: ${invalidBillIds.join(', ')}`,
       );
     }
 
@@ -534,25 +971,72 @@ export class MultisigService {
       proposal.account.publicKeys,
     );
 
-    // Update proposal status
+    const now = new Date();
+
+    // Update proposal and bills based on result
     if (result.success) {
-      await this.prisma.multisigProposal.update({
-        where: { id: proposalId },
-        data: {
-          status: 'EXECUTED',
-          transactionId: result.transactionId,
-        },
+      await this.prisma.$transaction(async (tx) => {
+        // Update proposal status
+        await tx.multisigProposal.update({
+          where: { id: proposalId },
+          data: {
+            status: 'EXECUTED',
+            transactionId: result.transactionId,
+          },
+        });
+
+        // Update valid bills to PAID
+        if (validBills.length > 0) {
+          await tx.bill.updateMany({
+            where: {
+              id: { in: validBills.map((b) => b.id) },
+            },
+            data: {
+              status: BillStatusEnum.PAID,
+              paidAt: now,
+              transactionHash: result.transactionId,
+            },
+          });
+
+          // Update corresponding invoices to PAID
+          const invoiceIds = validBills
+            .map((b) => b.invoice?.id)
+            .filter((id): id is number => id !== undefined);
+
+          if (invoiceIds.length > 0) {
+            await tx.invoice.updateMany({
+              where: { id: { in: invoiceIds } },
+              data: {
+                status: 'PAID',
+                paidAt: now,
+              },
+            });
+          }
+        }
       });
+
       this.logger.log(
-        `Proposal ${proposalId} executed successfully: ${result.transactionId}`,
+        `Proposal ${proposalId} executed successfully: ${result.transactionId}. ${validBills.length} bills paid.`,
       );
     } else {
-      await this.prisma.multisigProposal.update({
-        where: { id: proposalId },
-        data: { status: 'FAILED' },
+      await this.prisma.$transaction(async (tx) => {
+        // Update proposal status to FAILED
+        await tx.multisigProposal.update({
+          where: { id: proposalId },
+          data: { status: 'FAILED' },
+        });
+
+        // Update linked bills to FAILED (but keep them linked for audit trail)
+        if (proposal.bills.length > 0) {
+          await tx.bill.updateMany({
+            where: { multisigProposalId: proposalId },
+            data: { status: BillStatusEnum.FAILED },
+          });
+        }
       });
+
       this.logger.error(
-        `Proposal ${proposalId} execution failed: ${result.error}`,
+        `Proposal ${proposalId} execution failed: ${result.error}. ${proposal.bills.length} bills marked as FAILED.`,
       );
     }
 
@@ -580,11 +1064,29 @@ export class MultisigService {
       signaturesCount: proposal.signatures?.length || 0,
       threshold,
       noteIds: proposal.noteIds || [],
+      recipientId: proposal.recipientId,
+      faucetId: proposal.faucetId,
+      amount: proposal.amount,
       signatures: proposal.signatures?.map((sig: any) => ({
         id: sig.id,
+        uuid: sig.uuid,
         approverIndex: sig.approverIndex,
         approverPublicKey: sig.approverPublicKey,
         signatureHex: sig.signatureHex,
+        createdAt: sig.createdAt,
+        teamMember: sig.teamMember ? {
+          uuid: sig.teamMember.uuid,
+          firstName: sig.teamMember.firstName,
+          lastName: sig.teamMember.lastName,
+        } : undefined,
+      })) || [],
+      bills: proposal.bills?.map((bill: any) => ({
+        uuid: bill.uuid,
+        invoiceNumber: bill.invoice?.invoiceNumber,
+        amount: bill.invoice?.total,
+        status: bill.status,
+        recipientName: bill.invoice?.employee?.name || bill.invoice?.fromDetails?.name,
+        recipientAddress: bill.invoice?.paymentWalletAddress,
       })) || [],
       createdAt: proposal.createdAt,
       updatedAt: proposal.updatedAt,

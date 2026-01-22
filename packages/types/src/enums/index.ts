@@ -52,7 +52,9 @@ export const ActivityEntityTypeEnum = {
   BILL: 'BILL',
   PAYMENT_LINK: 'PAYMENT_LINK',
   EMPLOYEE_GROUP: 'EMPLOYEE_GROUP',
-  COMPANY: 'COMPANY'
+  COMPANY: 'COMPANY',
+  MULTISIG_ACCOUNT: 'MULTISIG_ACCOUNT',
+  MULTISIG_PROPOSAL: 'MULTISIG_PROPOSAL'
 } as const;
 
 export type ActivityEntityTypeEnum = (typeof ActivityEntityTypeEnum)[keyof typeof ActivityEntityTypeEnum];
@@ -125,10 +127,29 @@ export const BillStatusEnum = {
   PENDING: 'PENDING',
   PAID: 'PAID',
   OVERDUE: 'OVERDUE',
-  CANCELLED: 'CANCELLED'
+  CANCELLED: 'CANCELLED',
+  FAILED: 'FAILED'
 } as const;
 
 export type BillStatusEnum = (typeof BillStatusEnum)[keyof typeof BillStatusEnum];
+
+// Multisig Enums
+export const MultisigProposalTypeEnum = {
+  CONSUME: 'CONSUME',
+  SEND: 'SEND'
+} as const;
+
+export type MultisigProposalTypeEnum = (typeof MultisigProposalTypeEnum)[keyof typeof MultisigProposalTypeEnum];
+
+export const MultisigProposalStatusEnum = {
+  PENDING: 'PENDING',
+  READY: 'READY',
+  EXECUTED: 'EXECUTED',
+  FAILED: 'FAILED',
+  CANCELLED: 'CANCELLED'
+} as const;
+
+export type MultisigProposalStatusEnum = (typeof MultisigProposalStatusEnum)[keyof typeof MultisigProposalStatusEnum];
 
 // Category & Notification Enums
 export const CategoryShapeEnum = {

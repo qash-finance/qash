@@ -13,6 +13,8 @@ import {
   CreateMultisigAccountDto,
   CreateConsumeProposalDto,
   CreateSendProposalDto,
+  CreateBatchSendProposalDto,
+  CreateProposalFromBillsDto,
   SubmitSignatureDto,
   MultisigAccountResponseDto,
   MultisigProposalResponseDto,
@@ -138,6 +140,34 @@ export class MultisigController {
     return this.multisigService.createSendProposal(dto);
   }
 
+  @Post('proposals/send-batch')
+  @ApiOperation({ summary: 'Create a batch send funds proposal with multiple recipients' })
+  @ApiResponse({
+    status: 201,
+    description: 'Batch send proposal created successfully',
+    type: MultisigProposalResponseDto,
+  })
+  async createBatchSendProposal(
+    @Body() dto: CreateBatchSendProposalDto,
+  ): Promise<MultisigProposalResponseDto> {
+    return this.multisigService.createBatchSendProposal(dto);
+  }
+
+  @Post('proposals/from-bills')
+  @CompanyAuth()
+  @ApiOperation({ summary: 'Create a proposal from bills for multi-signature payment' })
+  @ApiResponse({
+    status: 201,
+    description: 'Proposal created from bills successfully',
+    type: MultisigProposalResponseDto,
+  })
+  async createProposalFromBills(
+    @Body() dto: CreateProposalFromBillsDto,
+    @CurrentUser('withCompany') user: UserWithCompany,
+  ): Promise<MultisigProposalResponseDto> {
+    return this.multisigService.createProposalFromBills(dto, user);
+  }
+
   @Get('proposals/:proposalId')
   @ApiOperation({ summary: 'Get a proposal by ID' })
   @ApiResponse({
@@ -162,6 +192,19 @@ export class MultisigController {
     @Param('accountId') accountId: string,
   ): Promise<MultisigProposalResponseDto[]> {
     return this.multisigService.listProposals(accountId);
+  }
+
+  @Get('companies/:companyId/proposals')
+  @ApiOperation({ summary: 'List all proposals for a company across all multisig accounts' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of proposals for the company',
+    type: [MultisigProposalResponseDto],
+  })
+  async listProposalsByCompany(
+    @Param('companyId', ParseIntPipe) companyId: number,
+  ): Promise<MultisigProposalResponseDto[]> {
+    return this.multisigService.listProposalsByCompany(companyId);
   }
 
   @Post('proposals/:proposalId/signatures')
@@ -189,6 +232,21 @@ export class MultisigController {
     @Param('proposalId', ParseIntPipe) proposalId: number,
   ): Promise<ExecuteTransactionResponseDto> {
     return this.multisigService.executeProposal(proposalId);
+  }
+
+  @Post('proposals/:proposalUuid/cancel')
+  @CompanyAuth()
+  @ApiOperation({ summary: 'Cancel a proposal (deletes signatures, unlinks bills)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Proposal cancelled successfully',
+    type: MultisigProposalResponseDto,
+  })
+  async cancelProposal(
+    @Param('proposalUuid') proposalUuid: string,
+    @CurrentUser('withCompany') user: UserWithCompany,
+  ): Promise<MultisigProposalResponseDto> {
+    return this.multisigService.cancelProposal(proposalUuid, user);
   }
 
   // ============================================================================

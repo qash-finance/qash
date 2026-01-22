@@ -178,6 +178,49 @@ export class MidenClientService {
   }
 
   /**
+   * Create a batch send funds proposal with multiple recipients and faucets
+   */
+  async createBatchSendProposal(
+    accountId: string,
+    payments: Array<{ recipientId: string; faucetId: string; amount: number }>,
+  ): Promise<{
+    summaryCommitment: string;
+    summaryBytesHex: string;
+    requestBytesHex: string;
+  }> {
+    try {
+      this.logger.debug(
+        `Creating batch send proposal for account ${accountId} with ${payments.length} payments`,
+      );
+
+      const response = await this.client.post('/multisig/batch-send-proposal', {
+        account_id: accountId,
+        payments: payments.map(p => ({
+          recipient_id: p.recipientId,
+          faucet_id: p.faucetId,
+          amount: p.amount,
+        })),
+      });
+
+      this.logger.debug(
+        `Batch send proposal created with commitment: ${response.data.summary_commitment}`,
+      );
+
+      return {
+        summaryCommitment: response.data.summary_commitment,
+        summaryBytesHex: response.data.summary_bytes_hex,
+        requestBytesHex: response.data.request_bytes_hex,
+      };
+    } catch (error) {
+      this.logger.error('Failed to create batch send proposal', error);
+      throw new HttpException(
+        `Failed to create batch send proposal: ${error.response?.data?.message || error.message}`,
+        error.response?.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
    * Execute a multisig transaction with collected signatures
    */
   async executeTransaction(

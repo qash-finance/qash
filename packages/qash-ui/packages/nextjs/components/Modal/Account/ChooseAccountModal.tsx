@@ -117,7 +117,13 @@ function AccountRow({ account, isSelected, onSelect, icon, backgroundColor = "bg
   );
 }
 
-export function ChooseAccountModal({ isOpen, onClose, zIndex, onSelectAccount }: ModalProp<ChooseAccountModalProps>) {
+export function ChooseAccountModal({
+  isOpen,
+  onClose,
+  zIndex,
+  onSelectAccount,
+  onConfirm,
+}: ModalProp<ChooseAccountModalProps>) {
   const { data: myCompany } = useGetMyCompany();
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const { data: accounts = [], isLoading: accountsLoading } = useListAccountsByCompany(myCompany?.id, {
@@ -134,6 +140,10 @@ export function ChooseAccountModal({ isOpen, onClose, zIndex, onSelectAccount }:
 
   const handleConfirm = () => {
     if (selectedAccountId) {
+      const account = accounts.find(a => a.accountId === selectedAccountId);
+      if (account && onConfirm) {
+        onConfirm(account);
+      }
       onClose();
     }
   };

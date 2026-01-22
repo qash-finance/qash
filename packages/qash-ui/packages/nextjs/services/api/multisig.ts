@@ -5,6 +5,8 @@ import type {
   MultisigAccountResponseDto,
   CreateConsumeProposalDto,
   CreateSendProposalDto,
+  CreateBatchSendProposalDto,
+  CreateProposalFromBillsDto,
   MultisigProposalResponseDto,
   SubmitSignatureDto,
   ExecuteTransactionResponseDto,
@@ -87,6 +89,26 @@ export const createSendProposal = async (
   );
 };
 
+// POST: Create a batch send funds proposal with multiple recipients
+export const createBatchSendProposal = async (
+  data: CreateBatchSendProposalDto
+): Promise<MultisigProposalResponseDto> => {
+  return apiServerWithAuth.postData<MultisigProposalResponseDto>(
+    `/multisig/proposals/send-batch`,
+    data
+  );
+};
+
+// POST: Create a proposal from bills (multi-signature bill payment)
+export const createProposalFromBills = async (
+  data: CreateProposalFromBillsDto
+): Promise<MultisigProposalResponseDto> => {
+  return apiServerWithAuth.postData<MultisigProposalResponseDto>(
+    `/multisig/proposals/from-bills`,
+    data
+  );
+};
+
 // GET: Get a proposal by ID
 export const getProposal = async (
   proposalId: number
@@ -102,6 +124,15 @@ export const listProposals = async (
 ): Promise<MultisigProposalResponseDto[]> => {
   return apiServerWithAuth.getData<MultisigProposalResponseDto[]>(
     `/multisig/accounts/${accountId}/proposals`
+  );
+};
+
+// GET: List all proposals for a company (across all multisig accounts)
+export const listProposalsByCompany = async (
+  companyId: number
+): Promise<MultisigProposalResponseDto[]> => {
+  return apiServerWithAuth.getData<MultisigProposalResponseDto[]>(
+    `/multisig/companies/${companyId}/proposals`
   );
 };
 
@@ -122,6 +153,15 @@ export const executeProposal = async (
 ): Promise<ExecuteTransactionResponseDto> => {
   return apiServerWithAuth.postData<ExecuteTransactionResponseDto>(
     `/multisig/proposals/${proposalId}/execute`
+  );
+};
+
+// POST: Cancel a proposal (deletes signatures, unlinks bills)
+export const cancelProposal = async (
+  proposalUuid: string
+): Promise<MultisigProposalResponseDto> => {
+  return apiServerWithAuth.postData<MultisigProposalResponseDto>(
+    `/multisig/proposals/${proposalUuid}/cancel`
   );
 };
 
@@ -299,6 +339,51 @@ export function useCreateSendProposal() {
 }
 
 /**
+ * React Query hook to create a batch send proposal with multiple recipients
+ */
+export function useCreateBatchSendProposal() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    MultisigProposalResponseDto,
+    Error,
+    CreateBatchSendProposalDto
+  >({
+    mutationFn: (data) => createBatchSendProposal(data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({
+        queryKey: ["multisig", "accounts", data.accountId, "proposals"],
+      });
+    },
+  });
+}
+
+/**
+ * React Query hook to create a proposal from bills (multi-signature bill payment)
+ */
+export function useCreateProposalFromBills() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    MultisigProposalResponseDto,
+    Error,
+    CreateProposalFromBillsDto
+  >({
+    mutationFn: (data) => createProposalFromBills(data),
+    onSuccess: (data) => {
+      // Invalidate both bills and multisig proposals
+      queryClient.invalidateQueries({ queryKey: ["bills"] });
+      queryClient.invalidateQueries({
+        queryKey: ["multisig", "accounts", data.accountId, "proposals"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["multisig", "proposals"],
+      });
+    },
+  });
+}
+
+/**
  * React Query hook to get a proposal
  */
 export function useGetProposal(
@@ -339,6 +424,26 @@ export function useListProposals(
 }
 
 /**
+ * React Query hook to list proposals for a company (across all multisig accounts)
+ */
+export function useListProposalsByCompany(
+  companyId?: number,
+  options?: { enabled?: boolean }
+) {
+  return useQuery<MultisigProposalResponseDto[]>({
+    queryKey: ["multisig", "companies", companyId, "proposals"],
+    queryFn: () => {
+      if (!companyId) throw new Error("companyId is required");
+      return listProposalsByCompany(companyId);
+    },
+    enabled: !!companyId && (options?.enabled !== false),
+    staleTime: 10000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+  });
+}
+
+/**
  * React Query hook to submit a signature for a proposal
  */
 export function useSubmitSignature() {
@@ -373,6 +478,27 @@ export function useExecuteProposal() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ["multisig", "proposals"] });
         queryClient.invalidateQueries({ queryKey: ["multisig", "accounts"] });
+        queryClient.invalidateQueries({ queryKey: ["bills"] });
+      },
+    }
+  );
+}
+
+/**
+ * React Query hook to cancel a proposal
+ */
+export function useCancelProposal() {
+  const queryClient = useQueryClient();
+
+  return useMutation<MultisigProposalResponseDto, Error, { proposalUuid: string }>(
+    {
+      mutationFn: ({ proposalUuid }) => cancelProposal(proposalUuid),
+      onSuccess: (data) => {
+        queryClient.invalidateQueries({ queryKey: ["multisig", "proposals"] });
+        queryClient.invalidateQueries({
+          queryKey: ["multisig", "accounts", data.accountId, "proposals"],
+        });
+        queryClient.invalidateQueries({ queryKey: ["bills"] });
       },
     }
   );

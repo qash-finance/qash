@@ -81,8 +81,8 @@ export default function TeamInvitePage() {
         <div className="rounded-[24px] p-12 max-w-[450px] w-full text-center bg-app-background">
           <div className="mb-6">
             <div className="text-6xl mb-4">✗</div>
-            <h2 className="text-2xl font-semibold text-white mb-2">Invitation Error</h2>
-            <p className="text-[#999] text-sm mb-4">{error}</p>
+            <h2 className="text-2xl font-semibold mb-2">Invitation Error</h2>
+            <p className="text-text-secondary text-sm mb-4">{error}</p>
             <button
               onClick={() => router.push("/")}
               className="inline-block px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
@@ -101,8 +101,8 @@ export default function TeamInvitePage() {
         <div className=" rounded-[24px] p-12 max-w-[450px] w-full text-center bg-app-background">
           <div className="mb-6">
             <div className="text-6xl mb-4">!</div>
-            <h2 className="text-2xl font-semibold text-white mb-2">Invalid Invitation Link</h2>
-            <p className="text-[#999] text-sm mb-4">
+            <h2 className="text-2xl font-semibold mb-2">Invalid Invitation Link</h2>
+            <p className="text-text-secondary text-sm mb-4">
               The invitation link is missing or invalid. Please check the URL in your email.
             </p>
             <button
@@ -123,8 +123,8 @@ export default function TeamInvitePage() {
         <div className="rounded-[24px] p-12 max-w-[450px] w-full text-center bg-app-background">
           <div className="mb-6">
             <div className="text-6xl mb-4">✓</div>
-            <h2 className="text-2xl font-semibold text-white mb-2">Welcome to {companyName}!</h2>
-            <p className="text-[#999] text-sm">You have successfully joined the team. Redirecting...</p>
+            <h2 className="text-2xl font-semibold mb-2">Welcome to {companyName}!</h2>
+            <p className="text-text-secondary text-sm">You have successfully joined the team. Redirecting...</p>
           </div>
         </div>
       </div>

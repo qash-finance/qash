@@ -165,6 +165,60 @@ export class BillService {
         });
       }
 
+      // Multisig proposal events
+      if (bill.multisigProposal) {
+        // Proposal created
+        timeline.push({
+          event: 'proposal_created',
+          timestamp: bill.multisigProposal.createdAt,
+          metadata: {
+            proposalUuid: bill.multisigProposal.uuid,
+            status: bill.multisigProposal.status,
+          },
+        });
+
+        // Add signature events
+        if (bill.multisigProposal.signatures) {
+          for (const sig of bill.multisigProposal.signatures) {
+            timeline.push({
+              event: 'proposal_signed',
+              timestamp: sig.createdAt,
+              metadata: {
+                signerName: `Approver ${sig.approverIndex + 1}`,
+                approverPublicKey: sig.approverPublicKey,
+              },
+            });
+          }
+        }
+
+        // Proposal executed
+        if (bill.multisigProposal.status === 'EXECUTED' && bill.multisigProposal.updatedAt) {
+          timeline.push({
+            event: 'proposal_executed',
+            timestamp: bill.multisigProposal.updatedAt,
+            metadata: {
+              transactionId: bill.multisigProposal.transactionId,
+            },
+          });
+        }
+
+        // Proposal cancelled
+        if (bill.multisigProposal.status === 'CANCELLED' && bill.multisigProposal.updatedAt) {
+          timeline.push({
+            event: 'proposal_cancelled',
+            timestamp: bill.multisigProposal.updatedAt,
+          });
+        }
+
+        // Proposal failed
+        if (bill.multisigProposal.status === 'FAILED' && bill.multisigProposal.updatedAt) {
+          timeline.push({
+            event: 'proposal_failed',
+            timestamp: bill.multisigProposal.updatedAt,
+          });
+        }
+      }
+
       // Sort timeline by timestamp
       timeline.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 

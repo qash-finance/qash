@@ -524,7 +524,8 @@ export interface EditTeamMemberProps extends BaseModalProps {
 }
 
 export interface ChooseAccountModalProps extends BaseModalProps {
-  onSelectAccount?: (accountId: MultisigAccountResponseDto) => void;
+  onSelectAccount?: (account: MultisigAccountResponseDto) => void;
+  onConfirm?: (account: MultisigAccountResponseDto) => void;
 }
 
 export type ModalPropsMap = {

@@ -13,15 +13,21 @@ import { InvoiceStatusEnum } from "@qash/types/enums";
 import { CategoryBadge } from "../ContactBook/ContactBookContainer";
 import { useGetAllEmployeeGroups } from "@/services/api/employee";
 import { CategoryShapeEnum } from "@qash/types/enums";
+import { useGetBillDetail } from "@/services/api/bill";
+import { BillTimelineDto } from "@qash/types/dto/bill";
 
 const BillDetailContainer = () => {
   const router = useRouter();
   const { openModal } = useModal();
   const searchParams = useSearchParams();
   const invoiceUUID = searchParams.get("uuid") || "";
+  const billUUID = searchParams.get("billUuid") || "";
   const { isLoading, fetchInvoiceByUUID, downloadPdf, cancelInvoiceData } = useInvoice();
   const [invoice, setInvoice] = useState<any>(null);
   const { data: groups } = useGetAllEmployeeGroups();
+
+  // Fetch bill details which includes the timeline with multisig proposal events
+  const { data: billDetail } = useGetBillDetail(billUUID, { enabled: !!billUUID });
 
   // Action handlers for invoice menu
   const handleCopyInvoiceLink = () => {
@@ -86,6 +92,43 @@ const BillDetailContainer = () => {
         return { text: status || "AWAITING", status: BadgeStatus.AWAITING };
     }
   };
+
+  // Format timeline event label
+  const getTimelineLabel = (event: string): string => {
+    const labels: Record<string, string> = {
+      invoice_created: "Invoice created",
+      invoice_sent: "Invoice sent",
+      invoice_reviewed: "Invoice reviewed",
+      invoice_confirmed: "Invoice confirmed",
+      bill_created: "Bill created",
+      bill_paid: "Bill paid",
+      proposal_created: "Payment proposal created",
+      proposal_signed: "Proposal signed",
+      proposal_executed: "Payment executed",
+      proposal_cancelled: "Proposal cancelled",
+      proposal_failed: "Proposal failed",
+    };
+    return labels[event] || event.replace(/_/g, " ");
+  };
+
+  // Build timeline items from API timeline or fallback to invoice data
+  const timelineItems = React.useMemo(() => {
+    if (billDetail?.timeline && billDetail.timeline.length > 0) {
+      return billDetail.timeline.map((t: BillTimelineDto) => ({
+        label: getTimelineLabel(t.event),
+        date: formatDateTime(t.timestamp as string),
+        metadata: t.metadata,
+      }));
+    }
+    // Fallback to invoice-based timeline
+    return [
+      { label: "Invoice created", date: formatDateTime(invoice?.createdAt) },
+      invoice?.sentAt && { label: "Invoice sent", date: formatDateTime(invoice.sentAt) },
+      invoice?.reviewedAt && { label: "Invoice reviewed", date: formatDateTime(invoice.reviewedAt) },
+      invoice?.confirmedAt && { label: "Invoice confirmed", date: formatDateTime(invoice.confirmedAt) },
+      invoice?.paidAt && { label: "Invoice paid", date: formatDateTime(invoice.paidAt) },
+    ].filter(Boolean);
+  }, [billDetail?.timeline, invoice]);
 
   const loadInvoice = async () => {
     try {
@@ -373,34 +416,29 @@ const BillDetailContainer = () => {
           <div className="border border-primary-divider rounded-2xl px-2 py-6 flex-1">
             <div className="px-4 flex flex-col gap-3">
               {/* Timeline Items */}
-              {[
-                { label: "Invoice created", date: formatDateTime(invoice.createdAt) },
-                invoice.sentAt && { label: "Invoice sent", date: formatDateTime(invoice.sentAt) },
-                invoice.reviewedAt && { label: "Invoice reviewed", date: formatDateTime(invoice.reviewedAt) },
-                invoice.confirmedAt && { label: "Invoice confirmed", date: formatDateTime(invoice.confirmedAt) },
-                invoice.paidAt && { label: "Invoice paid", date: formatDateTime(invoice.paidAt) },
-              ]
-                .filter(Boolean)
-                .map((item: any, idx, arr) => (
-                  <div className="flex gap-7 pb-6" key={idx}>
-                    {/* Timeline Marker with Polygon and Vertical Line */}
-                    <div className="flex flex-col items-center pt-1 relative">
-                      <img src="/misc/blue-polygon.svg" alt="Timeline Marker" className="w-6 h-6 z-10" />
-                      {/* Vertical Line (not for first item) */}
-                      {idx !== 0 && (
-                        <div
-                          className="absolute top-0 left-1/2 -translate-x-1/2"
-                          style={{ height: 75, width: 4, background: "#066EFF", zIndex: 0, marginTop: -50 }}
-                        />
-                      )}
-                    </div>
-                    {/* Timeline Content */}
-                    <div className="flex flex-col gap-1.5 w-40">
-                      <p className="text-sm font-semibold text-text-primary leading-none">{item.label}</p>
-                      <p className="text-sm font-medium text-text-secondary leading-none">{item.date}</p>
-                    </div>
+              {timelineItems.map((item: any, idx: number) => (
+                <div className="flex gap-7 pb-6" key={idx}>
+                  {/* Timeline Marker with Polygon and Vertical Line */}
+                  <div className="flex flex-col items-center pt-1 relative">
+                    <img src="/misc/blue-polygon.svg" alt="Timeline Marker" className="w-6 h-6 z-10" />
+                    {/* Vertical Line (not for first item) */}
+                    {idx !== 0 && (
+                      <div
+                        className="absolute top-0 left-1/2 -translate-x-1/2"
+                        style={{ height: 75, width: 4, background: "#066EFF", zIndex: 0, marginTop: -50 }}
+                      />
+                    )}
                   </div>
-                ))}
+                  {/* Timeline Content */}
+                  <div className="flex flex-col gap-1.5 w-40">
+                    <p className="text-sm font-semibold text-text-primary leading-none">{item.label}</p>
+                    <p className="text-sm font-medium text-text-secondary leading-none">{item.date}</p>
+                    {item.metadata?.signerName && (
+                      <p className="text-xs text-text-secondary">{item.metadata.signerName}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

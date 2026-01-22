@@ -387,7 +387,7 @@ function createInvoiceDataFromPayroll(
     return null;
   }
 
-  if(!payroll.metadata?.payStartDate) { 
+  if (!payroll.metadata?.payStartDate) {
     console.warn("Missing payStartDate in payroll metadata");
     return null;
   }
@@ -404,6 +404,7 @@ function createInvoiceDataFromPayroll(
     invoiceNumber: `INV0001`,
     date: invoiceDate.toISOString().split("T")[0],
     dueDate: payroll.metadata?.payStartDate.split("T")[0],
+    note: payroll.note,
     from: {
       name: employeeName,
       email: employee?.email,
@@ -455,9 +456,10 @@ const ReviewPayroll = ({ onBackAndEdit, payrollDto, employee, owner, company }: 
         payrollCycle: payrollDto.payrollCycle,
         amount: payrollDto.amount,
         joiningDate: payrollDto.joiningDate,
-        payday: payrollDto.metadata?.payDay,
+        payday: payrollDto.payday,
         generateDaysBefore: 5,
         description: payrollDto.description,
+        note: payrollDto.note,
       }).catch(err => {
         throw err;
       });

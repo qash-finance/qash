@@ -9,14 +9,16 @@ import { CategoryBadge } from "../ContactBook/ContactBookContainer";
 import { useGetAllEmployeeGroups } from "@/services/api/employee";
 import { CategoryShapeEnum } from "@qash/types/enums";
 import { useModal } from "@/contexts/ModalManagerProvider";
-import { InvoiceModalProps, TransactionOverviewModalProps } from "@/types/modal";
+import { ChooseAccountModalProps, InvoiceModalProps } from "@/types/modal";
 import { PrimaryButton } from "../Common/PrimaryButton";
 import toast from "react-hot-toast";
-import { QASH_TOKEN_ADDRESS, QASH_TOKEN_DECIMALS, QASH_TOKEN_SYMBOL } from "@/services/utils/constant";
-import { usePayBills } from "@/services/api/bill";
-import { getFaucetMetadata } from "@/services/utils/miden/faucet";
-import { useMidenProvider } from "@/contexts/MidenProvider";
-import { importAndGetAccount } from "@/services/utils/miden/account";
+import {
+  useCreateBatchSendProposal,
+  useCreateProposalFromBills,
+  useListAccountsByCompany,
+} from "@/services/api/multisig";
+import { CreateBatchSendProposalDto, BatchPaymentItem, CreateProposalFromBillsDto } from "@qash/types/dto/multisig";
+import { useGetMyCompany } from "@/services/api/company";
 
 const InvoiceItem = ({
   invoiceId,
@@ -88,10 +90,11 @@ const TokenItem = ({ token, amount, amountUsd }: { token: string; amount: string
 const BillReviewContainer = () => {
   const router = useRouter();
   const { setTitle, setShowBackArrow, setOnBackClick } = useTitle();
-  const { address, client } = useMidenProvider();
   const { data: groups } = useGetAllEmployeeGroups();
   const { openModal, closeModal } = useModal();
-  const payBillsMutate = usePayBills();
+  const { data: company } = useGetMyCompany();
+  const createProposalMutation = useCreateProposalFromBills();
+  const { data: multisigAccounts } = useListAccountsByCompany(company?.id);
 
   useEffect(() => {
     const handleBack = () => {
@@ -171,114 +174,47 @@ const BillReviewContainer = () => {
     };
   }, [searchParams, fetchInvoiceByUUID]);
 
-  const handleSubmit = async () => {
-    const midenSdk = await import("@demox-labs/miden-sdk");
-    const {
-      Note,
-      WebClient,
-      Address,
-      NoteAssets,
-      FungibleAsset,
-      NoteType,
-      Felt,
-      TransactionRequestBuilder,
-      BasicFungibleFaucetComponent,
-      OutputNote,
-    } = midenSdk;
-    const OutputNoteArray = (midenSdk as any).OutputNoteArray;
+  // Handle opening account selection modal
+  const handlePayInvoice = () => {
+    if (!company?.id) {
+      return toast.error("Company not found");
+    }
 
-    if (!address) {
-      return toast.error("Please connect your wallet");
+    if (!multisigAccounts || multisigAccounts.length === 0) {
+      return toast.error("No multisig accounts found. Please create one first.");
+    }
+
+    openModal<ChooseAccountModalProps>("CHOOSE_ACCOUNT", {
+      onConfirm: selectedAccount => {
+        handleCreateProposal(selectedAccount.accountId);
+      },
+    });
+  };
+
+  // Handle creating a batch proposal from selected invoices
+  const handleCreateProposal = async (accountId: string) => {
+    if (selectedInvoices.length === 0) {
+      return toast.error("No invoices selected for payment");
     }
 
     try {
       openModal("PROCESSING_TRANSACTION");
-      // prepare an array of p2id note
-      const p2idNotes: any[] = [];
-      const p2idNotesCopy: any[] = [];
-      const recipientAddresses = [];
-      const assets = [];
-      let totalAmount = 0;
-      // loop through selected invoices
-      for (const inv of selectedInvoices) {
-        // payment token address
-        const paymentTokenAddress = inv.paymentToken.address;
 
-        // payment amount
-        const paymentAmount = inv.total;
-        // recipient address
-        const recipientAddress = inv.paymentWalletAddress;
-        const faucetAccount = await importAndGetAccount(client, paymentTokenAddress);
-        // get faucet metadata
-        const faucetMetadata = await BasicFungibleFaucetComponent.fromAccount(faucetAccount);
-        assets.push(faucetMetadata);
-        totalAmount += Number(paymentAmount);
+      const totalAmount = tokenTotals.reduce((sum, t) => sum + t.total, 0);
+      const description = `Payment for ${selectedInvoices.length} invoice(s) - Total: ${totalAmount}`;
 
-        // build p2id note
-        const p2idNote = Note.createP2IDNote(
-          Address.fromBech32(address).accountId(),
-          Address.fromBech32(recipientAddress).accountId(),
-          new NoteAssets([
-            new FungibleAsset(
-              Address.fromBech32(paymentTokenAddress).accountId(),
-              BigInt(paymentAmount! * 10 ** faucetMetadata.decimals() || 8),
-            ),
-          ]),
-          NoteType.Private,
-          new Felt(BigInt(0)),
-        );
-        const p2idNoteCopy = p2idNote;
-        // Convert Note to OutputNote
-        p2idNotes.push(OutputNote.full(p2idNote));
-        p2idNotesCopy.push(p2idNoteCopy);
-        recipientAddresses.push(recipientAddress);
-      }
-      // Build transaction request with OutputNoteArray
-      const outputNotesArray = new OutputNoteArray(p2idNotes);
-      const transactionRequest = new TransactionRequestBuilder().withOwnOutputNotes(outputNotesArray).build();
-      const midenParaClient = client as import("@demox-labs/miden-sdk").WebClient;
-      const executedTx = await midenParaClient.executeTransaction(
-        Address.fromBech32(address).accountId(),
-        transactionRequest,
-      );
-      console.log("Start proving transaction");
-      const provenTx = await midenParaClient.proveTransaction(executedTx);
-      console.log("Start submitting proven transaction");
-      const submissionHeight = await midenParaClient.submitProvenTransaction(provenTx, executedTx);
-      console.log("Start applying transaction");
-      await midenParaClient.applyTransaction(executedTx, submissionHeight);
-      console.log("Start sending private notes");
-      // loop through p2idNotes and recipientAddresses, send each private note
-      for (let i = 0; i < p2idNotes.length; i++) {
-        await midenParaClient.sendPrivateNote(p2idNotesCopy[i], Address.fromBech32(recipientAddresses[i]));
-      }
-      console.log("Start mutating bills");
-      payBillsMutate.mutate({
-        billUUIDs: selectedInvoices.map(inv => inv.bill?.uuid),
-        transactionHash: executedTx.executedTransaction().id().toHex(),
-      });
+      await createProposalMutation.mutateAsync({
+        accountId,
+        billUUIDs: selectedInvoices.map(inv => inv.bill.uuid),
+        description,
+      } as CreateProposalFromBillsDto);
+
       closeModal("PROCESSING_TRANSACTION");
-      openModal<TransactionOverviewModalProps>("TRANSACTION_OVERVIEW", {
-        amount: totalAmount.toString(),
-        tokenSymbol: selectedInvoices
-          .map(inv => inv.assets?.map((asset: any) => asset.symbol).join(","))
-          .filter(Boolean)
-          .join(","),
-        tokenAddress: QASH_TOKEN_ADDRESS,
-        accountAddress: address,
-        accountName: "You",
-        recipientAddress: recipientAddresses.join(","),
-        recipientName: "Reciever",
-        transactionType: "Send",
-        transactionHash: executedTx.executedTransaction().id().toHex(),
-        onConfirm: () => {
-          closeModal("TRANSACTION_OVERVIEW");
-          router.push("/bill");
-        },
-      });
+      toast.success(`Proposal created for ${selectedInvoices.length} invoice(s). Waiting for signatures.`);
+      router.push("/transactions");
     } catch (error: any) {
-      console.log(error);
-      toast.error(String(error));
+      console.error("Failed to create proposal:", error);
+      toast.error(error?.message || "Failed to create payment proposal");
     } finally {
       closeModal("PROCESSING_TRANSACTION");
     }
@@ -423,20 +359,14 @@ const BillReviewContainer = () => {
                     : `${selectedInvoices.length} invoices`}
               </span>
             </div>
-            {address ? (
-              <PrimaryButton
-                text="Pay Invoice"
-                containerClassName="w-40 !rounded-xl"
-                buttonClassName="h-full"
-                onClick={() => handleSubmit()}
-              />
-            ) : (
-              <SecondaryButton
-                text="Connect Wallet"
-                buttonClassName="w-40 !rounded-xl"
-                onClick={() => openModal("CONNECT_MIDEN_WALLET")}
-              />
-            )}
+            <PrimaryButton
+              text="Propose"
+              containerClassName="w-40 !rounded-xl"
+              buttonClassName="h-full"
+              onClick={handlePayInvoice}
+              disabled={selectedInvoices.length === 0 || createProposalMutation.isPending}
+              loading={createProposalMutation.isPending}
+            />
           </div>
         </div>
       </div>

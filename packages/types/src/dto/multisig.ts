@@ -5,6 +5,8 @@
  * for multisig account and proposal management.
  */
 
+import { MultisigProposalStatusEnum, MultisigProposalTypeEnum } from '../enums/index.js';
+
 // Request DTOs
 export interface CreateMultisigAccountDto {
   name: string;
@@ -26,6 +28,24 @@ export interface CreateSendProposalDto {
   recipientId: string;
   faucetId: string;
   amount: number;
+}
+
+export interface BatchPaymentItem {
+  recipientId: string;
+  faucetId: string;
+  amount: number;
+}
+
+export interface CreateBatchSendProposalDto {
+  accountId: string;
+  description: string;
+  payments: BatchPaymentItem[];
+}
+
+export interface CreateProposalFromBillsDto {
+  accountId: string;
+  billUUIDs: string[];
+  description: string;
 }
 
 export interface SubmitSignatureDto {
@@ -50,9 +70,16 @@ export interface MultisigAccountResponseDto {
 
 export interface MultisigSignatureDto {
   id: number;
+  uuid: string;
   approverIndex: number;
   approverPublicKey: string;
   signatureHex: string;
+  createdAt: string | Date;
+  teamMember?: {
+    uuid: string;
+    firstName: string;
+    lastName: string;
+  };
 }
 
 export interface MultisigProposalResponseDto {
@@ -60,24 +87,54 @@ export interface MultisigProposalResponseDto {
   uuid: string;
   accountId: string;
   description: string;
-  proposalType: string;
+  proposalType: MultisigProposalTypeEnum | string;
   summaryCommitment: string;
   summaryBytesHex: string;
   requestBytesHex: string;
-  status: string;
+  status: MultisigProposalStatusEnum | string;
   transactionId?: string;
   signaturesCount: number;
   threshold: number;
   noteIds?: string[];
+  recipientId?: string;
+  faucetId?: string;
+  amount?: string;
+  payments?: BatchPaymentItem[]; // For batch send proposals
   signatures?: MultisigSignatureDto[];
+  bills?: MultisigProposalBillDto[];
   createdAt: string | Date;
   updatedAt: string | Date;
+}
+
+export interface MultisigProposalBillDto {
+  uuid: string;
+  invoiceNumber?: string;
+  amount?: string;
+  status: string;
+  recipientName?: string;
+  recipientAddress?: string;
 }
 
 export interface ExecuteTransactionResponseDto {
   success: boolean;
   transactionId?: string;
   error?: string;
+}
+
+export interface ProposalTimelineEventDto {
+  event: 'CREATED' | 'SIGNED' | 'EXECUTED' | 'FAILED' | 'CANCELLED';
+  timestamp: string | Date;
+  actorName?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface ProposalHistoryDto {
+  proposalUuid: string;
+  proposalStatus: MultisigProposalStatusEnum | string;
+  transactionId?: string;
+  threshold: number;
+  signaturesCount: number;
+  timeline: ProposalTimelineEventDto[];
 }
 
 // Type aliases for backwards compatibility

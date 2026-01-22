@@ -486,6 +486,10 @@ model Bill {
   paidAt          DateTime? @map("paid_at") @db.Timestamp(6)
   transactionHash String?   @map("transaction_hash") @db.VarChar(100)
 
+  // Link to multisig proposal (for multi-signature payments)
+  multisigProposalId Int?              @map("multisig_proposal_id")
+  multisigProposal   MultisigProposal? @relation(fields: [multisigProposalId], references: [id], onDelete: SetNull)
+
   metadata Json? @db.Json
 
   // Audit fields
@@ -497,6 +501,7 @@ model Bill {
   @@index([companyId])
   @@index([status])
   @@index([invoiceId])
+  @@index([multisigProposalId])
   @@index([createdByTeamMemberId])
   @@index([updatedByTeamMemberId])
   @@map("bills")
@@ -673,6 +678,7 @@ enum BillStatusEnum {
   PAID
   OVERDUE
   CANCELLED
+  FAILED
 }
 
 enum CategoryShapeEnum {
@@ -803,11 +809,6 @@ model MultisigProposal {
   // For CONSUME proposals: note IDs being consumed
   noteIds String[] @map("note_ids") @db.VarChar(255)
 
-  // For SEND proposals: recipient and amount details
-  recipientId String? @map("recipient_id") @db.VarChar(255)
-  faucetId    String? @map("faucet_id") @db.VarChar(255)
-  amount      String? @db.VarChar(50)
-
   // Proposal status
   status MultisigProposalStatusEnum @default(PENDING)
 
@@ -816,6 +817,9 @@ model MultisigProposal {
 
   // Signatures collected
   signatures MultisigSignature[]
+
+  // Bills linked to this proposal (many-to-one)
+  bills Bill[]
 
   // Additional metadata
   metadata Json? @db.Json

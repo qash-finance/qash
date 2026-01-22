@@ -184,6 +184,7 @@ const BillContainer = () => {
       __id: b.invoice?.uuid,
       __billId: b.id,
       __invoiceUuid: b.invoice?.uuid,
+      __billUuid: b.uuid,
       "header-0": (
         <div className="flex justify-center items-center" onClick={e => e.stopPropagation()}>
           <CustomCheckbox
@@ -336,7 +337,8 @@ const BillContainer = () => {
           onRowsPerPageChange={setRowsPerPage}
           onRowClick={rowData => {
             const invoiceUUID = (rowData as any).__invoiceUuid;
-            router.push(`/bill/detail?uuid=${invoiceUUID}`);
+            const billUUID = (rowData as any).__billUuid;
+            router.push(`/bill/detail?uuid=${invoiceUUID}&billUuid=${billUUID}`);
           }}
         />
       </BaseContainer>

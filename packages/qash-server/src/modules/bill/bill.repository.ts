@@ -28,6 +28,11 @@ export type BillWithInvoice = Prisma.BillGetPayload<{
         items: true;
       };
     };
+    multisigProposal: {
+      include: {
+        signatures: true;
+      };
+    };
   };
 }>;
 
@@ -99,6 +104,11 @@ export class BillRepository extends BaseRepository<
           },
         },
         company: true,
+        multisigProposal: {
+          include: {
+            signatures: true,
+          },
+        },
       },
     });
   }

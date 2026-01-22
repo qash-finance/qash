@@ -5,8 +5,15 @@ import {
 	PayBillsDto,
 	BatchPaymentResultDto,
 	BillModel,
+	BillTimelineDto,
 } from "@qash/types/dto/bill";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+// Types for bill detail response
+interface BillDetailResponse {
+	bill: BillModel;
+	timeline: BillTimelineDto[];
+}
 
 // React Query hooks
 export const useGetBills = (query?: BillQueryDto) => {
@@ -75,11 +82,26 @@ export const useDeleteBill = () => {
 	});
 };
 
+export const useGetBillDetail = (uuid: string | null | undefined, options?: { enabled?: boolean }) => {
+	return useQuery({
+		queryKey: ["bill", uuid],
+		queryFn: async () => {
+			if (!uuid) throw new Error("UUID is required");
+			return apiServerWithAuth.getData<BillDetailResponse>(`/api/v1/bill/${uuid}`);
+		},
+		enabled: !!uuid && (options?.enabled !== false),
+		staleTime: 0,
+		refetchOnMount: true,
+		refetchOnWindowFocus: false,
+	});
+};
+
 export default {
 	useGetBills,
 	useGetBillStats,
 	usePayBills,
 	useUpdateBillStatus,
 	useDeleteBill,
+	useGetBillDetail,
 };
 

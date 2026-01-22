@@ -5,7 +5,7 @@
  * for bill management.
  */
 
-import { BillStatusEnum } from '../enums/index.js';
+import { BillStatusEnum, MultisigProposalStatusEnum } from '../enums/index.js';
 import { PaginationMetaDto } from './common.js';
 
 export interface BillQueryDto {
@@ -42,6 +42,15 @@ export interface BatchPaymentResultDto {
   totalAmount: string;
 }
 
+export interface BillMultisigProposalDto {
+  uuid: string;
+  status: MultisigProposalStatusEnum | string;
+  transactionId?: string;
+  signaturesCount: number;
+  threshold: number;
+  createdAt: string | Date;
+}
+
 export interface BillModelDto {
   id: number;
   uuid: string;
@@ -52,6 +61,8 @@ export interface BillModelDto {
   status: BillStatusEnum;
   paidAt?: string | null;
   transactionHash?: string | null;
+  multisigProposalId?: number | null;
+  multisigProposal?: BillMultisigProposalDto | null;
   metadata?: Record<string, any>;
   invoice?: any;
   company?: any;

@@ -1,4 +1,4 @@
-import { IsString, IsInt, IsArray, IsOptional, IsNotEmpty, MaxLength, Min, ArrayMinSize, IsEnum } from 'class-validator';
+import { IsString, IsInt, IsArray, IsOptional, IsNotEmpty, MaxLength, Min, ArrayMinSize, IsEnum, IsUUID } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import type * as SharedTypes from '@qash/types/dto/multisig';
 
@@ -114,6 +114,63 @@ export class CreateSendProposalDto implements SharedTypes.CreateSendProposalDto 
   amount: number;
 }
 
+export class BatchPaymentItemDto {
+  @ApiProperty({
+    description: 'Recipient account ID (bech32 format)',
+    example: 'mtst1recipient...',
+  })
+  @IsString()
+  @IsNotEmpty()
+  recipientId: string;
+
+  @ApiProperty({
+    description: 'Faucet ID for the token',
+    example: 'mtst1faucet...',
+  })
+  @IsString()
+  @IsNotEmpty()
+  faucetId: string;
+
+  @ApiProperty({
+    description: 'Amount to send to this recipient',
+    example: 1000,
+  })
+  @IsInt()
+  @Min(1)
+  amount: number;
+}
+
+export class CreateBatchSendProposalDto implements SharedTypes.CreateBatchSendProposalDto {
+  @ApiProperty({
+    description: 'Multisig account ID (bech32 format)',
+    example: 'mtst1abc123...',
+  })
+  @IsString()
+  @IsNotEmpty()
+  accountId: string;
+
+  @ApiProperty({
+    description: 'Description of the batch proposal',
+    example: 'Batch payment for January payroll',
+  })
+  @IsString()
+  @IsNotEmpty()
+  description: string;
+
+  @ApiProperty({
+    description: 'Array of batch payments with recipient, faucet, and amount',
+    type: [BatchPaymentItemDto],
+    example: [
+      { recipientId: 'mtst1emp1...', faucetId: 'mtst1qash...', amount: 1000 },
+      { recipientId: 'mtst1emp2...', faucetId: 'mtst1qash...', amount: 2000 },
+    ],
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsNotEmpty({ each: true })
+  payments: BatchPaymentItemDto[];
+}
+
 export class SubmitSignatureDto implements SharedTypes.SubmitSignatureDto {
   @ApiProperty({
     description: 'Index of the approver in the approvers array',
@@ -136,6 +193,33 @@ export class SubmitSignatureDto implements SharedTypes.SubmitSignatureDto {
   })
   @IsString()
   signatureHex: string;
+}
+
+export class CreateProposalFromBillsDto implements SharedTypes.CreateProposalFromBillsDto {
+  @ApiProperty({
+    description: 'Multisig account ID (bech32 format)',
+    example: 'mtst1abc123...',
+  })
+  @IsString()
+  @IsNotEmpty()
+  accountId: string;
+
+  @ApiProperty({
+    description: 'Array of bill UUIDs to include in the proposal',
+    example: ['cuid1...', 'cuid2...'],
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  billUUIDs: string[];
+
+  @ApiProperty({
+    description: 'Description of the proposal',
+    example: 'Pay invoices for January 2026',
+  })
+  @IsString()
+  @IsNotEmpty()
+  description: string;
 }
 
 export class MultisigAccountResponseDto implements SharedTypes.MultisigAccountResponseDto {
@@ -220,12 +304,38 @@ export class MultisigProposalResponseDto implements SharedTypes.MultisigProposal
   @ApiProperty({ type: [String], required: false })
   noteIds?: string[];
 
+  @ApiProperty({ required: false })
+  recipientId?: string;
+
+  @ApiProperty({ required: false })
+  faucetId?: string;
+
+  @ApiProperty({ required: false })
+  amount?: string;
+
   @ApiProperty({ type: [Object], required: false })
   signatures?: Array<{
     id: number;
+    uuid: string;
     approverIndex: number;
     approverPublicKey: string;
     signatureHex: string;
+    createdAt: Date;
+    teamMember?: {
+      uuid: string;
+      firstName: string;
+      lastName: string;
+    };
+  }>;
+
+  @ApiProperty({ type: [Object], required: false })
+  bills?: Array<{
+    uuid: string;
+    invoiceNumber?: string;
+    amount?: string;
+    status: string;
+    recipientName?: string;
+    recipientAddress?: string;
   }>;
 
   @ApiProperty()

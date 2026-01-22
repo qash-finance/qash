@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { BaseContainer } from "../Common/BaseContainer";
 import { TabContainer } from "../Common/TabContainer";
 import { Table, CellContent } from "../Common/Table";
-import { MoreActionsTooltip } from "../Common/ToolTip/MemberActionTooltip";
 import { MultipleContactActionsTooltip } from "../Common/ToolTip/MultipleContactActionsTooltip";
 import { useGetClients, useDeleteClient } from "@/services/api/client";
 import { CustomCheckbox } from "../Common/CustomCheckbox";
@@ -13,6 +12,7 @@ import { useModal } from "@/contexts/ModalManagerProvider";
 import toast from "react-hot-toast";
 import { useAuth } from "@/services/auth/context";
 import { useForm } from "react-hook-form";
+import { MoreActionsTooltip } from "../Common/ToolTip/MoreActionsTooltip";
 
 export const ClientContact = () => {
   const router = useRouter();
