@@ -16,6 +16,7 @@ import {
   CreateBatchSendProposalDto,
   CreateProposalFromBillsDto,
   SubmitSignatureDto,
+  MintTokensDto,
   MultisigAccountResponseDto,
   MultisigProposalResponseDto,
   ExecuteTransactionResponseDto,
@@ -153,22 +154,30 @@ export class MultisigController {
     return this.multisigService.createBatchSendProposal(dto);
   }
 
-  @Post('proposals/from-bills')
-  @CompanyAuth()
-  @ApiOperation({ summary: 'Create a proposal from bills for multi-signature payment' })
+  @Post('accounts/:accountId/mint')
+  @ApiOperation({ summary: 'Mint tokens to a multisig account' })
   @ApiResponse({
-    status: 201,
-    description: 'Proposal created from bills successfully',
-    type: MultisigProposalResponseDto,
+    status: 200,
+    description: 'Tokens minted successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        transactionId: { type: 'string' },
+      },
+    },
   })
-  async createProposalFromBills(
-    @Body() dto: CreateProposalFromBillsDto,
-    @CurrentUser('withCompany') user: UserWithCompany,
-  ): Promise<MultisigProposalResponseDto> {
-    return this.multisigService.createProposalFromBills(dto, user);
+  async mintTokens(
+    @Param('accountId') accountId: string,
+    @Body() dto: MintTokensDto,
+  ): Promise<{ transactionId: string }> {
+    return this.multisigService.mintTokens(accountId, dto);
   }
 
-  @Get('proposals/:proposalId')
+  // ============================================================================
+  // Proposal Endpoints
+  // ============================================================================
+
+  @Post('proposals/consume')
   @ApiOperation({ summary: 'Get a proposal by ID' })
   @ApiResponse({
     status: 200,

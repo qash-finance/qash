@@ -1,9 +1,13 @@
 "use client";
 import React from "react";
+import { formatUnits } from "viem";
 import { PrimaryButton } from "@/components/Common/PrimaryButton";
 import { SecondaryButton } from "@/components/Common/SecondaryButton";
 import { MultisigProposalResponseDto } from "@qash/types/dto/multisig";
 import { MultisigProposalStatusEnum } from "@qash/types/enums";
+import { useGetConsumableNotes } from "@/services/api/multisig";
+import { QASH_TOKEN_ADDRESS } from "@/services/utils/constant";
+import { formatAddress } from "@/services/utils/miden/address";
 
 interface ProposalRowProps {
   proposal: MultisigProposalResponseDto;
@@ -13,6 +17,7 @@ interface ProposalRowProps {
   isSignLoading?: boolean;
   isExecuteLoading?: boolean;
   isCancelLoading?: boolean;
+  userPublicKey?: string;
 }
 
 const statusConfig: Record<string, { label: string; bgColor: string; borderColor: string; textColor: string }> = {
@@ -59,6 +64,16 @@ function formatDate(date: string | Date): string {
   });
 }
 
+// Format amount with 8 decimals
+function formatAmount(amount: number | string): string {
+  try {
+    const bigIntAmount = BigInt(Math.round(Number(amount)));
+    return formatUnits(bigIntAmount, 8);
+  } catch {
+    return "0";
+  }
+}
+
 export function ProposalRow({
   proposal,
   onSign,
@@ -67,8 +82,8 @@ export function ProposalRow({
   isSignLoading,
   isExecuteLoading,
   isCancelLoading,
+  userPublicKey,
 }: ProposalRowProps) {
-  console.log("🚀 ~ ProposalRow ~ proposal:", proposal);
   const status = proposal.status as MultisigProposalStatusEnum;
   const config = statusConfig[status] || statusConfig[MultisigProposalStatusEnum.PENDING];
   const isPending = status === MultisigProposalStatusEnum.PENDING;
@@ -78,38 +93,72 @@ export function ProposalRow({
     status === MultisigProposalStatusEnum.FAILED ||
     status === MultisigProposalStatusEnum.CANCELLED;
 
+  // Check if current user has already signed this proposal
+  const hasUserSigned = userPublicKey
+    ? proposal.signatures?.some(
+        sig => sig.approverPublicKey.toLowerCase().replace(/^0x/, "") === userPublicKey.toLowerCase().replace(/^0x/, ""),
+      )
+    : false;
+
   // Calculate how many bills
   const billCount = proposal.bills?.length || 0;
   const totalAmount = proposal.amount
     ? `${proposal.amount}`
     : proposal.bills?.reduce((sum, b) => sum + parseFloat(b.amount || "0"), 0) || 0;
 
+  // Fetch consumable notes if this is a CONSUME proposal
+  const { data: consumableNotesData = { notes: [] } } = useGetConsumableNotes(proposal.accountId, {
+    enabled: proposal.proposalType === "CONSUME",
+  });
+
+  // Find the first note that matches this proposal's noteIds
+  const proposalNote =
+    proposal.proposalType === "CONSUME" && proposal.noteIds?.length
+      ? consumableNotesData.notes.find(note => proposal.noteIds?.includes(note.note_id))
+      : null;
+
+  // Extract asset info from the note
+  const firstAsset = proposalNote?.assets?.[0];
+  const displayAmount = firstAsset ? formatAmount(firstAsset.amount) : "0";
+  const faucetId = firstAsset?.faucet_id || "";
+
   return (
-    <div className="flex items-center gap-4 px-4 py-3 rounded-lg border-b border-primary-divider last:border-b-0 hover:bg-app-background">
+    <div className="grid grid-cols-[1fr_1fr_1fr_1fr_1fr_auto] gap-4 items-center px-4 py-3 rounded-lg border-b border-primary-divider last:border-b-0 hover:bg-app-background">
       {/* Icon & Type */}
-      <div className="flex items-center gap-3 w-24 flex-shrink-0">
-        <img src="/transaction/pay-icon.svg" alt="Pay" className="w-6" />
+      <div className="flex items-center gap-3 justify-start">
+        <img
+          src={proposal.proposalType === "SEND" ? "/transaction/pay-icon.svg" : "/transaction/consume-icon.svg"}
+          alt="Pay"
+          className="w-6"
+        />
         <span className="text-sm font-medium text-text-primary whitespace-nowrap">
-          {proposal.proposalType === "SEND" ? "Pay" : "Consume"}
+          {proposal.proposalType === "SEND" ? "Pay" : "Recieve"}
         </span>
       </div>
 
       {/* Description */}
-      <div className="flex-1 min-w-0">
+      <div className="flex items-center gap-2 min-w-0">
         <p className="text-sm font-medium text-text-primary truncate">{proposal.description}</p>
-        {billCount > 0 && (
-          <p className="text-xs text-text-secondary truncate">
-            {billCount} bill{billCount !== 1 ? "s" : ""} linked
-          </p>
-        )}
       </div>
 
       {/* Bills/Amount Count */}
-      <div className="flex-shrink-0 w-32">
-        {billCount > 0 ? (
+      <div className="flex items-center justify-center">
+        {proposal.proposalType === "CONSUME" && proposalNote ? (
+          // Show asset info for CONSUME proposals
+          <div className="flex items-center justify-center">
+            <img
+              src={QASH_TOKEN_ADDRESS.startsWith(faucetId) ? "/token/qash.svg" : "/tokens/unknown-token.svg"}
+              alt="Token"
+              className="w-6 h-6 mr-2"
+            />
+            <span className="text-sm font-medium text-text-strong-950">
+              {displayAmount} {QASH_TOKEN_ADDRESS.startsWith(faucetId) ? "QASH" : formatAddress(faucetId)}
+            </span>
+          </div>
+        ) : billCount > 0 ? (
           <div className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-blue-50 border border-blue-200">
             <span className="text-sm font-semibold text-blue-600">
-              {billCount} bill{billCount !== 1 ? "s" : ""}
+              {billCount} transactions{billCount !== 1 ? "s" : ""}
             </span>
           </div>
         ) : (
@@ -120,23 +169,23 @@ export function ProposalRow({
       </div>
 
       {/* Signature Progress */}
-      <div className="flex-shrink-0 w-32 flex items-center justify-center">
+      <div className="flex items-center justify-center">
         <div
           className={`inline-flex items-center justify-center px-4 py-1 rounded-full border ${config.borderColor} ${config.bgColor}`}
         >
           <span className={`text-sm font-semibold ${config.textColor}`}>
-            {isHistory ? config.label : `${proposal.signaturesCount}/${proposal.threshold}`}
+            {isHistory ? config.label : `${proposal.signaturesCount} out of ${proposal.threshold}`}
           </span>
         </div>
       </div>
 
       {/* DateTime */}
-      <div className="flex-shrink-0 w-36 text-center">
+      <div className="flex items-center justify-center">
         <p className="text-sm font-medium text-text-secondary whitespace-nowrap">{formatDate(proposal.createdAt)}</p>
       </div>
 
       {/* Actions */}
-      <div className="flex-shrink-0 flex items-center justify-center gap-2 w-52">
+      <div className="flex items-center justify-end gap-2">
         {isPending && (
           <>
             <SecondaryButton
@@ -148,11 +197,11 @@ export function ProposalRow({
               disabled={isCancelLoading || isSignLoading}
             />
             <PrimaryButton
-              text="Sign"
+              text={hasUserSigned ? "Signed" : "Sign"}
               buttonClassName="px-6"
               onClick={() => onSign?.(proposal.id)}
               loading={isSignLoading}
-              disabled={isSignLoading || isCancelLoading}
+              disabled={hasUserSigned || isSignLoading || isCancelLoading}
             />
           </>
         )}
@@ -175,7 +224,9 @@ export function ProposalRow({
             />
           </>
         )}
-        {isHistory && <span className={`text-sm font-medium ${config.textColor}`}>{config.label}</span>}
+        {isHistory && (
+          <span className={`text-sm font-medium ${config.textColor} whitespace-nowrap`}>{config.label}</span>
+        )}
       </div>
     </div>
   );

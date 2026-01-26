@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { BaseContainer } from "../Common/BaseContainer";
 import { ProposalRow } from "./ProposalRow";
+import { NoteRow } from "./NoteRow";
 import { useGetMyCompany } from "@/services/api/company";
 import {
   useListAccountsByCompany,
@@ -9,6 +10,8 @@ import {
   useSubmitSignature,
   useExecuteProposal,
   useCancelProposal,
+  useGetConsumableNotes,
+  useCreateConsumeProposal,
 } from "@/services/api/multisig";
 import { MultisigProposalStatusEnum } from "@qash/types/enums";
 import toast from "react-hot-toast";
@@ -18,15 +21,17 @@ import { keccak_256 } from "@noble/hashes/sha3.js";
 import { useClient, useWallet } from "@getpara/react-sdk";
 
 // Previously a fixed enum - we now allow any multisig account id
-type SubTabType = "pending" | "history";
+type SubTabType = "pending" | "history" | "consume notes";
 
 export function TransactionsContainer() {
   const [activeTab, setActiveTab] = useState<string>("payroll");
   const [activeSubTab, setActiveSubTab] = useState<SubTabType>("pending");
   const [underlineStyle, setUnderlineStyle] = useState({ left: "0px", width: "200px" });
-  const [subTabUnderlineStyle, setSubTabUnderlineStyle] = useState({ left: "0px", width: "180px" });
+  const [subTabUnderlineStyle, setSubTabUnderlineStyle] = useState({ left: "20px", width: "180px" });
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [actionType, setActionType] = useState<"sign" | "execute" | "cancel" | null>(null);
+  const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
+  const [isCreatingProposal, setIsCreatingProposal] = useState(false);
   const { data: wallet } = useWallet();
   const paraClient = useClient();
 
@@ -41,9 +46,18 @@ export function TransactionsContainer() {
     refetch: refetchProposals,
   } = useListProposalsByCompany(myCompany?.id, { enabled: !!myCompany?.id });
 
+  const {
+    data: consumableNotesData = { notes: [] },
+    isLoading: notesLoading,
+    refetch: refetchNotes,
+  } = useGetConsumableNotes(activeTab, {
+    enabled: !!activeTab,
+  });
+
   const submitSignatureMutation = useSubmitSignature();
   const executeProposalMutation = useExecuteProposal();
   const cancelProposalMutation = useCancelProposal();
+  const createConsumeProposalMutation = useCreateConsumeProposal();
 
   // Build tabs from accounts (fallback to some defaults if no accounts yet)
   const tabs =
@@ -231,9 +245,81 @@ export function TransactionsContainer() {
     }
   };
 
+  // Handle note selection
+  const handleNoteSelection = (noteId: string) => {
+    setSelectedNoteIds(prev => (prev.includes(noteId) ? prev.filter(id => id !== noteId) : [...prev, noteId]));
+  };
+
+  // Handle select all notes
+  const handleSelectAllNotes = () => {
+    if (selectedNoteIds.length === consumableNotesData.notes.length) {
+      setSelectedNoteIds([]);
+    } else {
+      setSelectedNoteIds(consumableNotesData.notes.map(note => note.note_id));
+    }
+  };
+
+  // Handle create consume proposal
+  const handleCreateConsumeProposal = async () => {
+    if (selectedNoteIds.length === 0) {
+      toast.error("Please select at least one note");
+      return;
+    }
+
+    try {
+      setIsCreatingProposal(true);
+      openModal("PROCESSING_TRANSACTION");
+
+      await createConsumeProposalMutation.mutateAsync({
+        accountId: activeTab,
+        noteIds: selectedNoteIds,
+        description: `Consume ${selectedNoteIds.length} note${selectedNoteIds.length !== 1 ? "s" : ""}`,
+      });
+
+      closeModal("PROCESSING_TRANSACTION");
+      toast.success("Consume proposal created successfully");
+      setSelectedNoteIds([]);
+      refetchProposals();
+      setActiveSubTab("pending"); // Switch to pending tab to see new proposal
+    } catch (error) {
+      closeModal("PROCESSING_TRANSACTION");
+      console.error("Failed to create consume proposal:", error);
+      toast.error("Failed to create consume proposal");
+    } finally {
+      setIsCreatingProposal(false);
+    }
+  };
+
+  // Handle claiming a single note (select + create proposal)
+  const handleClaimNote = async (noteId: string) => {
+    try {
+      setIsCreatingProposal(true);
+      openModal("PROCESSING_TRANSACTION");
+
+      await createConsumeProposalMutation.mutateAsync({
+        accountId: activeTab,
+        noteIds: [noteId],
+        description: "Consume note",
+      });
+
+      closeModal("PROCESSING_TRANSACTION");
+      toast.success("Consume proposal created successfully");
+      setSelectedNoteIds([]);
+      refetchProposals();
+      setActiveSubTab("pending"); // Switch to pending tab to see new proposal
+    } catch (error) {
+      closeModal("PROCESSING_TRANSACTION");
+      console.error("Failed to create consume proposal:", error);
+      toast.error("Failed to create consume proposal");
+    } finally {
+      setIsCreatingProposal(false);
+    }
+  };
+
   const subTabs: { id: SubTabType; label: string }[] = [
     { id: "pending", label: "Pending to approve" },
     { id: "history", label: "History" },
+    { id: "consume notes", label: "Consume Notes" },
   ];
 
   return (
@@ -291,18 +377,18 @@ export function TransactionsContainer() {
         containerClassName="w-full h-full !px-8 !pb-6 !bg-app-background"
       >
         {/* Sub Tabs */}
-        <div className="px-6 flex gap-8 border-b border-primary-divider relative">
+        <div className="px-6 flex border-b border-primary-divider relative">
           {subTabs.map((tab, index) => (
             <div
               key={tab.id}
               onClick={() => {
                 setActiveSubTab(tab.id);
                 setSubTabUnderlineStyle({
-                  left: `${index * 180}px`,
+                  left: `${index * 180 + 20}px`,
                   width: "180px",
                 });
               }}
-              className={` py-4 text-base w-[180px] font-medium cursor-pointer transition-colors ${
+              className={` py-4 text-base w-[180px] font-medium cursor-pointer text-center transition-colors ${
                 activeSubTab === tab.id ? "text-text-primary" : "text-text-secondary hover:text-text-primary"
               }`}
             >
@@ -320,35 +406,117 @@ export function TransactionsContainer() {
 
         {/* Transactions List */}
         <div className="p-4 flex flex-col w-full h-full overflow-y-auto">
-          {proposalsLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-blue" />
-            </div>
-          ) : filteredProposals.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-text-secondary">
-              <img src="/empty-state.svg" alt="No proposals" className="w-24 h-24 mb-4 opacity-50" />
-              <p className="text-lg font-medium">
-                {activeSubTab === "pending" ? "No pending proposals" : "No transaction history"}
-              </p>
-              <p className="text-sm">
-                {activeSubTab === "pending"
-                  ? "Create a proposal from the Bills page to get started"
-                  : "Executed, failed, and cancelled proposals will appear here"}
-              </p>
-            </div>
+          {activeSubTab === "consume notes" ? (
+            // Render consumable notes list
+            <>
+              {notesLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-blue" />
+                </div>
+              ) : consumableNotesData.notes.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-text-secondary">
+                  <p className="text-lg font-medium">No consumable notes</p>
+                  <p className="text-sm">No notes available to consume on this account</p>
+                </div>
+              ) : (
+                <>
+                  {/* Select All Row */}
+                  {/* <div className="flex items-center gap-4 px-4 py-3 rounded-lg border-b border-primary-divider bg-gray-50">
+                    <div className="flex-shrink-0 w-6">
+                      <input
+                        type="checkbox"
+                        checked={selectedNoteIds.length === consumableNotesData.notes.length}
+                        onChange={handleSelectAllNotes}
+                        ref={input => {
+                          if (input) {
+                            (input as any).indeterminate =
+                              selectedNoteIds.length > 0 && selectedNoteIds.length < consumableNotesData.notes.length;
+                          }
+                        }}
+                        className="w-5 h-5 rounded cursor-pointer"
+                      />
+                    </div>
+                    <span className="text-sm font-medium text-text-strong-950">
+                      Select All ({selectedNoteIds.length} selected)
+                    </span>
+                  </div> */}
+
+                  {/* Notes List */}
+                  {consumableNotesData.notes.map(note => {
+                    // Check if this note is already in any proposal
+                    const isNoteInProposal = allProposals.some(
+                      proposal => proposal.proposalType === "CONSUME" && proposal.noteIds?.includes(note.note_id),
+                    );
+
+                    return (
+                      <NoteRow
+                        key={note.note_id}
+                        note={note}
+                        selected={selectedNoteIds.includes(note.note_id)}
+                        onSelect={handleNoteSelection}
+                        onClaimNote={handleClaimNote}
+                        isLoading={isCreatingProposal}
+                        isInProposal={isNoteInProposal}
+                      />
+                    );
+                  })}
+
+                  {/* Bulk Action Button */}
+                  {/* {selectedNoteIds.length > 0 && (
+                    <div className="mt-4 flex justify-end gap-2">
+                      <button
+                        onClick={() => setSelectedNoteIds([])}
+                        disabled={isCreatingProposal}
+                        className="px-4 py-2 border border-primary-divider rounded-lg font-medium text-sm hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleCreateConsumeProposal}
+                        disabled={isCreatingProposal}
+                        className="px-4 py-2 bg-primary-blue text-white rounded-lg font-medium text-sm hover:bg-blue-600 disabled:opacity-50 transition-colors"
+                      >
+                        {isCreatingProposal ? "Creating..." : `Create Proposal (${selectedNoteIds.length})`}
+                      </button>
+                    </div>
+                  )} */}
+                </>
+              )}
+            </>
           ) : (
-            filteredProposals.map(proposal => (
-              <ProposalRow
-                key={proposal.uuid}
-                proposal={proposal}
-                onSign={handleSign}
-                onExecute={handleExecute}
-                onCancel={handleCancel}
-                isSignLoading={actionLoadingId === proposal.uuid && actionType === "sign"}
-                isExecuteLoading={actionLoadingId === proposal.uuid && actionType === "execute"}
-                isCancelLoading={actionLoadingId === proposal.uuid && actionType === "cancel"}
-              />
-            ))
+            // Render proposals (pending or history)
+            <>
+              {proposalsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-blue" />
+                </div>
+              ) : filteredProposals.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-text-secondary">
+                  <p className="text-lg font-medium">
+                    {activeSubTab === "pending" ? "No pending proposals" : "No transaction history"}
+                  </p>
+                  <p className="text-sm">
+                    {activeSubTab === "pending"
+                      ? "Create a proposal from the Bills page to get started"
+                      : "Executed, failed, and cancelled proposals will appear here"}
+                  </p>
+                </div>
+              ) : (
+                filteredProposals.map(proposal => (
+                  <ProposalRow
+                    key={proposal.uuid}
+                    proposal={proposal}
+                    onSign={handleSign}
+                    onExecute={handleExecute}
+                    onCancel={handleCancel}
+                    isSignLoading={actionLoadingId === proposal.uuid && actionType === "sign"}
+                    isExecuteLoading={actionLoadingId === proposal.uuid && actionType === "execute"}
+                    isCancelLoading={actionLoadingId === proposal.uuid && actionType === "cancel"}
+                    userPublicKey={wallet?.publicKey}
+                  />
+                ))
+              )}
+            </>
           )}
         </div>
       </BaseContainer>

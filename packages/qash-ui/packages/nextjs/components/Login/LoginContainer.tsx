@@ -57,6 +57,10 @@ export default function LoginContainer() {
       // Extract wallet public key
       const publicKey = wallet?.publicKey;
 
+      if (!publicKey) {
+        throw new Error("Wallet public key is missing");
+      }
+
       // Send JWT and publicKey to backend
       const userData = await loginWithPara(jwtResult.token, publicKey);
 

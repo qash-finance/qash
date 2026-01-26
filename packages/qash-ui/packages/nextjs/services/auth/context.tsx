@@ -13,7 +13,7 @@ export interface AuthState {
 }
 
 export interface AuthContextValue extends AuthState {
-  loginWithPara: (paraJwtToken: string, publicKey?: string) => Promise<AuthMeResponse["user"] | null>;
+  loginWithPara: (paraJwtToken: string, publicKey: string) => Promise<AuthMeResponse["user"] | null>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   clearError: () => void;

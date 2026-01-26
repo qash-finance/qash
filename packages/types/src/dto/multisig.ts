@@ -30,6 +30,11 @@ export interface CreateSendProposalDto {
   amount: number;
 }
 
+export interface MintTokensDto {
+  faucetId: string;
+  amount: number;
+}
+
 export interface BatchPaymentItem {
   recipientId: string;
   faucetId: string;

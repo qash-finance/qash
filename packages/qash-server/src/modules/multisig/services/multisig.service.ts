@@ -14,6 +14,7 @@ import {
   CreateBatchSendProposalDto,
   CreateProposalFromBillsDto,
   SubmitSignatureDto,
+  MintTokensDto,
   MultisigAccountResponseDto,
   MultisigProposalResponseDto,
   ExecuteTransactionResponseDto,
@@ -273,6 +274,30 @@ export class MultisigService {
   }
 
   /**
+   * Mint tokens to a multisig account from a faucet
+   */
+  async mintTokens(
+    accountId: string,
+    dto: MintTokensDto,
+  ): Promise<{ transactionId: string }> {
+    this.logger.log(
+      `Minting ${dto.amount} tokens to account ${accountId} from faucet ${dto.faucetId}`,
+    );
+
+    // Verify account exists
+    await this.getAccount(accountId);
+
+    // Call Miden client to mint tokens
+    const { transactionId } = await this.midenClient.mintTokens(
+      accountId,
+      dto.faucetId,
+      dto.amount,
+    );
+
+    return { transactionId };
+  }
+
+  /**
    * Create a consume notes proposal
    */
   async createConsumeProposal(
@@ -383,13 +408,12 @@ export class MultisigService {
       );
     }
 
-    //TODO: Implement this
     // Create proposal via Miden client with batch payments
-    // const { summaryCommitment, summaryBytesHex, requestBytesHex } =
-    //   await this.midenClient.createBatchSendProposal(
-    //     dto.accountId,
-    //     dto.payments,
-    //   );
+    const { summaryCommitment, summaryBytesHex, requestBytesHex } =
+      await this.midenClient.createBatchSendProposal(
+        dto.accountId,
+        dto.payments,
+      );
 
     // Store proposal in database with payments stored as JSON
     const proposal = await this.prisma.multisigProposal.create({
@@ -397,9 +421,9 @@ export class MultisigService {
         accountId: dto.accountId,
         description: dto.description,
         proposalType: 'SEND',
-        summaryCommitment: 'placeholder-commitment',
-        summaryBytesHex: 'placeholder-bytes-hex',
-        requestBytesHex: 'placeholder-bytes-hex',
+        summaryCommitment: summaryCommitment,
+        summaryBytesHex: summaryBytesHex,
+        requestBytesHex: requestBytesHex,
         noteIds: [],
         status: 'PENDING',
       },

@@ -65,7 +65,7 @@ const TeamAccountContainer = () => {
           </div>
         </div>
 
-        <div className="flex flex-row gap-2 w-fit">
+        {/* <div className="flex flex-row gap-2 w-fit">
           <SecondaryButton
             text="Deposit"
             icon="/arrow/thin-arrow-down.svg"
@@ -90,7 +90,7 @@ const TeamAccountContainer = () => {
             variant="light"
             buttonClassName="py-1 w-fit px-3"
           />
-        </div>
+        </div> */}
       </div>
 
       {/* Stats Cards */}

@@ -26,7 +26,7 @@ import { useWalletConnect } from "@/hooks/web3/useWalletConnect";
 import { PaymentLinkPreview } from "@/components/PaymentLink/PaymentLinkPreview";
 import { useMidenProvider } from "@/contexts/MidenProvider";
 import { useAuth } from "@/services/auth/context";
-import { useAccount as useParaAccount } from "@getpara/react-sdk";
+import { useAccount as useParaAccount, useWallet } from "@getpara/react-sdk";
 import { useParaMiden } from "miden-para-react";
 
 const SubIcon = ({
@@ -127,6 +127,7 @@ const PaymentLinkDetailPage = () => {
   const isAuthenticatingRef = useRef(false);
   const { isConnected } = useParaAccount();
   const { para } = useParaMiden("https://rpc.testnet.miden.io");
+  const { data: wallet } = useWallet();
 
   // Handle Para authentication after connection
   const handleParaAuthentication = async () => {
@@ -150,7 +151,14 @@ const PaymentLinkDetailPage = () => {
         throw new Error("Failed to get JWT token from Para");
       }
 
-      await loginWithPara(jwtResult.token);
+      // Extract wallet public key
+      const publicKey = wallet?.publicKey;
+
+      if (!publicKey) {
+        throw new Error("Wallet public key is missing");
+      }
+
+      await loginWithPara(jwtResult.token, publicKey);
 
       toast.success("Successfully authenticated");
 

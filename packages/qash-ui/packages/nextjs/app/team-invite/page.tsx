@@ -1,10 +1,14 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PrimaryButton } from "@/components/Common/PrimaryButton";
 import { useAcceptInvitationByToken } from "@/services/api/team-member";
 import { useAuth } from "@/services/auth/context";
+import { useModal, useWallet } from "@getpara/react-sdk";
+import toast from "react-hot-toast";
+import { useAccount as useParaAccount } from "@getpara/react-sdk";
+import { useParaMiden } from "miden-para-react";
 
 interface TeamMember {
   id: string;
@@ -23,29 +27,75 @@ interface TeamInvitePageProps {
 export default function TeamInvitePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
+  const { user, loginWithPara, refreshUser, isAuthenticated } = useAuth();
+  const { openModal } = useModal();
   const [isAccepted, setIsAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { isConnected } = useParaAccount();
+  const [authenticatingWithPara, setAuthenticatingWithPara] = useState(false);
+  const { para } = useParaMiden("https://rpc.testnet.miden.io");
+  const authAttemptedRef = useRef(false);
+  const { data: wallet } = useWallet();
 
   const companyName = searchParams.get("company");
   const memberCount = parseInt(searchParams.get("teamMemberCount") || "0");
   const token = searchParams.get("token");
+  const intendedEmail = searchParams.get("email");
 
   const { mutate: acceptInviteByToken, isPending } = useAcceptInvitationByToken();
 
-  // Redirect authenticated users away from this page
-  useEffect(() => {
-    if (user) {
-      router.push("/");
+  const isIntendedUser = user?.email === intendedEmail;
+
+  // Handle Para authentication after wallet connection
+  const handleParaAuthentication = useCallback(async () => {
+    if (authenticatingWithPara || !isConnected || !para) {
+      return;
     }
-  }, [user]);
+
+    setAuthenticatingWithPara(true);
+    try {
+      const jwtResult = await para.issueJwt();
+
+      if (!jwtResult?.token) {
+        throw new Error("Failed to get JWT token from Para");
+      }
+
+      // Extract wallet public key
+      const publicKey = wallet?.publicKey;
+
+      if (!publicKey) {
+        throw new Error("Wallet public key is missing");
+      }
+
+      await loginWithPara(jwtResult.token, publicKey);
+      toast.success("Successfully authenticated");
+      await refreshUser();
+    } catch (error) {
+      console.error("Para authentication failed:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to authenticate with Para");
+    } finally {
+      setAuthenticatingWithPara(false);
+    }
+  }, [isConnected, para, authenticatingWithPara, loginWithPara, refreshUser]);
+
+  // Auto-authenticate once when wallet is connected
+  useEffect(() => {
+    if (isConnected && !isAuthenticated && !authAttemptedRef.current) {
+      authAttemptedRef.current = true;
+      handleParaAuthentication();
+    }
+  }, [isConnected, isAuthenticated, handleParaAuthentication]);
+
+  const handleSignIn = () => {
+    openModal();
+  };
 
   // Auto-redirect 1.5s after successful acceptance
   useEffect(() => {
     if (isAccepted) {
       const timer = setTimeout(() => {
         router.push("/");
-      }, 1500);
+      }, 2000);
       return () => clearTimeout(timer);
     }
   }, [isAccepted, router]);
@@ -53,6 +103,11 @@ export default function TeamInvitePage() {
   const handleAcceptInvite = async () => {
     if (!token) {
       setError("Invalid invitation link");
+      return;
+    }
+
+    if (!isIntendedUser) {
+      setError("This invitation was not sent to your email address. Please sign in with the correct account.");
       return;
     }
 
@@ -117,6 +172,55 @@ export default function TeamInvitePage() {
     );
   }
 
+  // User is not signed in - show sign in prompt
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-background">
+        <div className="bg-app-background px-10 py-8 rounded-[24px] w-[510px]">
+          {/* Team Icon */}
+          <img src="/logo/qash-icon-dark.svg " alt="Team Icon" className="w-30 mb-6 mx-auto" />
+
+          {/* Content */}
+          <div className="space-y-3">
+            {/* Title */}
+            <div className="text-center">
+              <h1 className="text-2xl font-semibold mb-3">{companyName}</h1>
+              <p className="leading-relaxed text-text-secondary">
+                Welcome! You've been added to the {companyName}. Sign in to accept the invitation.
+              </p>
+            </div>
+
+            {/* Team Members Info */}
+            <div className="flex items-center justify-center gap-3">
+              <div className="flex">
+                <img
+                  src="/misc/default-team-member-avatar.svg"
+                  alt="Team Avatar"
+                  className="w-8 h-8 rounded-full border-2 border-background -ml-2"
+                />
+                <img
+                  src="/misc/default-team-member-avatar.svg"
+                  alt="Team Avatar"
+                  className="w-8 h-8 rounded-full border-2 border-background -ml-2"
+                />
+                <img
+                  src="/misc/default-team-member-avatar.svg"
+                  alt="Team Avatar"
+                  className="w-8 h-8 rounded-full border-2 border-background -ml-2"
+                />
+              </div>
+              <span className="text-sm text-text-secondary">{memberCount} members</span>
+            </div>
+
+            {/* Sign In Button */}
+            <PrimaryButton text="Sign in" onClick={handleSignIn} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // User is signed in
   if (isAccepted) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -143,7 +247,7 @@ export default function TeamInvitePage() {
           <div className="text-center">
             <h1 className="text-2xl font-semibold mb-3">{companyName}</h1>
             <p className="leading-relaxed text-text-secondary">
-              Welcome! You've been added to the {companyName}. Click below to accept the invitation.
+              Welcome, {user?.email}! Click below to accept the invitation.
             </p>
           </div>
 
@@ -170,7 +274,15 @@ export default function TeamInvitePage() {
           </div>
 
           {/* Join Button */}
-          <PrimaryButton text="Join team" onClick={handleAcceptInvite} loading={isPending} />
+          {isIntendedUser ? (
+            <PrimaryButton text="Join team" onClick={handleAcceptInvite} loading={isPending} />
+          ) : (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-center">
+              <p className="text-red-700 text-sm">
+                This invitation was sent to {intendedEmail}. Please sign in with that account to accept.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -114,6 +114,24 @@ export class CreateSendProposalDto implements SharedTypes.CreateSendProposalDto 
   amount: number;
 }
 
+export class MintTokensDto implements SharedTypes.MintTokensDto {
+  @ApiProperty({
+    description: 'Faucet ID for the token source (bech32 format)',
+    example: 'mtst1faucet...',
+  })
+  @IsString()
+  @IsNotEmpty()
+  faucetId: string;
+
+  @ApiProperty({
+    description: 'Amount of tokens to mint',
+    example: 1000,
+  })
+  @IsInt()
+  @Min(1)
+  amount: number;
+}
+
 export class BatchPaymentItemDto {
   @ApiProperty({
     description: 'Recipient account ID (bech32 format)',

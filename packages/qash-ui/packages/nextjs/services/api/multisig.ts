@@ -7,10 +7,27 @@ import type {
   CreateSendProposalDto,
   CreateBatchSendProposalDto,
   CreateProposalFromBillsDto,
+  MintTokensDto,
   MultisigProposalResponseDto,
   SubmitSignatureDto,
   ExecuteTransactionResponseDto,
 } from "@qash/types/dto/multisig";
+
+// ==========================================================================
+// Type Definitions
+// ==========================================================================
+
+export interface ConsumableNoteAsset {
+  faucet_id: string;
+  amount: number | string;
+}
+
+export interface ConsumableNote {
+  note_id: string;
+  assets: ConsumableNoteAsset[];
+  sender: string;
+  note_type: string;
+}
 
 // ==========================================================================
 // Account API
@@ -62,6 +79,17 @@ export const getAccountBalances = async (accountId: string) => {
 export const getAccountMembers = async (accountId: string) => {
   return apiServerWithAuth.getData<{ members: any[] }>(
     `/multisig/accounts/${accountId}/members`
+  );
+};
+
+// POST: Mint tokens to a multisig account
+export const mintTokens = async (
+  accountId: string,
+  data: MintTokensDto
+): Promise<{ transactionId: string }> => {
+  return apiServerWithAuth.postData<{ transactionId: string }>(
+    `/multisig/accounts/${accountId}/mint`,
+    data
   );
 };
 
@@ -298,6 +326,28 @@ export function useGetAccountMembers(
     refetchOnWindowFocus: false,
   });
 }
+
+/**
+ * React Query hook to mint tokens to a multisig account
+ */
+export function useMintTokens() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    { transactionId: string },
+    Error,
+    { accountId: string; data: MintTokensDto }
+  >({
+    mutationFn: (params) => mintTokens(params.accountId, params.data),
+    onSuccess: (data, params) => {
+      // Invalidate account balances
+      queryClient.invalidateQueries({
+        queryKey: ["multisig", "accounts", params.accountId, "balances"],
+      });
+    },
+  });
+}
+
 /**
  * React Query hook to create a consume proposal
  */

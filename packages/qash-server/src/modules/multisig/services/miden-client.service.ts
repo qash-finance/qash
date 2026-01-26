@@ -270,4 +270,39 @@ export class MidenClientService {
       return false;
     }
   }
-}
+
+  /**
+   * Mint tokens to a multisig account from a faucet (direct execution)
+   */
+  async mintTokens(
+    accountId: string,
+    faucetId: string,
+    amount: number,
+  ): Promise<{ transactionId: string }> {
+    try {
+      this.logger.debug(
+        `Minting ${amount} tokens to account ${accountId} from faucet ${faucetId}`,
+      );
+
+      const response = await this.client.post('/mint', {
+        account_id: accountId,
+        faucet_id: faucetId,
+        amount,
+      });
+
+      this.logger.log(
+        `Tokens minted successfully. Transaction ID: ${response.data.transaction_id}`,
+      );
+
+      return {
+        transactionId: response.data.transaction_id,
+      };
+    } catch (error) {
+      this.logger.error('Failed to mint tokens', error);
+      throw new HttpException(
+        `Failed to mint tokens: ${error.response?.data?.message || error.message}`,
+        error.response?.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+    }

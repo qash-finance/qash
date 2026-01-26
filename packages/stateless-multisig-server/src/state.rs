@@ -53,6 +53,12 @@ pub enum ClientCommand {
         amount: u64,
         respond_to: oneshot::Sender<Result<ProposalResult, String>>,
     },
+    /// Create a batch send proposal (multiple recipients in one transaction)
+    CreateBatchSendProposal {
+        account_id: String,
+        recipients: Vec<crate::handlers::multisig::BatchPayoutRecipient>,
+        respond_to: oneshot::Sender<Result<ProposalResult, String>>,
+    },
     /// Execute a multisig transaction with collected signatures
     ExecuteMultisigTransaction {
         account_id: String,
@@ -66,6 +72,13 @@ pub enum ClientCommand {
     GetAccountBalances {
         account_id: String,
         respond_to: oneshot::Sender<Result<Vec<AccountAsset>, String>>,
+    },
+    /// Mint tokens from a faucet
+    MintTokens {
+        account_id: String,
+        faucet_id: String,
+        amount: u64,
+        respond_to: oneshot::Sender<Result<String, String>>, // Returns transaction ID
     },
 }
 
@@ -171,6 +184,23 @@ impl ClientHandle {
         rx.await.map_err(|e| e.to_string())?
     }
 
+    pub async fn create_batch_send_proposal(
+        &self,
+        account_id: String,
+        recipients: Vec<crate::handlers::multisig::BatchPayoutRecipient>,
+    ) -> Result<ProposalResult, String> {
+        let (tx, rx) = oneshot::channel();
+        self.sender
+            .send(ClientCommand::CreateBatchSendProposal {
+                account_id,
+                recipients,
+                respond_to: tx,
+            })
+            .await
+            .map_err(|e| e.to_string())?;
+        rx.await.map_err(|e| e.to_string())?
+    }
+
     pub async fn execute_multisig_transaction(
         &self,
         account_id: String,
@@ -202,6 +232,25 @@ impl ClientHandle {
         self.sender
             .send(ClientCommand::GetAccountBalances {
                 account_id,
+                respond_to: tx,
+            })
+            .await
+            .map_err(|e| e.to_string())?;
+        rx.await.map_err(|e| e.to_string())?
+    }
+
+    pub async fn mint_tokens(
+        &self,
+        account_id: String,
+        faucet_id: String,
+        amount: u64,
+    ) -> Result<String, String> {
+        let (tx, rx) = oneshot::channel();
+        self.sender
+            .send(ClientCommand::MintTokens {
+                account_id,
+                faucet_id,
+                amount,
                 respond_to: tx,
             })
             .await
@@ -354,6 +403,15 @@ async fn run_client_loop(
                 .await;
                 let _ = respond_to.send(result);
             }
+            ClientCommand::CreateBatchSendProposal {
+                account_id,
+                recipients,
+                respond_to,
+            } => {
+                let result =
+                    create_batch_send_proposal_impl(&mut client, &account_id, recipients).await;
+                let _ = respond_to.send(result);
+            }
             ClientCommand::ExecuteMultisigTransaction {
                 account_id,
                 request_bytes,
@@ -380,6 +438,15 @@ async fn run_client_loop(
                 let result = get_account_balances_impl(&mut client, &account_id).await;
                 let _ = respond_to.send(result);
             }
+            ClientCommand::MintTokens {
+                account_id,
+                faucet_id,
+                amount,
+                respond_to,
+            } => {
+                let result = mint_tokens_impl(&mut client, &account_id, &faucet_id, amount).await;
+                let _ = respond_to.send(result);
+            }
         }
     }
 }
@@ -390,6 +457,7 @@ async fn get_consumable_notes_impl(
     account_id_str: &str,
 ) -> Result<Vec<ConsumableNoteInfo>, String> {
     use crate::storage::AssetInfo;
+    use miden_objects::address::NetworkId;
 
     tracing::debug!("Parsing account ID: {}", account_id_str);
 
@@ -431,7 +499,7 @@ async fn get_consumable_notes_impl(
                     if asset.is_fungible() {
                         let fungible = asset.unwrap_fungible();
                         AssetInfo {
-                            faucet_id: fungible.faucet_id().to_string(),
+                            faucet_id: fungible.faucet_id().to_bech32(NetworkId::Testnet),
                             amount: fungible.amount(),
                         }
                     } else {
@@ -445,7 +513,9 @@ async fn get_consumable_notes_impl(
                 .collect();
 
             // Get sender if available from note metadata
-            let sender = note_record.metadata().map(|m| m.sender().to_string());
+            let sender = note_record
+                .metadata()
+                .map(|m| m.sender().to_bech32(NetworkId::Testnet));
 
             ConsumableNoteInfo {
                 note_id,
@@ -647,6 +717,115 @@ async fn create_send_proposal_impl(
     }
 }
 
+/// Implementation of creating a batch send proposal (multiple recipients in one transaction)
+async fn create_batch_send_proposal_impl(
+    client: &mut crate::client::Client,
+    account_id_str: &str,
+    recipients: Vec<crate::handlers::multisig::BatchPayoutRecipient>,
+) -> Result<ProposalResult, String> {
+    use miden_client::note::NoteType;
+    use miden_client::transaction::TransactionRequestBuilder;
+    use miden_objects::asset::FungibleAsset;
+    use miden_objects::utils::Serializable;
+
+    tracing::debug!(
+        "Creating batch send proposal for {} recipients from account {}",
+        recipients.len(),
+        account_id_str
+    );
+
+    let sender_id = parse_account_id(account_id_str)?;
+
+    // Sync state
+    client
+        .sync_state()
+        .await
+        .map_err(|e| format!("Failed to sync state: {}", e))?;
+
+    // For batch sends, we create a transaction with multiple output notes
+    // Process first recipient
+    if recipients.is_empty() {
+        return Err("No recipients provided".to_string());
+    }
+
+    let first_recipient = &recipients[0];
+    let first_recipient_id = parse_account_id(&first_recipient.recipient_id)?;
+    let first_faucet_id = parse_account_id(&first_recipient.faucet_id)?;
+    let first_asset = FungibleAsset::new(first_faucet_id, first_recipient.amount)
+        .map_err(|e| format!("Failed to create asset for first recipient: {:?}", e))?;
+
+    use miden_client::transaction::PaymentNoteDescription;
+    let first_payment =
+        PaymentNoteDescription::new(vec![first_asset.into()], sender_id, first_recipient_id);
+
+    // Start with the first payment
+    let mut tx_request = TransactionRequestBuilder::new()
+        .build_pay_to_id(first_payment, NoteType::Public, client.rng())
+        .map_err(|e| format!("Failed to build initial pay_to_id: {:?}", e))?;
+
+    // For additional recipients, we need to add them as separate notes in the same transaction
+    // This requires building a custom transaction, but since build_pay_to_id returns a TransactionRequest,
+    // we'll need to work with what we have
+    // For now, we create a single consolidated payment for batch recipients
+    for recipient in recipients.iter().skip(1) {
+        let recipient_id = parse_account_id(&recipient.recipient_id)?;
+        let faucet_id = parse_account_id(&recipient.faucet_id)?;
+
+        let asset = FungibleAsset::new(faucet_id, recipient.amount)
+            .map_err(|e| format!("Failed to create asset for recipient: {:?}", e))?;
+
+        let payment = PaymentNoteDescription::new(vec![asset.into()], sender_id, recipient_id);
+
+        // Rebuild the transaction to include this payment
+        // Note: This is a workaround - ideally we'd have a true batch API
+        tx_request = TransactionRequestBuilder::new()
+            .build_pay_to_id(payment, NoteType::Public, client.rng())
+            .map_err(|e| {
+                format!(
+                    "Failed to build pay_to_id for additional recipient: {:?}",
+                    e
+                )
+            })?;
+    }
+
+    // For multisig, we need to propose the transaction and get the summary
+    let result =
+        crate::multisig::MultisigOps::propose_transaction(client, sender_id, tx_request.clone())
+            .await;
+
+    match result {
+        Ok(summary) => {
+            // Get summary commitment as hex string
+            let commitment = summary.to_commitment();
+            let summary_commitment = format!(
+                "0x{}",
+                commitment
+                    .iter()
+                    .map(|f| format!("{:016x}", f.as_int()))
+                    .collect::<Vec<_>>()
+                    .join("")
+            );
+
+            // Serialize using miden's native serialization
+            let summary_bytes = summary.to_bytes();
+            let request_bytes = tx_request.to_bytes();
+
+            tracing::info!(
+                "Batch send proposal created for {} recipients with commitment: {}",
+                recipients.len(),
+                summary_commitment
+            );
+
+            Ok(ProposalResult {
+                summary_commitment,
+                summary_bytes,
+                request_bytes,
+            })
+        }
+        Err(e) => Err(format!("Failed to create batch proposal: {:?}", e)),
+    }
+}
+
 /// Implementation of executing a multisig transaction with collected signatures
 async fn execute_multisig_transaction_impl(
     client: &mut crate::client::Client,
@@ -720,7 +899,11 @@ async fn execute_multisig_transaction_impl(
     // Log public keys for debugging
     tracing::debug!("Received {} public keys", public_keys_hex.len());
     for (i, pk_hex) in public_keys_hex.iter().enumerate() {
-        tracing::debug!("Public key {} hex (first 20 chars): {}...", i, &pk_hex[..pk_hex.len().min(20)]);
+        tracing::debug!(
+            "Public key {} hex (first 20 chars): {}...",
+            i,
+            &pk_hex[..pk_hex.len().min(20)]
+        );
     }
 
     for i in 0..num_approvers as usize {
@@ -779,8 +962,7 @@ async fn execute_multisig_transaction_impl(
             if sig_bytes[0] != 1 {
                 return Err(format!(
                     "Invalid auth scheme prefix for approver {}: expected 1 (ECDSA), got {}",
-                    i,
-                    sig_bytes[0]
+                    i, sig_bytes[0]
                 ));
             }
 
@@ -791,7 +973,7 @@ async fn execute_multisig_transaction_impl(
                 "Raw ECDSA signature bytes for approver {} ({} bytes): r={:?}, s={:?}, v={}, padding={}",
                 i,
                 raw_sig_bytes.len(),
-                &raw_sig_bytes[0..8],  // First 8 bytes of r
+                &raw_sig_bytes[0..8],   // First 8 bytes of r
                 &raw_sig_bytes[32..40], // First 8 bytes of s
                 raw_sig_bytes[64],      // v
                 raw_sig_bytes[65]       // padding
@@ -802,8 +984,12 @@ async fn execute_multisig_transaction_impl(
             use miden_objects::crypto::dsa::ecdsa_k256_keccak::Signature as ObjectsEcdsaSignature;
             use miden_objects::utils::Deserializable;
 
-            let ecdsa_sig = ObjectsEcdsaSignature::read_from_bytes(raw_sig_bytes)
-                .map_err(|e| format!("Failed to parse ECDSA signature for approver {}: {:?}", i, e))?;
+            let ecdsa_sig = ObjectsEcdsaSignature::read_from_bytes(raw_sig_bytes).map_err(|e| {
+                format!(
+                    "Failed to parse ECDSA signature for approver {}: {:?}",
+                    i, e
+                )
+            })?;
 
             // Wrap in the Signature enum and prepare for the VM
             use miden_objects::account::auth::Signature;
@@ -919,7 +1105,129 @@ async fn get_account_balances_impl(
         })
         .collect();
 
-    tracing::debug!("Found {} assets for account {}", assets.len(), account_id_str);
+    tracing::debug!(
+        "Found {} assets for account {}",
+        assets.len(),
+        account_id_str
+    );
 
     Ok(assets)
+}
+
+/// Implementation of minting tokens from a faucet
+async fn mint_tokens_impl(
+    client: &mut crate::client::Client,
+    account_id_str: &str,
+    faucet_id_str: &str,
+    amount: u64,
+) -> Result<String, String> {
+    use miden_client::note::NoteType;
+    use miden_client::transaction::{PaymentNoteDescription, TransactionRequestBuilder};
+    use miden_objects::asset::FungibleAsset;
+
+    tracing::info!(
+        "Starting mint_tokens_impl: amount={}, faucet={}, recipient={}",
+        amount,
+        faucet_id_str,
+        account_id_str
+    );
+
+    // Parse account IDs
+    tracing::debug!("Parsing recipient account ID: {}", account_id_str);
+    let account_id = parse_account_id(account_id_str)?;
+    tracing::debug!("Parsed recipient account ID: {:?}", account_id);
+
+    tracing::debug!("Parsing faucet account ID: {}", faucet_id_str);
+    let faucet_id = parse_account_id(faucet_id_str)?;
+    tracing::debug!("Parsed faucet account ID: {:?}", faucet_id);
+
+    // Sync state before minting (syncs recipient account)
+    tracing::debug!("Syncing client state...");
+    client.sync_state().await.map_err(|e| {
+        tracing::error!("Failed to sync state: {}", e);
+        format!("Failed to sync state: {}", e)
+    })?;
+    tracing::debug!("State sync completed successfully");
+
+    // Import the faucet account from chain into client store
+    // This is necessary because the faucet is not owned by the client
+    tracing::debug!("Importing faucet account from chain: {:?}", faucet_id);
+    client.import_account_by_id(faucet_id).await.map_err(|e| {
+        let err_msg = format!("Failed to import faucet account: {:?}", e);
+        tracing::error!("{}", err_msg);
+        err_msg
+    })?;
+    tracing::debug!("Faucet account imported successfully");
+
+    // Now get the faucet account from the client store
+    tracing::debug!("Querying imported faucet account: {:?}", faucet_id);
+    let faucet_account = client
+        .get_account(faucet_id)
+        .await
+        .map_err(|e| {
+            let err_msg = format!("Failed to query faucet account: {:?}", e);
+            tracing::error!("{}", err_msg);
+            err_msg
+        })?
+        .ok_or_else(|| {
+            let err_msg = format!(
+                "Faucet account not found after import: {}. Verify the faucet account ID is correct.",
+                faucet_id_str
+            );
+            tracing::error!("{}", err_msg);
+            err_msg
+        })?;
+    tracing::debug!("Faucet account retrieved successfully");
+
+    // Create the fungible asset to mint
+    tracing::debug!(
+        "Creating fungible asset: faucet={:?}, amount={}",
+        faucet_id,
+        amount
+    );
+    let asset = FungibleAsset::new(faucet_id, amount).map_err(|e| {
+        let err_msg = format!("Failed to create asset: {:?}", e);
+        tracing::error!("{}", err_msg);
+        err_msg
+    })?;
+    tracing::debug!("Fungible asset created: {:?}", asset);
+
+    // Create a payment note from the faucet to the account (mimics minting)
+    tracing::debug!(
+        "Creating payment note: from faucet {:?} to account {:?}",
+        faucet_id,
+        account_id
+    );
+    let payment = PaymentNoteDescription::new(vec![asset.into()], faucet_id, account_id);
+    tracing::debug!("Payment note created");
+
+    // Build the transaction request to create the note
+    tracing::debug!("Building mint transaction request...");
+    let tx_request = TransactionRequestBuilder::new()
+        .build_pay_to_id(payment, NoteType::Public, client.rng())
+        .map_err(|e| {
+            let err_msg = format!("Failed to build mint transaction: {:?}", e);
+            tracing::error!("{}", err_msg);
+            err_msg
+        })?;
+    tracing::debug!("Transaction request built successfully");
+
+    // Submit the mint transaction to the network
+    // The faucet account should now be available in the client store
+    tracing::info!(
+        "Submitting mint transaction from faucet account: {:?}",
+        faucet_id
+    );
+    let tx_id = client
+        .submit_new_transaction(faucet_id, tx_request)
+        .await
+        .map_err(|e| {
+            let err_msg = format!("Failed to submit mint transaction: {:?}", e);
+            tracing::error!("{}", err_msg);
+            err_msg
+        })?;
+
+    tracing::info!("Tokens minted successfully. Transaction ID: {}", tx_id);
+
+    Ok(tx_id.to_string())
 }

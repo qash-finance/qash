@@ -1,7 +1,10 @@
 use miden_client::{
-    builder::ClientBuilder, keystore::FilesystemKeyStore, rpc::Endpoint, rpc::GrpcClient,
-    note_transport::{grpc::GrpcNoteTransportClient, NOTE_TRANSPORT_DEFAULT_ENDPOINT},
     Client as MidenClient, ClientError, DebugMode,
+    builder::ClientBuilder,
+    keystore::FilesystemKeyStore,
+    note_transport::{NOTE_TRANSPORT_DEFAULT_ENDPOINT, grpc::GrpcNoteTransportClient},
+    rpc::Endpoint,
+    rpc::GrpcClient,
 };
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use rand::rngs::StdRng;
@@ -12,19 +15,24 @@ pub type Client = MidenClient<FilesystemKeyStore<StdRng>>;
 
 /// Creates and initializes a new Miden client
 pub async fn create_client(endpoint: Endpoint) -> Result<Client, ClientError> {
-    let timeout_ms = 10_000;
+    // Configure RPC timeout (ms). Default to 30s but can be overridden via env var MIDEN_RPC_TIMEOUT_MS
+    let timeout_ms: u64 = std::env::var("MIDEN_RPC_TIMEOUT_MS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(30_000);
+
+    tracing::info!("Using MIDEN RPC timeout (ms): {}", timeout_ms);
+
     let rpc_client = Arc::new(GrpcClient::new(&endpoint, timeout_ms));
 
     // Connect to the note transport layer for private note exchange
-    let note_transport = GrpcNoteTransportClient::connect(
-        NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string(),
-        timeout_ms,
-    )
-    .await
-    .map_err(|e| {
-        tracing::warn!("Failed to connect to note transport: {:?}", e);
-        e
-    })?;
+    let note_transport =
+        GrpcNoteTransportClient::connect(NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string(), timeout_ms)
+            .await
+            .map_err(|e| {
+                tracing::warn!("Failed to connect to note transport: {:?}", e);
+                e
+            })?;
 
     let client = ClientBuilder::new()
         .rpc(rpc_client)

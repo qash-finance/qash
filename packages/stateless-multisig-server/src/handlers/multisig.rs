@@ -55,6 +55,38 @@ pub struct CreateSendProposalRequest {
     pub amount: u64,
 }
 
+/// A single recipient in a batch payout
+#[derive(Deserialize, Clone)]
+pub struct BatchPayoutRecipient {
+    pub recipient_id: String,
+    pub faucet_id: String,
+    pub amount: u64,
+}
+
+/// Request to create a batch payout proposal (multiple recipients in one transaction)
+#[derive(Deserialize)]
+pub struct CreateBatchSendProposalRequest {
+    pub account_id: String,
+    pub recipients: Vec<BatchPayoutRecipient>,
+}
+
+/// Request to mint tokens from a faucet
+#[derive(Deserialize)]
+pub struct MintRequest {
+    /// The account ID to mint tokens to
+    pub account_id: String,
+    /// The faucet account ID
+    pub faucet_id: String,
+    /// Amount of tokens to mint
+    pub amount: u64,
+}
+
+#[derive(Serialize)]
+pub struct MintResponse {
+    /// Transaction ID of the mint transaction
+    pub transaction_id: String,
+}
+
 #[derive(Serialize)]
 pub struct ProposeTransactionResponse {
     pub summary_commitment: String,
@@ -192,6 +224,36 @@ pub async fn create_send_proposal(
     }))
 }
 
+/// POST /multisig/batch-send-proposal - Create a batch payout proposal (multiple recipients)
+/// STATELESS: Creates the proposal via Miden client, returns the summary for signing
+/// The caller is responsible for storing the proposal in the database
+pub async fn create_batch_send_proposal(
+    State(state): State<AppState>,
+    Json(payload): Json<CreateBatchSendProposalRequest>,
+) -> Result<Json<ProposeTransactionResponse>, StatusCode> {
+    // Validate we have at least one recipient
+    if payload.recipients.is_empty() {
+        tracing::error!("Batch send proposal has no recipients");
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    // Create the batch send proposal via client
+    let result = state
+        .client
+        .create_batch_send_proposal(payload.account_id.clone(), payload.recipients.clone())
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to create batch send proposal: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    Ok(Json(ProposeTransactionResponse {
+        summary_commitment: result.summary_commitment,
+        summary_bytes_hex: hex::encode(&result.summary_bytes),
+        request_bytes_hex: hex::encode(&result.request_bytes),
+    }))
+}
+
 // Removed: list_proposals, get_proposal, submit_signature - these are now handled by the database layer
 
 /// Request to execute a multisig transaction
@@ -272,6 +334,30 @@ pub async fn get_account_balances(
         .collect();
 
     Ok(Json(GetBalancesResponse { balances }))
+}
+
+/// POST /mint - Mint tokens from a faucet
+/// Creates a mint transaction and executes it immediately (no multisig approval needed)
+pub async fn mint_tokens(
+    State(state): State<AppState>,
+    Json(payload): Json<MintRequest>,
+) -> Result<Json<MintResponse>, StatusCode> {
+    let tx_id = state
+        .client
+        .mint_tokens(
+            payload.account_id.clone(),
+            payload.faucet_id,
+            payload.amount,
+        )
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to mint tokens: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    Ok(Json(MintResponse {
+        transaction_id: tx_id,
+    }))
 }
 
 // All helper functions removed - stateless server needs no helpers

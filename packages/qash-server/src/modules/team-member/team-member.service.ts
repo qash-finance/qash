@@ -960,7 +960,7 @@ export class TeamMemberService {
   ): string {
     const frontendUrl =
       this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
-    const acceptUrl = `${frontendUrl}/team-invite?token=${invitationToken}&company=${encodeURIComponent(company.companyName)}&teamMemberCount=${teamMemberCount}`;
+    const acceptUrl = `${frontendUrl}/team-invite?token=${invitationToken}&company=${encodeURIComponent(company.companyName)}&teamMemberCount=${teamMemberCount}&email=${encodeURIComponent(teamMember.user?.email || '')}`;
     const firstName = teamMember.firstName || 'there';
 
     return `

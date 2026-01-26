@@ -1,65 +1,94 @@
 "use client";
 
 import React, { useState } from "react";
-import { OnboardingModalProps } from "@/types/modal";
-import { ModalProp } from "@/contexts/ModalManagerProvider";
+import { OnboardingModalProps, ChooseAccountModalProps } from "@/types/modal";
+import { ModalProp, useModal } from "@/contexts/ModalManagerProvider";
 import { MIDEN_EXPLORER_URL, QASH_TOKEN_ADDRESS } from "@/services/utils/constant";
 import { PrimaryButton } from "../Common/PrimaryButton";
-import { createFaucetMintAndConsume } from "@/services/utils/mint";
 import BaseModal from "./BaseModal";
 import toast from "react-hot-toast";
 import { useMidenProvider } from "@/contexts/MidenProvider";
+import { MultisigAccountResponseDto } from "@qash/types/dto/multisig";
+import { useMintTokens } from "@/services/api/multisig";
 
-export function OnboardingModal({ isOpen, onClose }: ModalProp<OnboardingModalProps>) {
+export function OnboardingModal({ isOpen, onClose, zIndex }: ModalProp<OnboardingModalProps>) {
   // **************** Custom Hooks *******************
-  const { client, address, fetchBalances } = useMidenProvider();
+  const { fetchBalances } = useMidenProvider();
+  const { openModal } = useModal();
+  const { mutate: mint, isPending } = useMintTokens();
 
   // **************** Local State *******************
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
 
-  const handleMintToken = async () => {
-    if (!address) return toast.error("Please connect your wallet to mint tokens");
-    if (!client) return toast.error("Miden client not initialized");
+  const handleMintToken = async (targetAddress?: string) => {
+    const mintAddress = targetAddress;
+    if (!mintAddress) return toast.error("Please connect your wallet to mint tokens");
 
     try {
       setLoading(true);
       toast.loading("Minting...");
 
-      // mint qash token to user
-      const txId = await createFaucetMintAndConsume(client, address, QASH_TOKEN_ADDRESS);
-      toast.dismiss();
-      toast.success(
-        <div>
-          Mint successfully, view transaction on{" "}
-          <a href={`${MIDEN_EXPLORER_URL}/tx/${txId}`} target="_blank" rel="noopener noreferrer" className="underline">
-            Miden Explorer
-          </a>
-        </div>,
-      );
+      // Mint tokens to the target address (multisig account)
+      mint(
+        {
+          accountId: mintAddress,
+          data: {
+            faucetId: QASH_TOKEN_ADDRESS,
+            amount: 100 * 1e8, // 100 tokens with 8 decimals
+          },
+        },
+        {
+          onSuccess: data => {
+            toast.dismiss();
+            toast.success(
+              <div>
+                Mint successfully, view transaction on{" "}
+                <a
+                  href={`${MIDEN_EXPLORER_URL}/tx/${data.transactionId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                >
+                  Miden Explorer
+                </a>
+              </div>,
+            );
 
-      onClose();
-      setSuccess(true);
-      fetchBalances();
+            fetchBalances();
+            onClose();
+          },
+          onError: error => {
+            toast.dismiss();
+            toast.error("Failed to mint tokens, it might because the faucet was drained!");
+            console.error(error);
+          },
+          onSettled: () => {
+            setLoading(false);
+          },
+        },
+      );
     } catch (error) {
       toast.dismiss();
-      toast.error("Failed to mint tokens, it might because the faucet was drained!");
+      toast.error("Failed to mint tokens!");
       console.error(error);
-    } finally {
       setLoading(false);
     }
+  };
+
+  const handleAccountSelected = (account: MultisigAccountResponseDto) => {
+    handleMintToken(account.accountId);
+  };
+
+  const handleRequestTokens = () => {
+    openModal<ChooseAccountModalProps>("CHOOSE_ACCOUNT", {
+      onConfirm: handleAccountSelected,
+    });
   };
 
   if (!isOpen) return null;
 
   return (
-    <BaseModal
-      isOpen={isOpen}
-      onClose={() => {
-        onClose();
-        setSuccess(false);
-      }}
-    >
+    <BaseModal isOpen={isOpen} onClose={onClose} zIndex={zIndex}>
       <div className="flex flex-col items-center border-2 border-primary-divider bg-background w-[550px] rounded-2xl ">
         <main className="flex flex-col gap-6 items-center self-stretch p-3 pt-5 z-10 relative">
           {/* Close icon */}
@@ -82,26 +111,12 @@ export function OnboardingModal({ isOpen, onClose }: ModalProp<OnboardingModalPr
           </div>
 
           {/* Action Button */}
-          {success ? (
-            <PrimaryButton
-              text="Ready to Claim!"
-              onClick={() => {
-                // if (pathname !== "/") {
-                //   router.push("/");
-                // }
-                onClose();
-                setSuccess(false);
-              }}
-              containerClassName="w-full"
-            />
-          ) : (
-            <PrimaryButton
-              text="Request free tokens"
-              onClick={handleMintToken}
-              loading={loading}
-              containerClassName="w-full"
-            />
-          )}
+          <PrimaryButton
+            text="Request free tokens"
+            onClick={handleRequestTokens}
+            loading={loading || isPending}
+            containerClassName="w-full"
+          />
         </main>
       </div>
     </BaseModal>
