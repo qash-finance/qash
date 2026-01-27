@@ -7,7 +7,7 @@ import { SecondaryButton } from "../Common/SecondaryButton";
 import { useInvoice } from "@/hooks/server/useInvoice";
 import { CategoryBadge } from "../ContactBook/ContactBookContainer";
 import { useGetAllEmployeeGroups } from "@/services/api/employee";
-import { CategoryShapeEnum } from "@qash/types/enums";
+import { CategoryShapeEnum, InvoiceTypeEnum } from "@qash/types/enums";
 import { useModal } from "@/contexts/ModalManagerProvider";
 import { ChooseAccountModalProps, InvoiceModalProps } from "@/types/modal";
 import { PrimaryButton } from "../Common/PrimaryButton";
@@ -203,10 +203,18 @@ const BillReviewContainer = () => {
       const totalAmount = tokenTotals.reduce((sum, t) => sum + t.total, 0);
       const description = `Payment for ${selectedInvoices.length} invoice(s) - Total: ${totalAmount}`;
 
+      // Build payments array from selected invoices
+      const payments = selectedInvoices.map(inv => ({
+        recipientId: inv.paymentWalletAddress,
+        faucetId: (inv.paymentToken as any)?.address,
+        amount: Math.floor(Number(inv.total) * Math.pow(10, (inv.paymentToken as any)?.decimals ?? 6)),
+      }));
+
       await createProposalMutation.mutateAsync({
         accountId,
         billUUIDs: selectedInvoices.map(inv => inv.bill.uuid),
         description,
+        payments,
       } as CreateProposalFromBillsDto);
 
       closeModal("PROCESSING_TRANSACTION");

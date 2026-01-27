@@ -5,7 +5,7 @@ interface PrimaryButtonProps {
   text: string;
   icon?: string;
   iconPosition?: "left" | "right";
-  onClick?: () => void;
+  onClick?: (e?: React.MouseEvent<HTMLButtonElement>) => void;
   type?: "button" | "submit" | "reset";
   containerClassName?: string;
   buttonClassName?: string;

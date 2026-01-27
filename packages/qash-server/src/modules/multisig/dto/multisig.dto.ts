@@ -213,6 +213,18 @@ export class SubmitSignatureDto implements SharedTypes.SubmitSignatureDto {
   signatureHex: string;
 }
 
+export class SubmitRejectionDto implements SharedTypes.SubmitRejectionDto {
+  @ApiProperty({
+    description: 'Optional reason for rejecting the proposal',
+    example: 'Insufficient budget allocation for this period',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500, { message: 'reason cannot be longer than 500 characters' })
+  reason?: string;
+}
+
 export class CreateProposalFromBillsDto implements SharedTypes.CreateProposalFromBillsDto {
   @ApiProperty({
     description: 'Multisig account ID (bech32 format)',
@@ -238,6 +250,19 @@ export class CreateProposalFromBillsDto implements SharedTypes.CreateProposalFro
   @IsString()
   @IsNotEmpty()
   description: string;
+
+  @ApiProperty({
+    description: 'Array of batch payments with recipient, faucet, and amount',
+    type: [BatchPaymentItemDto],
+    example: [
+      { recipientId: 'mtst1emp1...', faucetId: 'mtst1qash...', amount: 1000 },
+      { recipientId: 'mtst1emp2...', faucetId: 'mtst1qash...', amount: 2000 },
+    ],
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsNotEmpty({ each: true })
+  payments: BatchPaymentItemDto[];
 }
 
 export class MultisigAccountResponseDto implements SharedTypes.MultisigAccountResponseDto {
@@ -307,7 +332,7 @@ export class MultisigProposalResponseDto implements SharedTypes.MultisigProposal
   @ApiProperty()
   requestBytesHex: string;
 
-  @ApiProperty({ enum: ['PENDING', 'READY', 'EXECUTED', 'FAILED', 'CANCELLED'] })
+  @ApiProperty({ enum: ['PENDING', 'READY', 'EXECUTED', 'FAILED', 'CANCELLED', 'REJECTED'] })
   status: string;
 
   @ApiProperty({ required: false })
@@ -315,6 +340,9 @@ export class MultisigProposalResponseDto implements SharedTypes.MultisigProposal
 
   @ApiProperty()
   signaturesCount: number;
+
+  @ApiProperty({ required: false })
+  rejectionCount?: number;
 
   @ApiProperty()
   threshold: number;
@@ -344,6 +372,41 @@ export class MultisigProposalResponseDto implements SharedTypes.MultisigProposal
       firstName: string;
       lastName: string;
     };
+  }>; 
+
+  @ApiProperty({ type: [Object], required: false })
+  rejections?: Array<{
+    id: number;
+    uuid: string;
+    teamMemberId: number;
+    teamMember?: {
+      id: number;
+      uuid: string;
+      firstName: string;
+      lastName: string;
+      email?: string;
+    };
+    reason?: string;
+    createdAt: Date;
+  }>;
+
+  @ApiProperty({ type: [Object], required: false })
+  approvers?: Array<{
+    id?: number;
+    uuid?: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    publicKey?: string;
+    joinedAt?: Date;
+    signed?: boolean;
+    signature?: {
+      id: number;
+      uuid: string;
+      approverIndex: number;
+      signatureHex: string;
+      createdAt: Date;
+    };
   }>;
 
   @ApiProperty({ type: [Object], required: false })
@@ -354,6 +417,7 @@ export class MultisigProposalResponseDto implements SharedTypes.MultisigProposal
     status: string;
     recipientName?: string;
     recipientAddress?: string;
+    paymentToken?: any;
   }>;
 
   @ApiProperty()

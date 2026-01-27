@@ -481,7 +481,7 @@ async fn get_consumable_notes_impl(
         .map_err(|e| format!("Failed to get consumable notes: {}", e))?;
 
     // print out all consumable notes
-    tracing::debug!("Consumable notes {:?}", consumable_notes);
+    // tracing::debug!("Consumable notes {:?}", consumable_notes);
 
     // Convert to our info format
     // The return type is Vec<(InputNoteRecord, Vec<(AccountId, NoteRelevance)>)>
@@ -723,8 +723,8 @@ async fn create_batch_send_proposal_impl(
     account_id_str: &str,
     recipients: Vec<crate::handlers::multisig::BatchPayoutRecipient>,
 ) -> Result<ProposalResult, String> {
-    use miden_client::note::NoteType;
-    use miden_client::transaction::TransactionRequestBuilder;
+    use miden_client::note::{NoteType, create_p2id_note};
+    use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
     use miden_objects::asset::FungibleAsset;
     use miden_objects::utils::Serializable;
 
@@ -742,51 +742,44 @@ async fn create_batch_send_proposal_impl(
         .await
         .map_err(|e| format!("Failed to sync state: {}", e))?;
 
-    // For batch sends, we create a transaction with multiple output notes
-    // Process first recipient
-    if recipients.is_empty() {
-        return Err("No recipients provided".to_string());
-    }
+    // Create P2ID notes for each recipient
+    let mut output_notes: Vec<OutputNote> = Vec::new();
 
-    let first_recipient = &recipients[0];
-    let first_recipient_id = parse_account_id(&first_recipient.recipient_id)?;
-    let first_faucet_id = parse_account_id(&first_recipient.faucet_id)?;
-    let first_asset = FungibleAsset::new(first_faucet_id, first_recipient.amount)
-        .map_err(|e| format!("Failed to create asset for first recipient: {:?}", e))?;
-
-    use miden_client::transaction::PaymentNoteDescription;
-    let first_payment =
-        PaymentNoteDescription::new(vec![first_asset.into()], sender_id, first_recipient_id);
-
-    // Start with the first payment
-    let mut tx_request = TransactionRequestBuilder::new()
-        .build_pay_to_id(first_payment, NoteType::Public, client.rng())
-        .map_err(|e| format!("Failed to build initial pay_to_id: {:?}", e))?;
-
-    // For additional recipients, we need to add them as separate notes in the same transaction
-    // This requires building a custom transaction, but since build_pay_to_id returns a TransactionRequest,
-    // we'll need to work with what we have
-    // For now, we create a single consolidated payment for batch recipients
-    for recipient in recipients.iter().skip(1) {
+    for (idx, recipient) in recipients.iter().enumerate() {
         let recipient_id = parse_account_id(&recipient.recipient_id)?;
         let faucet_id = parse_account_id(&recipient.faucet_id)?;
 
+        // Create the fungible asset
         let asset = FungibleAsset::new(faucet_id, recipient.amount)
-            .map_err(|e| format!("Failed to create asset for recipient: {:?}", e))?;
+            .map_err(|e| format!("Failed to create asset for recipient {}: {:?}", idx, e))?;
 
-        let payment = PaymentNoteDescription::new(vec![asset.into()], sender_id, recipient_id);
+        // Create P2ID note for this recipient
+        let note = create_p2id_note(
+            sender_id,
+            recipient_id,
+            vec![asset.into()],
+            NoteType::Public,
+            Default::default(),
+            client.rng(),
+        )
+        .map_err(|e| format!("Failed to create P2ID note for recipient {}: {:?}", idx, e))?;
 
-        // Rebuild the transaction to include this payment
-        // Note: This is a workaround - ideally we'd have a true batch API
-        tx_request = TransactionRequestBuilder::new()
-            .build_pay_to_id(payment, NoteType::Public, client.rng())
-            .map_err(|e| {
-                format!(
-                    "Failed to build pay_to_id for additional recipient: {:?}",
-                    e
-                )
-            })?;
+        output_notes.push(OutputNote::Full(note));
+
+        tracing::debug!(
+            "Created P2ID note {} for recipient {} ({} to {})",
+            idx,
+            recipient.recipient_id,
+            recipient.amount,
+            recipient.faucet_id
+        );
     }
+
+    // Build the transaction request with all output notes
+    let tx_request = TransactionRequestBuilder::new()
+        .own_output_notes(output_notes)
+        .build()
+        .map_err(|e| format!("Failed to build batch transaction request: {:?}", e))?;
 
     // For multisig, we need to propose the transaction and get the summary
     let result =
@@ -795,24 +788,16 @@ async fn create_batch_send_proposal_impl(
 
     match result {
         Ok(summary) => {
-            // Get summary commitment as hex string
             let commitment = summary.to_commitment();
-            let summary_commitment = format!(
-                "0x{}",
-                commitment
-                    .iter()
-                    .map(|f| format!("{:016x}", f.as_int()))
-                    .collect::<Vec<_>>()
-                    .join("")
-            );
+
+            let summary_commitment = commitment.to_hex();
 
             // Serialize using miden's native serialization
             let summary_bytes = summary.to_bytes();
             let request_bytes = tx_request.to_bytes();
 
             tracing::info!(
-                "Batch send proposal created for {} recipients with commitment: {}",
-                recipients.len(),
+                "Consume proposal created with commitment: {}",
                 summary_commitment
             );
 
@@ -822,7 +807,7 @@ async fn create_batch_send_proposal_impl(
                 request_bytes,
             })
         }
-        Err(e) => Err(format!("Failed to create batch proposal: {:?}", e)),
+        Err(e) => Err(format!("Failed to create batch send proposal: {:?}", e)),
     }
 }
 

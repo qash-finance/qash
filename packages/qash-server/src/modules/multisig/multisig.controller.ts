@@ -16,6 +16,7 @@ import {
   CreateBatchSendProposalDto,
   CreateProposalFromBillsDto,
   SubmitSignatureDto,
+  SubmitRejectionDto,
   MintTokensDto,
   MultisigAccountResponseDto,
   MultisigProposalResponseDto,
@@ -154,6 +155,21 @@ export class MultisigController {
     return this.multisigService.createBatchSendProposal(dto);
   }
 
+  @Post('proposals/from-bills')
+  @CompanyAuth()
+  @ApiOperation({ summary: 'Create a proposal from bills with specified payments' })
+  @ApiResponse({
+    status: 201,
+    description: 'Bill proposal created successfully',
+    type: MultisigProposalResponseDto,
+  })
+  async createProposalFromBills(
+    @Body() dto: CreateProposalFromBillsDto,
+    @CurrentUser('withCompany') user: UserWithCompany,
+  ): Promise<MultisigProposalResponseDto> {
+    return this.multisigService.createProposalFromBills(dto, user);
+  }
+
   @Post('accounts/:accountId/mint')
   @ApiOperation({ summary: 'Mint tokens to a multisig account' })
   @ApiResponse({
@@ -174,10 +190,10 @@ export class MultisigController {
   }
 
   // ============================================================================
-  // Proposal Endpoints
+  // Proposal Detail Endpoints
   // ============================================================================
 
-  @Post('proposals/consume')
+  @Get('proposals/:proposalId')
   @ApiOperation({ summary: 'Get a proposal by ID' })
   @ApiResponse({
     status: 200,
@@ -228,6 +244,22 @@ export class MultisigController {
     @Body() dto: SubmitSignatureDto,
   ): Promise<MultisigProposalResponseDto> {
     return this.multisigService.submitSignature(proposalId, dto);
+  }
+
+  @Post('proposals/:proposalId/rejections')
+  @CompanyAuth()
+  @ApiOperation({ summary: 'Submit a rejection for a proposal' })
+  @ApiResponse({
+    status: 200,
+    description: 'Rejection submitted successfully',
+    type: MultisigProposalResponseDto,
+  })
+  async submitRejection(
+    @Param('proposalId', ParseIntPipe) proposalId: number,
+    @Body() dto: SubmitRejectionDto,
+    @CurrentUser('withCompany') user: UserWithCompany,
+  ): Promise<MultisigProposalResponseDto> {
+    return this.multisigService.submitRejection(proposalId, user, dto);
   }
 
   @Post('proposals/:proposalId/execute')

@@ -146,7 +146,8 @@ export const MultisigProposalStatusEnum = {
   READY: 'READY',
   EXECUTED: 'EXECUTED',
   FAILED: 'FAILED',
-  CANCELLED: 'CANCELLED'
+  CANCELLED: 'CANCELLED',
+  REJECTED: 'REJECTED'
 } as const;
 
 export type MultisigProposalStatusEnum = (typeof MultisigProposalStatusEnum)[keyof typeof MultisigProposalStatusEnum];

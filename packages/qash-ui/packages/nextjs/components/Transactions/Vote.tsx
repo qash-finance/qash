@@ -4,7 +4,13 @@ import React from "react";
 import { SecondaryButton } from "../Common/SecondaryButton";
 import { PrimaryButton } from "../Common/PrimaryButton";
 
-const ConfirmVote = () => {
+interface ConfirmVoteProps {
+  onDeny?: () => void;
+  onApprove?: () => void;
+  isLoading?: boolean;
+}
+
+const ConfirmVote = ({ onDeny, onApprove, isLoading = false }: ConfirmVoteProps) => {
   return (
     <div className="flex flex-col gap-4 w-full max-w-md bg-app-background p-3 rounded-2xl">
       {/* Header Section */}
@@ -23,8 +29,8 @@ const ConfirmVote = () => {
 
       {/* Action Buttons */}
       <div className="flex gap-2 w-full">
-        <SecondaryButton text="Deny" onClick={() => {}} buttonClassName="flex-1" />
-        <PrimaryButton text="Approve" onClick={() => {}} containerClassName="flex-1" />
+        <SecondaryButton text="Deny" onClick={onDeny} buttonClassName="flex-1" disabled={isLoading} />
+        <PrimaryButton text="Approve" onClick={onApprove} containerClassName="flex-1" disabled={isLoading} />
       </div>
     </div>
   );

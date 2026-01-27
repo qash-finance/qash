@@ -18,6 +18,7 @@ interface ProposalRowProps {
   isExecuteLoading?: boolean;
   isCancelLoading?: boolean;
   userPublicKey?: string;
+  onProposalClick?: (e: any) => void;
 }
 
 const statusConfig: Record<string, { label: string; bgColor: string; borderColor: string; textColor: string }> = {
@@ -83,6 +84,7 @@ export function ProposalRow({
   isExecuteLoading,
   isCancelLoading,
   userPublicKey,
+  onProposalClick,
 }: ProposalRowProps) {
   const status = proposal.status as MultisigProposalStatusEnum;
   const config = statusConfig[status] || statusConfig[MultisigProposalStatusEnum.PENDING];
@@ -96,7 +98,8 @@ export function ProposalRow({
   // Check if current user has already signed this proposal
   const hasUserSigned = userPublicKey
     ? proposal.signatures?.some(
-        sig => sig.approverPublicKey.toLowerCase().replace(/^0x/, "") === userPublicKey.toLowerCase().replace(/^0x/, ""),
+        sig =>
+          sig.approverPublicKey.toLowerCase().replace(/^0x/, "") === userPublicKey.toLowerCase().replace(/^0x/, ""),
       )
     : false;
 
@@ -123,7 +126,10 @@ export function ProposalRow({
   const faucetId = firstAsset?.faucet_id || "";
 
   return (
-    <div className="grid grid-cols-[1fr_1fr_1fr_1fr_1fr_auto] gap-4 items-center px-4 py-3 rounded-lg border-b border-primary-divider last:border-b-0 hover:bg-app-background">
+    <div
+      className="grid grid-cols-[1fr_1fr_1fr_1fr_1fr_auto] gap-4 items-center px-4 py-3 rounded-lg border-b border-primary-divider last:border-b-0 hover:bg-app-background cursor-pointer"
+      onClick={onProposalClick}
+    >
       {/* Icon & Type */}
       <div className="flex items-center gap-3 justify-start">
         <img
@@ -192,14 +198,20 @@ export function ProposalRow({
               text="Cancel"
               variant="dark"
               buttonClassName="px-4"
-              onClick={() => onCancel?.(proposal.uuid)}
+              onClick={(e: any) => {
+                e.stopPropagation();
+                onCancel?.(proposal.uuid);
+              }}
               loading={isCancelLoading}
               disabled={isCancelLoading || isSignLoading}
             />
             <PrimaryButton
               text={hasUserSigned ? "Signed" : "Sign"}
               buttonClassName="px-6"
-              onClick={() => onSign?.(proposal.id)}
+              onClick={(e: any) => {
+                e.stopPropagation();
+                onSign?.(proposal.id);
+              }}
               loading={isSignLoading}
               disabled={hasUserSigned || isSignLoading || isCancelLoading}
             />
@@ -211,14 +223,20 @@ export function ProposalRow({
               text="Cancel"
               variant="dark"
               buttonClassName="px-4"
-              onClick={() => onCancel?.(proposal.uuid)}
+              onClick={(e: any) => {
+                e.stopPropagation();
+                onCancel?.(proposal.uuid);
+              }}
               loading={isCancelLoading}
               disabled={isCancelLoading || isExecuteLoading}
             />
             <PrimaryButton
               text="Execute"
               buttonClassName="px-4"
-              onClick={() => onExecute?.(proposal.id)}
+              onClick={(e: any) => {
+                e.stopPropagation();
+                onExecute?.(proposal.id);
+              }}
               loading={isExecuteLoading}
               disabled={isExecuteLoading || isCancelLoading}
             />

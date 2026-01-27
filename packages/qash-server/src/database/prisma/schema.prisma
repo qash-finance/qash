@@ -75,6 +75,7 @@ model TeamMember {
   updatedPaymentLinks PaymentLink[]           @relation("PaymentLinkUpdatedBy")
   activityLogs        ActivityLog[]
   multisigAccounts    MultisigAccountMember[]
+  multisigRejections  MultisigRejection[]
 
   @@index([companyId])
   @@index([role])
@@ -818,6 +819,9 @@ model MultisigProposal {
   // Signatures collected
   signatures MultisigSignature[]
 
+  // Rejections collected
+  rejections MultisigRejection[]
+
   // Bills linked to this proposal (many-to-one)
   bills Bill[]
 
@@ -856,6 +860,30 @@ model MultisigSignature {
   @@map("multisig_signatures")
 }
 
+model MultisigRejection {
+  id   Int    @id @default(autoincrement())
+  uuid String @unique @default(cuid()) @map("uuid")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  // Link to proposal
+  proposalId Int              @map("proposal_id")
+  proposal   MultisigProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  // Team member who rejected
+  teamMemberId Int        @map("team_member_id")
+  teamMember   TeamMember @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
+
+  // Optional reason for rejection
+  reason String? @db.Text
+
+  @@unique([proposalId, teamMemberId])
+  @@index([proposalId])
+  @@index([teamMemberId])
+  @@map("multisig_rejections")
+}
+
 model MultisigAccountMember {
   id   Int    @id @default(autoincrement())
   uuid String @unique @default(cuid()) @map("uuid")
@@ -890,5 +918,6 @@ enum MultisigProposalStatusEnum {
   READY // Has enough signatures, ready to execute
   EXECUTED // Transaction executed successfully
   FAILED // Transaction failed
-  CANCELLED // Proposal cancelled
+  CANCELLED // Proposal cancelled by user
+  REJECTED // Proposal rejected via threshold rejections
 }

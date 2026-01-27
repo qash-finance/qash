@@ -193,14 +193,16 @@ export class MidenClientService {
         `Creating batch send proposal for account ${accountId} with ${payments.length} payments`,
       );
 
-      const response = await this.client.post('/multisig/batch-send-proposal', {
+      const payload = {
         account_id: accountId,
-        payments: payments.map(p => ({
+        recipients: payments.map(p => ({
           recipient_id: p.recipientId,
           faucet_id: p.faucetId,
           amount: p.amount,
         })),
-      });
+      };
+
+      const response = await this.client.post('/multisig/batch-send-proposal', payload);
 
       this.logger.debug(
         `Batch send proposal created with commitment: ${response.data.summary_commitment}`,
@@ -213,8 +215,12 @@ export class MidenClientService {
       };
     } catch (error) {
       this.logger.error('Failed to create batch send proposal', error);
+      // Log server response body (if any) to help debugging
+      if (error.response?.data) {
+        this.logger.debug('Batch send proposal server response: %o', error.response.data);
+      }
       throw new HttpException(
-        `Failed to create batch send proposal: ${error.response?.data?.message || error.message}`,
+        `Failed to create batch send proposal: ${error.response?.data?.message || JSON.stringify(error.response?.data) || error.message}`,
         error.response?.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

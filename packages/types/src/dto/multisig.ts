@@ -59,6 +59,10 @@ export interface SubmitSignatureDto {
   signatureHex: string;
 }
 
+export interface SubmitRejectionDto {
+  reason?: string;
+}
+
 // Response DTOs
 export interface MultisigAccountResponseDto {
   id: number;
@@ -87,6 +91,21 @@ export interface MultisigSignatureDto {
   };
 }
 
+export interface MultisigRejectionDto {
+  id: number;
+  uuid: string;
+  teamMemberId: number;
+  teamMember?: {
+    id: number;
+    uuid: string;
+    firstName: string;
+    lastName: string;
+    email?: string;
+  };
+  reason?: string;
+  createdAt: string | Date;
+}
+
 export interface MultisigProposalResponseDto {
   id: number;
   uuid: string;
@@ -106,6 +125,25 @@ export interface MultisigProposalResponseDto {
   amount?: string;
   payments?: BatchPaymentItem[]; // For batch send proposals
   signatures?: MultisigSignatureDto[];
+  rejections?: MultisigRejectionDto[];
+  rejectionCount?: number;
+  approvers?: Array<{
+    id?: number;
+    uuid?: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    publicKey?: string;
+    joinedAt?: string | Date;
+    signed?: boolean;
+    signature?: {
+      id: number;
+      uuid: string;
+      approverIndex: number;
+      signatureHex: string;
+      createdAt: string | Date;
+    };
+  }>;
   bills?: MultisigProposalBillDto[];
   createdAt: string | Date;
   updatedAt: string | Date;
@@ -118,6 +156,7 @@ export interface MultisigProposalBillDto {
   status: string;
   recipientName?: string;
   recipientAddress?: string;
+  paymentToken?: any; // token metadata from invoice.paymentToken
 }
 
 export interface ExecuteTransactionResponseDto {

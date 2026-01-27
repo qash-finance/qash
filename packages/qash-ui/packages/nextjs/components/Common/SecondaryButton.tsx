@@ -5,7 +5,7 @@ interface SecondaryButtonProps {
   text: string | React.ReactNode;
   icon?: string;
   iconPosition?: "left" | "right";
-  onClick?: () => void;
+  onClick?: (e?: React.MouseEvent<HTMLButtonElement>) => void;
   buttonClassName?: string;
   iconClassName?: string;
   disabled?: boolean;

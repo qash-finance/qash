@@ -10,6 +10,7 @@ import type {
   MintTokensDto,
   MultisigProposalResponseDto,
   SubmitSignatureDto,
+  SubmitRejectionDto,
   ExecuteTransactionResponseDto,
 } from "@qash/types/dto/multisig";
 
@@ -171,6 +172,17 @@ export const submitSignature = async (
 ): Promise<MultisigProposalResponseDto> => {
   return apiServerWithAuth.postData<MultisigProposalResponseDto>(
     `/multisig/proposals/${proposalId}/signatures`,
+    data
+  );
+};
+
+// POST: Submit a rejection for a proposal
+export const submitRejection = async (
+  proposalId: number,
+  data: SubmitRejectionDto
+): Promise<MultisigProposalResponseDto> => {
+  return apiServerWithAuth.postData<MultisigProposalResponseDto>(
+    `/multisig/proposals/${proposalId}/rejections`,
     data
   );
 };
@@ -505,6 +517,29 @@ export function useSubmitSignature() {
     { proposalId: number; data: SubmitSignatureDto }
   >({
     mutationFn: ({ proposalId, data }) => submitSignature(proposalId, data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({
+        queryKey: ["multisig", "proposals", data.id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["multisig", "accounts", data.accountId, "proposals"],
+      });
+    },
+  });
+}
+
+/**
+ * React Query hook to submit a rejection for a proposal
+ */
+export function useSubmitRejection() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    MultisigProposalResponseDto,
+    Error,
+    { proposalId: number; data: SubmitRejectionDto }
+  >({
+    mutationFn: ({ proposalId, data }) => submitRejection(proposalId, data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({
         queryKey: ["multisig", "proposals", data.id],
