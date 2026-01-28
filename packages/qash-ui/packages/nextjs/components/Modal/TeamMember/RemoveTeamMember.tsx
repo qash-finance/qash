@@ -13,7 +13,7 @@ export function RemoveTeamMember({ isOpen, onClose, zIndex, name, onRemove }: Mo
   return (
     <BaseModal isOpen={isOpen} onClose={onClose} zIndex={zIndex}>
       <div className="bg-background flex  w-[450px] flex-col rounded-2xl">
-        <ModalHeader title="Delete payroll" onClose={onClose} />
+        <ModalHeader title="Remove team member" onClose={onClose} />
         <div className="flex flex-col rounded-b-2xl justify-center items-center py-5 px-3 gap-7 border-t border-2 border-primary-divider">
           <div className="flex flex-col gap-3 items-center">
             <span className="text-lg text-center text-text-primary px-5 font-bold">

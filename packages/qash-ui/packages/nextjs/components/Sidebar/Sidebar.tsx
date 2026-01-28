@@ -13,6 +13,8 @@ import { useMidenProvider } from "@/contexts/MidenProvider";
 import { formatAddress } from "@/services/utils/miden/address";
 import toast from "react-hot-toast";
 import TeamSidebar from "./TeamSidebar";
+import { useGetMyCompany } from "@/services/api/company";
+import { useGetTeamStats } from "@/services/api/team-member";
 
 export const MOVE_CRYPTO_SIDEBAR_OFFSET = 290;
 
@@ -135,35 +137,9 @@ export const actionItems = [
   },
 ];
 
-const SidebarHeader = ({ onClick }: { onClick?: () => void }) => {
-  return (
-    <div
-      className="w-full shadow-md flex items-center justify-center rounded-xl bg-background flex-col my-3 mx-2 cursor-pointer"
-      onClick={onClick}
-    >
-      <div className="flex p-3 justify-between w-full items-center border-b border-primary-divider">
-        <div className="flex flex-row gap-2">
-          <img src="/logo/qash-icon-dark.svg" alt="Qash Logo" className="w-10" />
-          <div className="flex flex-col gap-1">
-            <span className="leading-none text-primary-blue">Qash</span>
-            <span className="leading-none">$2,125,545.00</span>
-          </div>
-        </div>
-
-        <img src="/arrow/chevron-right.svg" alt="Qash Logo" className="w-4" />
-      </div>
-
-      <div className="w-full flex flex-row items-center justify-between p-3">
-        <div className="flex flex-row gap-2">
-          <img src="/misc/user-edit-icon.svg" alt="Eye Icon" className="w-5" />
-          <span className="text-text-secondary text-sm">5 members</span>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 export const Sidebar: React.FC<NavProps> = ({ onActionItemClick }) => {
+  const { data: myCompany } = useGetMyCompany();
+  const { data: teamStats } = useGetTeamStats(myCompany?.id, { enabled: !!myCompany?.id });
   const [action, setActions] = useState(actionItems);
   const router = useRouter();
   const pathname = usePathname();
@@ -280,8 +256,32 @@ export const Sidebar: React.FC<NavProps> = ({ onActionItemClick }) => {
                 <p className="text-[13px] text-badge-neutral-text">Beta</p>
               </div>
             </header>
-            {/* <div className="h-[2px] bg-primary-divider my-3" /> */}
-            <SidebarHeader onClick={() => setShowTeamSidebar(!showTeamSidebar)} />
+
+            {/* Navigation Sections */}
+
+            <div
+              className="w-full shadow-md flex items-center justify-center rounded-xl bg-background flex-col my-3 mx-2 cursor-pointer"
+              onClick={() => setShowTeamSidebar(true)}
+            >
+              <div className="flex p-3 justify-between w-full items-center border-b border-primary-divider">
+                <div className="flex flex-row gap-2">
+                  <img src="/logo/qash-icon-dark.svg" alt="Qash Logo" className="w-10" />
+                  <div className="flex flex-col gap-1">
+                    <span className="leading-none text-primary-blue">{myCompany?.companyName}</span>
+                    <span className="leading-none">$2,125,545.00</span>
+                  </div>
+                </div>
+
+                <img src="/arrow/chevron-right.svg" alt="Qash Logo" className="w-4" />
+              </div>
+
+              <div className="w-full flex flex-row items-center justify-between p-3">
+                <div className="flex flex-row gap-2">
+                  <img src="/misc/user-edit-icon.svg" alt="Eye Icon" className="w-5" />
+                  <span className="text-text-secondary text-sm">{teamStats?.total || 0} members</span>
+                </div>
+              </div>
+            </div>
 
             {/* Action */}
             <NavSections sections={action} onItemClick={handleActionItemClick} onSubmenuClick={handleSubmenuClick} />

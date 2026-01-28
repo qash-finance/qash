@@ -4,19 +4,23 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { MOVE_CRYPTO_SIDEBAR_OFFSET } from "./Sidebar";
 import { PrimaryButton } from "../Common/PrimaryButton";
 import { SecondaryButton } from "../Common/SecondaryButton";
+import { useGetTeamStats } from "@/services/api/team-member";
+import { useGetMyCompany } from "@/services/api/company";
+import { useListAccountsByCompany } from "@/services/api/multisig";
+import MultisigAccountCard from "./MultisigAccountCard";
 
 interface TeamSidebarProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-// Image constants from Figma
-const imgAva3 = "https://www.figma.com/api/mcp/asset/c389d8bd-5645-4ba5-8773-0ff071c3c94c";
-const imgAva4 = "https://www.figma.com/api/mcp/asset/24f9c5d4-4d77-43e5-9b57-f34f365187d7";
-const imgAva5 = "https://www.figma.com/api/mcp/asset/28ae59ea-40ef-4d38-b276-c5e15a1e2b85";
-
 export default function TeamSidebar({ isOpen, onClose }: TeamSidebarProps) {
   const pathname = usePathname();
+  const { data: myCompany } = useGetMyCompany();
+  const { data: teamStats } = useGetTeamStats(myCompany?.id, { enabled: !!myCompany?.id });
+  const { data: multisigAccounts, isLoading: accountsLoading } = useListAccountsByCompany(myCompany?.id, {
+    enabled: !!myCompany?.id,
+  });
 
   // Close sidebar when route changes
   useEffect(() => {
@@ -66,7 +70,7 @@ export default function TeamSidebar({ isOpen, onClose }: TeamSidebarProps) {
               <img alt="cheveron Left" className="w-5" src="/arrow/double-chevron-left.svg" onClick={onClose} />
             </div>
 
-            <h2 className="text-[24px] font-medium leading-[24px] text-text-primary">Qash Team</h2>
+            <h2 className="text-[24px] font-medium leading-[24px] text-text-primary">{myCompany?.companyName}</h2>
 
             {/* Team Members Tab */}
             <div className="flex gap-2 items-center">
@@ -81,7 +85,7 @@ export default function TeamSidebar({ isOpen, onClose }: TeamSidebarProps) {
                   <img alt="Team member 3" className="w-full h-full object-cover rounded-full" src={imgAva5} />
                 </div>
               </div> */}
-              <span className="text-xs font-medium text-text-secondary">30 members</span>
+              <span className="text-xs font-medium text-text-secondary">{teamStats?.total || 0} members</span>
             </div>
           </div>
         </div>
@@ -101,17 +105,25 @@ export default function TeamSidebar({ isOpen, onClose }: TeamSidebarProps) {
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-medium text-text-primary">Multisig Accounts</h3>
-            <span className="text-sm font-medium text-text-secondary">0</span>
+            <span className="text-sm font-medium text-text-secondary">{multisigAccounts?.length || 0}</span>
           </div>
 
-          {/* Empty State */}
-          <div className="flex flex-col items-center justify-center gap-3 py-10 px-4">
-            <img alt="Empty State Icon" className="w-32" src="/misc/hexagon-multisig-icon.svg" />
-            <p className="text-center text-text-secondary max-w-xs leading-none">
-              You don't have a multisig account yet.
-            </p>
-            <p className="text-center text-text-secondary max-w-xs leading-none">Create one now.</p>
-          </div>
+          {multisigAccounts && multisigAccounts.length > 0 ? (
+            <div className="flex flex-col gap-3 w-full">
+              {multisigAccounts.map(account => (
+                <MultisigAccountCard key={account.uuid} account={account} memberCount={account.publicKeys.length} />
+              ))}
+            </div>
+          ) : (
+            /* Empty State */
+            <div className="flex flex-col items-center justify-center gap-3 py-10 px-4">
+              <img alt="Empty State Icon" className="w-32" src="/misc/hexagon-multisig-icon.svg" />
+              <p className="text-center text-text-secondary max-w-xs leading-none">
+                You don't have a multisig account yet.
+              </p>
+              <p className="text-center text-text-secondary max-w-xs leading-none">Create one now.</p>
+            </div>
+          )}
         </div>
       </div>
     </>

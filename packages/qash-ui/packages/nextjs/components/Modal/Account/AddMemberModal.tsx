@@ -9,7 +9,7 @@ import { CustomCheckbox } from "@/components/Common/CustomCheckbox";
 import { SecondaryButton } from "@/components/Common/SecondaryButton";
 import { CustomBlueCheckbox } from "@/components/Common/Checkbox/CustomBlueCheckbox";
 import { MemberRoleTooltip } from "@/components/Common/ToolTip/MemberRoleTooltip";
-import { TeamMemberRoleEnum } from "@qash/types/enums";
+import { TeamMemberRoleEnum, TeamMemberStatusEnum } from "@qash/types/enums";
 import { useGetCompanyTeamMembers } from "@/services/api/team-member";
 import { useGetMyCompany } from "@/services/api/company";
 import { useAuth } from "@/services/auth/context";
@@ -21,6 +21,7 @@ interface MemberData {
   role: TeamMemberRoleEnum;
   companyRole?: string;
   avatar?: string;
+  status: TeamMemberStatusEnum;
   isSelected?: boolean;
 }
 
@@ -48,20 +49,32 @@ const MemberRow = ({
 
   return (
     <div
-      className="flex items-center justify-between p-2 hover:bg-app-background rounded-lg transition-colors w-full cursor-pointer"
-      onClick={() => onSelect(member.id)}
+      className={`flex items-center justify-between p-2 hover:bg-app-background rounded-lg transition-colors w-full ${member.status !== TeamMemberStatusEnum.ACTIVE ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+      onClick={() => member.status === TeamMemberStatusEnum.ACTIVE && onSelect(member.id)}
     >
       <div className="flex gap-3 items-center flex-1">
-        <CustomBlueCheckbox checked={member.isSelected ?? false} onChange={() => onSelect(member.id)} />
+        <CustomBlueCheckbox
+          checked={member.isSelected ?? false}
+          onChange={() => onSelect(member.id)}
+          disabled={member.status !== TeamMemberStatusEnum.ACTIVE}
+        />
         <div className="flex gap-1 items-center flex-1">
           <img
             src={member.avatar || "/misc/default-team-member-avatar.svg"}
             alt="avatar"
             className="w-8 h-8 rounded-full"
           />
-          <div className="flex flex-col gap-1">
-            <div className="flex gap-2 items-center">
-              <p className="text-sm font-medium text-text-primary leading-none">{member.name}</p>
+          <div className="flex flex-col gap-1 w-full">
+            <div className="flex gap-2 items-center w-full">
+              <div className="flex flex-row items-center gap-1 justify-between w-full">
+                <p className="text-sm font-medium text-text-primary leading-none">{member.name}</p>
+                {member.status === TeamMemberStatusEnum.PENDING && (
+                  <span className="text-sm italic text-text-secondary leading-none">Pending Invite</span>
+                )}
+                {member.status === TeamMemberStatusEnum.SUSPENDED && (
+                  <span className="text-sm italic text-text-secondary leading-none">Suspended</span>
+                )}
+              </div>
               {member.companyRole && (
                 <span className="text-xs font-semibold text-primary-blue">{member.companyRole}</span>
               )}
@@ -95,23 +108,26 @@ export function AddMemberModal({
 
   // Map API response to local state when data loads
   useEffect(() => {
-    if (teamMembersData && user && selectedMembers.length > 0) {
+    if (teamMembersData && user) {
       const mappedMembers: MemberData[] = teamMembersData
         .filter(tm => tm.user!.email !== user?.email)
         .map(tm => {
-          const isSelected = selectedMembers.some(sm => sm.id === tm.id);
+          const isSelected = selectedMembers.some(sm => String(sm.id) === String(tm.id));
+          // Only allow selection if member is ACTIVE
+          const selectable = tm.status === TeamMemberStatusEnum.ACTIVE;
           return {
             id: tm.id,
             name: `${tm.firstName} ${tm.lastName}`,
             email: tm.user!.email,
             role: tm.role,
             companyRole: tm.position,
-            isSelected: isSelected,
+            status: tm.status,
+            isSelected: selectable ? isSelected : false,
           };
         });
       setMembers(mappedMembers);
     }
-  }, [teamMembersData, selectedMembers]);
+  }, [teamMembersData, user]);
 
   const selectedCount = members.filter(m => m.isSelected).length;
   const totalCount = members.length;
@@ -125,7 +141,11 @@ export function AddMemberModal({
   }, [members, search]);
 
   const handleSelectMember = (id: number) => {
-    setMembers(prev => prev.map(m => (m.id === id ? { ...m, isSelected: !m.isSelected } : m)));
+    setMembers(prev =>
+      prev.map(m =>
+        m.id === id ? (m.status === TeamMemberStatusEnum.ACTIVE ? { ...m, isSelected: !m.isSelected } : m) : m,
+      ),
+    );
   };
 
   const handleRoleChange = (id: number, role: TeamMemberRoleEnum) => {
@@ -133,7 +153,7 @@ export function AddMemberModal({
   };
 
   const handleSelectAll = () => {
-    setMembers(prev => prev.map(m => ({ ...m, isSelected: true })));
+    setMembers(prev => prev.map(m => (m.status === TeamMemberStatusEnum.ACTIVE ? { ...m, isSelected: true } : m)));
   };
 
   const handleDeselectAll = () => {

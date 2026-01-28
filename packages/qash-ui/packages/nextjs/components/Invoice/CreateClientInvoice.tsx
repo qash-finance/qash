@@ -13,6 +13,7 @@ import InvoicePreview from "../Common/Invoice/InvoicePreview";
 import { useModal } from "@/contexts/ModalManagerProvider";
 import { createB2BInvoice, sendB2BInvoice, createB2BSchedule } from "@/services/api/invoice";
 import { useGetMyCompany } from "@/services/api/company";
+import { useListAccountsByCompany } from "@/services/api/multisig";
 import {
   CreateB2BInvoiceDto,
   CreateB2BScheduleDto,
@@ -29,7 +30,7 @@ import { useAuth } from "@/services/auth/context";
 import { AuthMeResponse } from "@/services/auth/api";
 import { InvoiceModalProps } from "@/types/modal";
 
-const LAST_STEP = 4;
+const LAST_STEP = 5;
 
 interface PaymentMethod {
   id: string;
@@ -107,6 +108,9 @@ const CreateClientInvoice = () => {
   const router = useRouter();
   const { user } = useAuth();
   const { data: myCompany, isLoading: companyLoading } = useGetMyCompany();
+  const { data: multisigAccounts, isLoading: accountsLoading } = useListAccountsByCompany(myCompany?.id, {
+    enabled: !!myCompany?.id,
+  });
   const [currentStep, setCurrentStep] = useState(1);
   const [invoiceSent, setInvoiceSent] = useState(false);
   const [expandAdditionalDetails, setExpandAdditionalDetails] = useState(false);
@@ -318,23 +322,12 @@ const CreateClientInvoice = () => {
     };
   };
 
-  const paymentMethods: PaymentMethod[] = [
-    { id: "payroll", name: "Payroll", balance: "$125,545.00", color: "bg-blue-500", icon: "payroll" },
-    { id: "earning", name: "Earning", balance: "$12,745.00", color: "bg-orange-400", icon: "earning" },
-    { id: "accounting", name: "Accounting", balance: "$5,545.00", color: "bg-purple-500", icon: "accounting" },
-  ];
-
-  const getMethodIcon = (methodId: string) => {
-    switch (methodId) {
-      case "payroll":
-        // Payroll icon - wallet/briefcase
-        return <img src="/client-invoice/payroll-icon.svg" alt="payroll" className="w-10" />;
-      case "earning":
-        // Earning icon - trending up/chart
-        return <img src="/client-invoice/earning-icon.svg" alt="earning" className="w-10" />;
-      case "accounting":
-        // Accounting icon - calculator/document
-        return <img src="/client-invoice/accounting-icon.svg" alt="accounting" className="w-10" />;
+  const handleMultisigAccountSelect = (accountId: string) => {
+    setValue("paymentMethodId", accountId);
+    // Auto-fill wallet address with the selected account's ID (Bech32 format)
+    const selectedAccount = multisigAccounts?.find(acc => acc.accountId === accountId);
+    if (selectedAccount) {
+      setValue("walletAddress", selectedAccount.accountId);
     }
   };
 
@@ -582,13 +575,6 @@ const CreateClientInvoice = () => {
         return;
       }
 
-      if (!formData.walletAddress || formData.walletAddress.trim() === "") {
-        const msg = "Please enter a wallet address to receive payment.";
-        setError(msg);
-        toast.error(msg);
-        return;
-      }
-
       if (formData.items.length === 0) {
         const msg = "Please add at least one item to the invoice.";
         setError(msg);
@@ -602,6 +588,23 @@ const CreateClientInvoice = () => {
 
       if (invalidItem) {
         const msg = "Please make sure each item has a description and price.";
+        setError(msg);
+        toast.error(msg);
+        return;
+      }
+    }
+
+    // Validate Step 4 fields: multisig account selection
+    if (currentStep === 4) {
+      if (!formData.paymentMethodId || formData.paymentMethodId.trim() === "") {
+        const msg = "Please select a multisig account to receive payment.";
+        setError(msg);
+        toast.error(msg);
+        return;
+      }
+
+      if (!formData.walletAddress || formData.walletAddress.trim() === "") {
+        const msg = "Please select a valid multisig account.";
         setError(msg);
         toast.error(msg);
         return;
@@ -664,7 +667,7 @@ const CreateClientInvoice = () => {
 
   const StepIndicator = () => (
     <div className="flex gap-8 items-center justify-center w-full px-12">
-      {[1, 2, 3, 4].map(step => (
+      {[1, 2, 3, 4, 5].map(step => (
         <React.Fragment key={step}>
           <div
             className={`flex items-center justify-center w-9 h-9 rounded-full border-2 transition-all duration-500 ${
@@ -866,13 +869,6 @@ const CreateClientInvoice = () => {
                 iconOnClick={() => openModal("SELECT_NETWORK", { onNetworkSelect: handleNetworkSelect })}
               />
 
-              {/* Wallet Address */}
-              <InputOutlined
-                label="Wallet address to receive payment"
-                placeholder="Enter wallet address"
-                {...register("walletAddress")}
-              />
-
               {/* Payment Collection Type */}
               <div className="flex flex-col gap-2 items-start w-full">
                 <label className="text-sm font-medium text-text-secondary">Payment collection</label>
@@ -1021,7 +1017,7 @@ const CreateClientInvoice = () => {
           </div>
         );
 
-      case 0:
+      case 4:
         return (
           <div className="flex flex-col gap-3 items-start w-full">
             {/* Title */}
@@ -1046,39 +1042,59 @@ const CreateClientInvoice = () => {
 
               {/* Payment Method Options */}
               <div className="flex flex-col gap-3 w-full">
-                {paymentMethods.map(method => (
-                  <button
-                    key={method.id}
-                    onClick={() => setValue("paymentMethodId", method.id)}
-                    className={`w-full flex gap-4 items-center px-4 py-3 rounded-2xl border transition-all border-primary-divider`}
-                  >
-                    {/* Radio Button */}
-                    <div
-                      className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 bg-primary-blue"
-                      style={{
-                        background: formData.paymentMethodId === method.id ? "var(--primary-blue)" : "white",
-                        border: formData.paymentMethodId === method.id ? "none" : "2px solid var(--primary-divider)",
-                      }}
+                {accountsLoading ? (
+                  <div className="w-full py-6 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border border-primary-divider border-t-primary-blue" />
+                  </div>
+                ) : !multisigAccounts || multisigAccounts.length === 0 ? (
+                  <div className="w-full py-6 flex flex-col items-center justify-center gap-3">
+                    <p className="text-center text-text-secondary font-medium">No multisig accounts found</p>
+                    <p className="text-center text-xs text-text-secondary">
+                      Create a multisig account first to receive payment
+                    </p>
+                  </div>
+                ) : (
+                  multisigAccounts.map(account => (
+                    <button
+                      key={account.accountId}
+                      onClick={() => handleMultisigAccountSelect(account.accountId)}
+                      disabled={accountsLoading}
+                      className={`w-full flex gap-2 items-center px-4 py-3 rounded-2xl border transition-all ${
+                        accountsLoading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                      } border-primary-divider`}
                     >
-                      {formData.paymentMethodId === method.id && <div className="w-2.5 h-2.5 bg-white rounded-full" />}
-                    </div>
+                      {/* Radio Button */}
+                      <div
+                        className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 bg-primary-blue"
+                        style={{
+                          background: formData.paymentMethodId === account.accountId ? "var(--primary-blue)" : "white",
+                          border:
+                            formData.paymentMethodId === account.accountId
+                              ? "none"
+                              : "2px solid var(--primary-divider)",
+                        }}
+                      >
+                        {formData.paymentMethodId === account.accountId && (
+                          <div className="w-2.5 h-2.5 bg-white rounded-full" />
+                        )}
+                      </div>
 
-                    {/* Icon */}
-                    {getMethodIcon(method.id)}
+                      <img src="/client-invoice/payroll-icon.svg" alt="account icon" className="w-8" />
 
-                    {/* Content */}
-                    <div className="flex-1 text-left">
-                      <p className="text-base font-medium">{method.name}</p>
-                      <p className="text-xs font-medium text-text-secondary">{method.balance}</p>
-                    </div>
-                  </button>
-                ))}
+                      {/* Content */}
+                      <div className="flex-1 text-left">
+                        <p className="text-base font-medium">{account.name}</p>
+                        <p className="text-xs font-medium text-text-secondary break-all italic">{account.accountId}</p>
+                      </div>
+                    </button>
+                  ))
+                )}
               </div>
             </div>
           </div>
         );
 
-      case 4:
+      case 5:
         return (
           <div className="flex flex-col gap-10 items-start w-full pb-32">
             {/* Header Section */}

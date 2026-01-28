@@ -54,7 +54,7 @@ const TeamSettings = () => {
         <div className="flex gap-3 items-center">
           <img src="/logo/qash-icon-dark.svg" alt="Team Avatar" className="w-12" />
           <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-semibold text-text-primary leading-none">Qash Team</h1>
+            <h1 className="text-2xl font-semibold text-text-primary leading-none">{myCompany?.companyName}</h1>
             <p className="text-xs font-medium text-text-secondary leading-none">{teamStats?.total} members</p>
           </div>
         </div>

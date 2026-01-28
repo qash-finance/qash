@@ -1,6 +1,7 @@
 import React from "react";
 import { Tooltip } from "react-tooltip";
 import { MemberActionTooltip } from "@/components/Common/ToolTip/MemberActionTooltip";
+import { TeamMemberStatusEnum } from "@qash/types/enums";
 
 type Role = string;
 
@@ -10,6 +11,7 @@ interface Member {
   email: string;
   companyRole: string;
   role: Role[];
+  status: TeamMemberStatusEnum;
 }
 
 interface MemberCardProps {
@@ -23,6 +25,7 @@ const Chip = ({ label }: { label: Role }) => (
   <div className="px-3 py-1 rounded-full w-fit flex items-center gap-1 border-b border-primary-divider bg-background">
     {label === "Owner" && <img src="/misc/purple-crown-icon.svg" alt="Owner" className="w-5" />}
     {label === "Admin" && <img src="/misc/green-shield-icon.svg" alt="Admin" className="w-5" />}
+    {label === "Reviewer" && <img src="/misc/blue-note-icon.svg" alt="Reviewer" className="w-5" />}
     <span className="text-sm font-medium">{label}</span>
   </div>
 );
@@ -54,10 +57,13 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, onMenuClick, onEdit, on
           <span className="text-primary-blue font-bold">{member.companyRole}</span>
 
           {/* Roles */}
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
             {member.role.map((role, index) => (
               <Chip key={index} label={role} />
             ))}
+            {member.status === TeamMemberStatusEnum.PENDING && (
+              <span className="text-sm italic text-text-secondary">Pending Invite</span>
+            )}
           </div>
         </div>
 

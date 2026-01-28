@@ -62,7 +62,7 @@ import ChooseContactTypeModal from "@/components/Modal/Contact/ChooseContactType
 import CreateAccountModal from "@/components/Modal/Account/CreateAccountModal";
 import AddMemberModal from "@/components/Modal/Account/AddMemberModal";
 import DepositModal from "@/components/Modal/DepositModal";
-import InviteTeamMemberModal from "@/components/Modal/TeamMember/InviteTeamMemberModal";
+import InviteTeamMember from "@/components/Modal/TeamMember/InviteTeamMember";
 import RemoveTeamMember from "@/components/Modal/TeamMember/RemoveTeamMember";
 import EditTeamMember from "@/components/Modal/TeamMember/EditTeamMember";
 import ChooseAccountModal from "@/components/Modal/Account/ChooseAccountModal";
@@ -661,7 +661,7 @@ export const modalRegistry = {
   [MODAL_IDS.CREATE_ACCOUNT]: CreateAccountModal,
   [MODAL_IDS.ADD_MEMBER]: AddMemberModal,
   [MODAL_IDS.DEPOSIT]: DepositModal,
-  [MODAL_IDS.INVITE_TEAM_MEMBER]: InviteTeamMemberModal,
+  [MODAL_IDS.INVITE_TEAM_MEMBER]: InviteTeamMember,
   [MODAL_IDS.REMOVE_TEAM_MEMBER]: RemoveTeamMember,
   [MODAL_IDS.EDIT_TEAM_MEMBER]: EditTeamMember,
   [MODAL_IDS.CHOOSE_ACCOUNT]: ChooseAccountModal,

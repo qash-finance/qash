@@ -52,3 +52,7 @@ yarn.lock
 
 #Copilot
 .github/copilot-instructions.md
+.github/skills
+
+# Agent
+.agents/

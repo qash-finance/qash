@@ -97,6 +97,7 @@ const MemberTab: React.FC<MemberTabProps> = ({ onMenuClick }) => {
             email: m.user?.email || "",
             companyRole: m.position || "",
             role: [roleDisplay(m.role)],
+            status: m.status,
           };
 
           const handleEdit = () => openModal("EDIT_TEAM_MEMBER", { id: Number(m.id) });
