@@ -22,7 +22,11 @@ export default function MultisigAccountCard({ account, memberCount = 0 }: Multis
         <div className="flex items-center justify-between w-full">
           <div className="flex gap-2 items-center flex-1">
             {/* Avatar */}
-            <img src="/client-invoice/payroll-icon.svg" alt="Account Avatar" className={`w-10 h-10 `} />
+            <img
+              src={account.logo ? account.logo : "/client-invoice/payroll-icon.svg"}
+              alt="Account Avatar"
+              className={`w-10 h-10 `}
+            />
 
             {/* Account Info */}
             <div className="flex flex-col gap-1 items-start justify-center flex-1">

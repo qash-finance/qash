@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, use } from "react";
 import { NavSections } from "./NavSection";
 import { Connect } from "./Connect";
 import { useRouter, usePathname } from "next/navigation";
@@ -15,6 +15,7 @@ import toast from "react-hot-toast";
 import TeamSidebar from "./TeamSidebar";
 import { useGetMyCompany } from "@/services/api/company";
 import { useGetTeamStats } from "@/services/api/team-member";
+import { useGetBatchAccountBalances, useGetMultisigAccount, useListAccountsByCompany } from "@/services/api/multisig";
 
 export const MOVE_CRYPTO_SIDEBAR_OFFSET = 290;
 
@@ -140,13 +141,17 @@ export const actionItems = [
 export const Sidebar: React.FC<NavProps> = ({ onActionItemClick }) => {
   const { data: myCompany } = useGetMyCompany();
   const { data: teamStats } = useGetTeamStats(myCompany?.id, { enabled: !!myCompany?.id });
+  const { data: multisigAccounts } = useListAccountsByCompany(myCompany?.id, { enabled: !!myCompany?.id });
   const [action, setActions] = useState(actionItems);
   const router = useRouter();
   const pathname = usePathname();
   const [showMoveCryptoSidebar, setShowMoveCryptoSidebar] = useState(false);
   const [showTeamSidebar, setShowTeamSidebar] = useState(false);
   const { isAuthenticated, user, logout } = useAuth();
-  const { logoutAsync, address } = useMidenProvider();
+  const { logoutAsync } = useMidenProvider();
+  const getBalances = useGetBatchAccountBalances();
+  const [totalBalance, setTotalBalance] = useState<number>(0);
+
   // **************** Effect ****************
   useEffect(() => {
     // Check if any submenu is currently open
@@ -185,6 +190,17 @@ export const Sidebar: React.FC<NavProps> = ({ onActionItemClick }) => {
       }),
     );
   }, [pathname, showMoveCryptoSidebar]);
+
+  useEffect(() => {
+    if (multisigAccounts && multisigAccounts.length !== 0) {
+      (async () => {
+        const { accounts } = await getBalances.mutateAsync({
+          accountIds: multisigAccounts.map(acc => acc.accountId),
+        });
+        setTotalBalance(accounts.reduce((acc, curr) => acc + Number(curr.stats.totalUSD), 0));
+      })();
+    }
+  }, [multisigAccounts]);
 
   // **************** Handlers ****************
   const handleActionItemClick = (itemIndex: number) => {
@@ -265,10 +281,14 @@ export const Sidebar: React.FC<NavProps> = ({ onActionItemClick }) => {
             >
               <div className="flex p-3 justify-between w-full items-center border-b border-primary-divider">
                 <div className="flex flex-row gap-2">
-                  <img src="/logo/qash-icon-dark.svg" alt="Qash Logo" className="w-10" />
+                  <img
+                    src={myCompany?.logo ? myCompany.logo : "/logo/qash-icon-dark.svg"}
+                    alt="Qash Logo"
+                    className="w-10"
+                  />
                   <div className="flex flex-col gap-1">
                     <span className="leading-none text-primary-blue">{myCompany?.companyName}</span>
-                    <span className="leading-none">$2,125,545.00</span>
+                    <span className="leading-none">${totalBalance.toFixed(2)}</span>
                   </div>
                 </div>
 
@@ -298,25 +318,6 @@ export const Sidebar: React.FC<NavProps> = ({ onActionItemClick }) => {
                     {(user as AuthMeResponse["user"])?.teamMembership?.lastName}
                   </span>
                   <span className="text-text-secondary leading-none">{(user as AuthMeResponse["user"])?.email}</span>
-                  {address && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-text-secondary leading-none">{formatAddress(address)}</span>
-                      <img
-                        src="/misc/copy-icon.svg"
-                        alt="copy"
-                        className="w-6 h-6 cursor-pointer opacity-60 hover:opacity-100 transition-opacity"
-                        onClick={async () => {
-                          try {
-                            await navigator.clipboard.writeText(address);
-                            toast.success("Wallet address copied to clipboard");
-                          } catch (err) {
-                            console.error("Failed to copy address:", err);
-                            toast.error("Failed to copy address");
-                          }
-                        }}
-                      />
-                    </div>
-                  )}
                 </div>
                 <img
                   src="/misc/three-dot-icon.svg"

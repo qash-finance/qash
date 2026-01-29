@@ -6,8 +6,9 @@ import { PrimaryButton } from "../Common/PrimaryButton";
 import { SecondaryButton } from "../Common/SecondaryButton";
 import { useGetTeamStats } from "@/services/api/team-member";
 import { useGetMyCompany } from "@/services/api/company";
-import { useListAccountsByCompany } from "@/services/api/multisig";
+import { useGetAccountBalances, useListAccountsByCompany } from "@/services/api/multisig";
 import MultisigAccountCard from "./MultisigAccountCard";
+import { useModal } from "@/contexts/ModalManagerProvider";
 
 interface TeamSidebarProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ interface TeamSidebarProps {
 
 export default function TeamSidebar({ isOpen, onClose }: TeamSidebarProps) {
   const pathname = usePathname();
+  const { openModal } = useModal();
   const { data: myCompany } = useGetMyCompany();
   const { data: teamStats } = useGetTeamStats(myCompany?.id, { enabled: !!myCompany?.id });
   const { data: multisigAccounts, isLoading: accountsLoading } = useListAccountsByCompany(myCompany?.id, {
@@ -30,8 +32,7 @@ export default function TeamSidebar({ isOpen, onClose }: TeamSidebarProps) {
   }, [pathname]);
 
   const handleCreateNewAccount = () => {
-    // TODO: Implement create new account logic
-    console.log("Create new account");
+    openModal("CREATE_ACCOUNT");
   };
 
   const handleAddMember = () => {
@@ -66,7 +67,11 @@ export default function TeamSidebar({ isOpen, onClose }: TeamSidebarProps) {
           {/* Team Avatar and Info */}
           <div className="flex flex-col gap-2">
             <div className="flex items-start justify-between">
-              <img alt="Team Avatar" className="w-10" src="/logo/qash-icon-dark.svg" />
+              <img
+                alt="Team Avatar"
+                className="w-10"
+                src={myCompany?.logo ? myCompany.logo : "/logo/qash-icon-dark.svg"}
+              />
               <img alt="cheveron Left" className="w-5" src="/arrow/double-chevron-left.svg" onClick={onClose} />
             </div>
 
@@ -109,7 +114,7 @@ export default function TeamSidebar({ isOpen, onClose }: TeamSidebarProps) {
           </div>
 
           {multisigAccounts && multisigAccounts.length > 0 ? (
-            <div className="flex flex-col gap-3 w-full">
+            <div className="flex flex-col gap-1 w-full">
               {multisigAccounts.map(account => (
                 <MultisigAccountCard key={account.uuid} account={account} memberCount={account.publicKeys.length} />
               ))}

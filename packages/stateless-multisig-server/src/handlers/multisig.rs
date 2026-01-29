@@ -112,6 +112,22 @@ pub struct GetBalancesResponse {
     pub balances: Vec<AccountBalanceInfo>,
 }
 
+#[derive(Deserialize)]
+pub struct GetBatchBalancesRequest {
+    pub account_ids: Vec<String>,
+}
+
+#[derive(Serialize)]
+pub struct AccountBalancesInfo {
+    pub account_id: String,
+    pub balances: Vec<AccountBalanceInfo>,
+}
+
+#[derive(Serialize)]
+pub struct GetBatchBalancesResponse {
+    pub accounts: Vec<AccountBalancesInfo>,
+}
+
 // ============================================================================
 // Handlers
 // ============================================================================
@@ -334,6 +350,43 @@ pub async fn get_account_balances(
         .collect();
 
     Ok(Json(GetBalancesResponse { balances }))
+}
+
+/// POST /multisig/balances - Get balances for multiple accounts
+pub async fn get_batch_account_balances(
+    State(state): State<AppState>,
+    Json(payload): Json<GetBatchBalancesRequest>,
+) -> Result<Json<GetBatchBalancesResponse>, StatusCode> {
+    let mut accounts = Vec::new();
+
+    for account_id in payload.account_ids {
+        match state.client.get_account_balances(account_id.clone()).await {
+            Ok(balances) => {
+                let balances_info: Vec<AccountBalanceInfo> = balances
+                    .into_iter()
+                    .map(|b| AccountBalanceInfo {
+                        faucet_id: b.faucet_id,
+                        amount: b.amount,
+                    })
+                    .collect();
+
+                accounts.push(AccountBalancesInfo {
+                    account_id,
+                    balances: balances_info,
+                });
+            }
+            Err(e) => {
+                tracing::error!("Failed to get balances for account {}: {}", account_id, e);
+                // Continue with other accounts on error
+                accounts.push(AccountBalancesInfo {
+                    account_id,
+                    balances: vec![],
+                });
+            }
+        }
+    }
+
+    Ok(Json(GetBatchBalancesResponse { accounts }))
 }
 
 /// POST /mint - Mint tokens from a faucet

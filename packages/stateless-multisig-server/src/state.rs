@@ -1,3 +1,4 @@
+use miden_client::address::NetworkId;
 use miden_client::rpc::Endpoint;
 use miden_objects::account::auth::PublicKeyCommitment;
 use tokio::sync::{mpsc, oneshot};
@@ -1077,7 +1078,7 @@ async fn get_account_balances_impl(
             if asset.is_fungible() {
                 let fungible = asset.unwrap_fungible();
                 AccountAsset {
-                    faucet_id: fungible.faucet_id().to_string(),
+                    faucet_id: fungible.faucet_id().to_bech32(NetworkId::Testnet),
                     amount: fungible.amount(),
                 }
             } else {

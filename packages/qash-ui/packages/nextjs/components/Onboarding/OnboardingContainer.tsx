@@ -12,6 +12,7 @@ import { CountryDropdown } from "../Common/Dropdown/CountryDropdown";
 import { SecondaryButton } from "../Common/SecondaryButton";
 import { FileUpload } from "./FileUpload";
 import { useCreateCompany } from "@/services/api/company";
+import { useUploadCompanyLogo } from "@/services/api/upload";
 import toast from "react-hot-toast";
 import { useAuth } from "@/services/auth/context";
 import { User } from "@/types/user";
@@ -51,9 +52,13 @@ export default function OnboardingContainer() {
   const router = useRouter();
   const { isAuthenticated, user, refreshUser } = useAuth();
   const createCompanyMutation = useCreateCompany();
+  const uploadLogoMutation = useUploadCompanyLogo();
   const [step, setStep] = useState<Step>("company");
   const [selectedCompanyType, setSelectedCompanyType] = useState<string>("");
   const [selectedCountry, setSelectedCountry] = useState<string>("");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  console.log("🚀 ~ OnboardingContainer ~ logoUrl:", logoUrl);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
   const {
     register,
     handleSubmit,
@@ -91,6 +96,34 @@ export default function OnboardingContainer() {
     router.push("/login");
   }, [isAuthenticated, router]);
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!["image/jpeg", "image/png"].includes(file.type)) {
+      toast.error("Only JPEG and PNG files are allowed");
+      return;
+    }
+
+    // Validate file size (max 10MB for company logo)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("File size must be less than 10MB");
+      return;
+    }
+
+    setLogoFile(file);
+
+    try {
+      const result = await uploadLogoMutation.mutateAsync(file);
+      setLogoUrl(result.url);
+      toast.success("Logo uploaded successfully");
+    } catch (error) {
+      toast.error("Failed to upload logo");
+      setLogoFile(null);
+    }
+  };
+
   const onSubmit = async (data: OnboardingFormData) => {
     if (!selectedCompanyType || !selectedCountry) {
       toast.error("Please select company type and country");
@@ -110,6 +143,7 @@ export default function OnboardingContainer() {
           address2: data.address2 || undefined,
           city: data.city,
           postalCode: data.postalCode,
+          logo: logoUrl || undefined,
         });
         toast.success("Company registered successfully");
         // Refresh the user data to get updated company info
@@ -130,7 +164,53 @@ export default function OnboardingContainer() {
         return (
           <div className="flex flex-col gap-4 w-full animate-in fade-in duration-500">
             {/* Title */}
-            <h1 className="text-[22px] md:text-[28px] font-medium text-text-primary tracking-tight">Tell us about your company</h1>
+            <h1 className="text-[22px] md:text-[28px] font-medium text-text-primary tracking-tight">
+              Tell us about your company
+            </h1>
+
+            {/* Company Logo Upload */}
+            <div className="flex gap-4 items-start w-full">
+              <label className="bg-[#ebf4ff] border border-primary-blue border-dashed rounded-full shrink-0 w-[86px] h-[86px] flex items-center justify-center relative overflow-hidden cursor-pointer hover:bg-blue-50 transition-colors">
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Company logo" className="w-full h-full object-cover" />
+                ) : (
+                  <img src="/misc/blue-upload-icon.svg" alt="Upload" className="w-6 h-6" />
+                )}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png"
+                  onChange={handleLogoUpload}
+                  disabled={uploadLogoMutation.isPending}
+                  className="hidden"
+                />
+              </label>
+              <div className="flex flex-col gap-2 flex-1 justify-center min-h-[86px]">
+                <div className="flex flex-col gap-0.5">
+                  <p className="font-barlow font-medium text-[16px] text-text-primary leading-[24px] tracking-[-0.32px]">
+                    Company logo
+                  </p>
+                  <p className="font-barlow text-[14px] text-text-secondary leading-[20px] tracking-[-0.21px]">
+                    Supported formats: JPEG, PNG
+                  </p>
+                </div>
+                <label
+                  className="border border-primary-divider rounded-lg px-3 py-1.5 w-fit font-barlow font-medium text-[14px] text-text-primary leading-[20px] tracking-[-0.56px] hover:bg-base-container-sub-background transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    pointerEvents: uploadLogoMutation.isPending ? "none" : "auto",
+                    opacity: uploadLogoMutation.isPending ? 0.5 : 1,
+                  }}
+                >
+                  {uploadLogoMutation.isPending ? "Uploading..." : "Upload photo"}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png"
+                    onChange={handleLogoUpload}
+                    disabled={uploadLogoMutation.isPending}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            </div>
 
             {/* Form Fields */}
             <form className="flex flex-col gap-3 w-full" onSubmit={handleSubmit(onSubmit)}>
@@ -273,7 +353,12 @@ export default function OnboardingContainer() {
             <div className="flex flex-col gap-3 md:gap-4 w-full">
               {Array.from({ length: 3 }).map((_, index) => (
                 <div className="flex flex-col sm:flex-row gap-2 w-full" key={index}>
-                  <InputOutlined label={`Member ${index + 1}`} placeholder="Enter name" size="compact" {...register("firstName")} />
+                  <InputOutlined
+                    label={`Member ${index + 1}`}
+                    placeholder="Enter name"
+                    size="compact"
+                    {...register("firstName")}
+                  />
                   <InputOutlined label="Email" placeholder="@mail" size="compact" {...register("lastName")} />
                 </div>
               ))}
@@ -301,9 +386,15 @@ export default function OnboardingContainer() {
               }}
             />
             <div className="relative z-10 flex flex-col items-center justify-center w-full h-full px-4 text-center">
-              <img src="/onboarding/hexagon-avatar.svg" alt="Onboarding Complete" className="w-[150px] h-[150px] md:w-[220px] md:h-[220px]" />
+              <img
+                src="/onboarding/hexagon-avatar.svg"
+                alt="Onboarding Complete"
+                className="w-[150px] h-[150px] md:w-[220px] md:h-[220px]"
+              />
               <span className="font-bold text-xl md:text-2xl">Congratulations</span>
-              <span className="text-base md:text-lg text-text-secondary">Your new account is ready to accept payments</span>
+              <span className="text-base md:text-lg text-text-secondary">
+                Your new account is ready to accept payments
+              </span>
               <PrimaryButton
                 text="Go to app"
                 containerClassName="w-[180px] mt-6"
@@ -344,9 +435,7 @@ export default function OnboardingContainer() {
         </div>
 
         {/* Form content - scrollable */}
-        <div className="w-full flex-1 overflow-y-auto min-h-0">
-          {renderStep()}
-        </div>
+        <div className="w-full flex-1 overflow-y-auto min-h-0">{renderStep()}</div>
 
         {step !== "complete" && (
           <div

@@ -23,7 +23,7 @@ const AccountCard: React.FC<AccountCardProps> = ({ account, onClick, onMenuClick
         {/* Account Info */}
         <div className="flex flex-col gap-4 h-full w-full">
           {/* Avatar */}
-          <img src={account.icon} alt={account.name} className="w-10" />
+          <img src={account.logo} alt={account.name} className="w-10" />
 
           {/* Account Details */}
           <div className="flex flex-col gap-1 h-20">

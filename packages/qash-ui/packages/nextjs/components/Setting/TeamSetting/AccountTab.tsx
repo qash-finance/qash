@@ -9,9 +9,8 @@ export interface Account {
   id: string;
   name: string;
   description: string;
-  backgroundColor: string;
   memberCount: number;
-  icon: string;
+  logo: string;
 }
 
 interface AccountTabProps {
@@ -89,12 +88,7 @@ const AccountTab: React.FC<AccountTabProps> = ({ onCreateNewAccount, onMenuClick
       {/* Account Cards Grid */}
       <div className="grid grid-cols-3 gap-2 w-full">
         {accounts.map(account => (
-          <AccountCard
-            key={account.id}
-            account={account}
-            onClick={handleAccountClick}
-            onMenuClick={onMenuClick}
-          />
+          <AccountCard key={account.id} account={account} onClick={handleAccountClick} onMenuClick={onMenuClick} />
         ))}
       </div>
     </div>

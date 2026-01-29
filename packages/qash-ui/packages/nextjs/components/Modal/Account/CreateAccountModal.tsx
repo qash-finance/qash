@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { CreateAccountModalProps } from "@/types/modal";
 import { ModalProp, useModal } from "@/contexts/ModalManagerProvider";
 import { ModalHeader } from "../../Common/ModalHeader";
@@ -11,6 +11,7 @@ import { useCreateMultisigAccount } from "@/services/api/multisig";
 import { useGetMyCompany } from "@/services/api/company";
 import { useGetCompanyTeamMembers } from "@/services/api/team-member";
 import { useAuth } from "@/services/auth/context";
+import { useUploadMultisigLogo } from "@/services/api/upload";
 import { TeamMemberRoleEnum } from "@qash/types/enums";
 import { MIDEN_EXPLORER_URL } from "@/services/utils/constant";
 import toast from "react-hot-toast";
@@ -123,6 +124,7 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
   const [selectedMembers, setSelectedMembers] = useState<MemberItem[]>([]);
   const [accountName, setAccountName] = useState("");
   const [accountDescription, setAccountDescription] = useState("");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [createdAccountId, setCreatedAccountId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -147,6 +149,49 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
       }
     }
   }, [teamMembersData, user, isInitialized]);
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadLogoMutation = useUploadMultisigLogo();
+
+  const resetState = () => {
+    setIsSuccess(false);
+    setActiveTab("detail");
+    setThresholdDropdownOpen(false);
+    setThresholdValue(1);
+    setSelectedMembers([]);
+    setAccountName("");
+    setAccountDescription("");
+    setLogoUrl(null);
+    setCreatedAccountId("");
+    setIsLoading(false);
+    setIsInitialized(false);
+    if (fileInputRef.current) {
+      try {
+        fileInputRef.current.value = "";
+      } catch (e) {
+        // ignore
+      }
+    }
+  };
+
+  const handleClose = () => {
+    resetState();
+    onClose();
+  };
+
+  const handleLogoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const resp = await uploadLogoMutation.mutateAsync(file);
+      setLogoUrl(resp.url);
+      toast.success("Logo uploaded");
+    } catch (err) {
+      console.error("Logo upload failed", err);
+      toast.error("Failed to upload logo");
+    }
+  };
 
   const goNext = () => {
     const idx = tabOrder.indexOf(activeTab);
@@ -207,6 +252,7 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
         teamMemberIds,
         threshold: thresholdValue,
         companyId: company.id as number,
+        logo: logoUrl || undefined,
       });
 
       setCreatedAccountId(response.accountId);
@@ -231,6 +277,12 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
     }
   };
 
+  useEffect(() => {
+    if (!isOpen && isSuccess) {
+      resetState();
+    }
+  }, [isOpen]);
+
   const renderTabContent = () => {
     switch (activeTab) {
       case "detail":
@@ -238,8 +290,30 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
           <>
             <span className="text-3xl">Create new account</span>
 
-            <div className="flex justify-center items-center w-20 h-20 rounded-full border border-primary-divider">
-              <img src="/setting/new-account.svg" alt="Create Account Illustration" className="w-full h-full" />
+            <div className="relative group" onClick={() => fileInputRef.current?.click()} role="button" tabIndex={0}>
+              <div className="flex justify-center items-center w-20 h-20 rounded-full border border-primary-divider overflow-hidden">
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Account logo" className="w-full h-full object-cover" />
+                ) : (
+                  <img src="/setting/new-account.svg" alt="Create Account Illustration" className="w-full h-full" />
+                )}
+
+                <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity rounded-full cursor-pointer">
+                  {uploadLogoMutation.isPending ? (
+                    <div className="w-6 h-6 border-2 border-white rounded-full animate-spin" />
+                  ) : (
+                    <img src="/misc/upload-icon.svg" alt="Overlay Icon" className="w-6 h-6" />
+                  )}
+                </div>
+              </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleLogoFileChange}
+              />
             </div>
 
             <div className="w-[600px] flex flex-col gap-2">
@@ -468,8 +542,8 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
 
   if (!isOpen) return null;
   return (
-    <BaseModal isOpen={isOpen} onClose={onClose}>
-      <ModalHeader title="Create new account" onClose={onClose} icon="/misc/create-account-icon.svg" />
+    <BaseModal isOpen={isOpen} onClose={handleClose}>
+      <ModalHeader title="Create new account" onClose={handleClose} icon="/misc/create-account-icon.svg" />
       <div className="flex flex-col w-[800px] p-4 justify-center  rounded-b-2xl items-center border-2  border-primary-divider bg-background gap-5">
         {!isSuccess ? (
           <>
@@ -554,7 +628,7 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
                   text="View Account"
                   containerClassName="flex-1"
                   onClick={() => {
-                    onClose();
+                    handleClose();
                   }}
                 />
               </div>

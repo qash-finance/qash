@@ -103,7 +103,11 @@ function AccountRow({ account, isSelected, onSelect, icon, backgroundColor = "bg
       {/* Avatar and Info */}
       <div className="flex gap-2 items-center flex-1 min-w-0">
         {/* Avatar */}
-        <AccountAvatar fillColor={randomColor} />
+        <img
+          src={account.logo ? account.logo : "/client-invoice/payroll-icon.svg"}
+          alt={`${account.name} avatar`}
+          className="w-10 h-10 rounded-lg"
+        />
 
         {/* Account Details */}
         <div className="flex flex-col items-start min-w-0 flex-1">

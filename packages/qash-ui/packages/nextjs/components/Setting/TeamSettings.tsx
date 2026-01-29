@@ -23,9 +23,8 @@ const TeamSettings = () => {
     id: a.accountId,
     name: a.name,
     description: a.description || `Threshold ${a.threshold} · ${a.publicKeys.length} approvers`,
-    backgroundColor: "#6895ff",
     memberCount: a.publicKeys.length,
-    icon: "/client-invoice/payroll-icon.svg",
+    logo: a.logo ? a.logo : "/client-invoice/payroll-icon.svg",
   }));
 
   const handleCreateNewAccount = () => {
@@ -52,7 +51,7 @@ const TeamSettings = () => {
       {/* Header Section */}
       <div className="flex items-center justify-between w-full">
         <div className="flex gap-3 items-center">
-          <img src="/logo/qash-icon-dark.svg" alt="Team Avatar" className="w-12" />
+          <img src={myCompany?.logo ? myCompany.logo : "/logo/qash-icon-dark.svg"} alt="Team Avatar" className="w-12" />
           <div className="flex flex-col gap-1">
             <h1 className="text-2xl font-semibold text-text-primary leading-none">{myCompany?.companyName}</h1>
             <p className="text-xs font-medium text-text-secondary leading-none">{teamStats?.total} members</p>

@@ -16,6 +16,7 @@ import {
   SubmitSignatureDto,
   SubmitRejectionDto,
   MintTokensDto,
+  GetBatchAccountBalancesDto,
   MultisigAccountResponseDto,
   MultisigProposalResponseDto,
   ExecuteTransactionResponseDto,
@@ -142,6 +143,7 @@ export class MultisigService {
         publicKeys,
         threshold: dto.threshold,
         companyId: dto.companyId,
+        logo: dto.logo,
         teamMembers: {
           create: memberIdArray.map((teamMemberId) => ({
             teamMemberId,
@@ -170,6 +172,7 @@ export class MultisigService {
         description: dto.description,
         threshold: dto.threshold,
         memberCount: memberIds.size,
+        logo: dto.logo,
       },
     });
 
@@ -231,6 +234,23 @@ export class MultisigService {
 
     // Get balances from Miden client
     return this.midenClient.getAccountBalances(accountId);
+  }
+
+  /**
+   * Get balances for multiple accounts
+   */
+  async getBatchAccountBalances(
+    accountIds: string[],
+  ): Promise<Array<{ accountId: string; balances: any[] }>> {
+    this.logger.log(`Getting balances for ${accountIds.length} accounts`);
+
+    // Verify all accounts exist
+    for (const accountId of accountIds) {
+      await this.getAccount(accountId);
+    }
+
+    // Get balances from Miden client
+    return this.midenClient.getBatchAccountBalances(accountIds);
   }
 
   /**

@@ -21,6 +21,7 @@ export interface CreateCompanyDto {
   city: string;
   postalCode: string;
   metadata?: any;
+  logo?: string;
 }
 
 export interface UpdateCompanyDto {
@@ -33,6 +34,7 @@ export interface UpdateCompanyDto {
   city?: string;
   postalCode?: string;
   metadata?: any;
+  logo?: string;
 }
 
 export interface UpdateVerificationStatusDto {
@@ -65,6 +67,7 @@ export interface CompanyResponseDto {
   createdAt: Date | string;
   updatedAt: Date | string;
   metadata?: any;
+  logo?: string;
 }
 
 // Type alias for backwards compatibility

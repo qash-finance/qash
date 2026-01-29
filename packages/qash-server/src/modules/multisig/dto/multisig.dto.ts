@@ -25,6 +25,15 @@ export class CreateMultisigAccountDto implements SharedTypes.CreateMultisigAccou
   description?: string;
 
   @ApiProperty({
+    description: 'Optional logo URL or base64 encoded image for the multisig account',
+    example: 'https://example.com/multisig-logo.png',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  logo?: string;
+
+  @ApiProperty({
     description: 'Array of team member IDs to include as approvers (owner is auto-included). IDs should be strings.',
     example: ['1', '2'],
   })
@@ -130,6 +139,53 @@ export class MintTokensDto implements SharedTypes.MintTokensDto {
   @IsInt()
   @Min(1)
   amount: number;
+}
+
+export class GetBatchAccountBalancesDto {
+  @ApiProperty({
+    description: 'Array of account IDs to get balances for (bech32 format)',
+    example: ['mtst1abc123...', 'mtst1def456...'],
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  accountIds: string[];
+}
+
+export class AccountBalanceDto {
+  @ApiProperty({
+    description: 'Faucet ID (bech32 format)',
+    example: 'mtst1faucet...',
+  })
+  faucetId: string;
+
+  @ApiProperty({
+    description: 'Amount of the asset',
+    example: 1000,
+  })
+  amount: number;
+}
+
+export class AccountBalancesInfoDto {
+  @ApiProperty({
+    description: 'Account ID (bech32 format)',
+    example: 'mtst1abc123...',
+  })
+  accountId: string;
+
+  @ApiProperty({
+    description: 'Array of assets in this account',
+    type: [AccountBalanceDto],
+  })
+  balances: AccountBalanceDto[];
+}
+
+export class GetBatchAccountBalancesResponseDto {
+  @ApiProperty({
+    description: 'Array of account balance information',
+    type: [AccountBalancesInfoDto],
+  })
+  accounts: AccountBalancesInfoDto[];
 }
 
 export class BatchPaymentItemDto {

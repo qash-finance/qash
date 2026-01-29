@@ -19,6 +19,7 @@ model User {
   isActive  Boolean      @default(true) @map("is_active")
   lastLogin DateTime?    @map("last_login") @db.Timestamp(6)
   publicKey String?      @map("public_key") @db.Text
+  avatar    String?      @db.Text
 
   teamMembership TeamMember? // 1:1 relationship, each user is a company team member
   invitedMembers TeamMember[] @relation("TeamMemberInviter")
@@ -98,6 +99,7 @@ model Company {
   taxId              String?         @map("tax_id") @db.VarChar(100)
   notificationEmail  String?         @map("notification_email") @db.VarChar(255)
   ccNotifications    String[]        @map("cc_notifications") @db.VarChar(255)
+  logo               String?         @db.Text
 
   country    String  @db.VarChar(100)
   address1   String  @map("address_1") @db.VarChar(255)
@@ -758,6 +760,7 @@ model MultisigAccount {
 
   name        String  @db.VarChar(255)
   description String? @db.Text
+  logo        String? @db.Text
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)

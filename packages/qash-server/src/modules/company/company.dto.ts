@@ -111,6 +111,14 @@ export class CreateCompanyDto implements SharedTypes.CreateCompanyDto {
   @IsOptional()
   @IsObject()
   metadata?: any;
+
+  @ApiPropertyOptional({
+    description: 'Company logo URL or base64 encoded image',
+    example: 'https://example.com/logo.png',
+  })
+  @IsOptional()
+  @IsString()
+  logo?: string;
 }
 
 export class UpdateCompanyDto implements SharedTypes.UpdateCompanyDto {
@@ -198,6 +206,14 @@ export class UpdateCompanyDto implements SharedTypes.UpdateCompanyDto {
   @IsOptional()
   @IsObject()
   metadata?: any;
+
+  @ApiPropertyOptional({
+    description: 'Company logo URL or base64 encoded image',
+    example: 'https://example.com/logo.png',
+  })
+  @IsOptional()
+  @IsString()
+  logo?: string;
 }
 
 export class UpdateVerificationStatusDto implements SharedTypes.UpdateVerificationStatusDto {

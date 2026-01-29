@@ -17,7 +17,7 @@ interface SettingTab {
 
 const generalSettingTabs: SettingTab[] = [
   { id: "account", icon: "/misc/user-hexagon-icon.svg", label: "Account" },
-  { id: "notifications", icon: "/misc/notification-icon.svg", label: "Notifications" },
+  // { id: "notifications", icon: "/misc/notification-icon.svg", label: "Notifications" },
   { id: "company", icon: "/misc/company-icon.svg", label: "Company" },
 ];
 
@@ -98,7 +98,7 @@ export default function SettingContainer() {
         <div className="w-[900px]">
           {/* Content based on active tab */}
           {activeTab === "account" && <AccountSettings />}
-          {activeTab === "notifications" && <NotificationSettings />}
+          {/* {activeTab === "notifications" && <NotificationSettings />} */}
           {activeTab === "company" && <CompanySettings />}
           {activeTab === "team" && (teamAccountParam ? <TeamAccountContainer /> : <TeamSettings />)}
         </div>

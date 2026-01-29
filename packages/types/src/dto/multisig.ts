@@ -11,6 +11,7 @@ import { MultisigProposalStatusEnum, MultisigProposalTypeEnum } from '../enums/i
 export interface CreateMultisigAccountDto {
   name: string;
   description?: string;
+  logo?: string;
   teamMemberIds: string[];
   threshold: number;
   companyId: number;
@@ -33,6 +34,37 @@ export interface CreateSendProposalDto {
 export interface MintTokensDto {
   faucetId: string;
   amount: number;
+}
+
+export interface GetBatchAccountBalancesDto {
+  accountIds: string[];
+}
+
+export interface AccountBalanceDto {
+  faucetId: string;
+  amount: number;
+}
+
+export interface TokenStatDto {
+  faucetId: string;
+  symbol?: string;
+  amount: number; // normalized amount (e.g., divided by decimals for QASH)
+  amountUSD: number; // USD value (assuming $1 per token)
+}
+
+export interface AccountBalanceStatDto {
+  totalUSD: number;
+  tokens: TokenStatDto[];
+}
+
+export interface AccountBalancesInfoDto {
+  accountId: string;
+  balances: AccountBalanceDto[];
+  stats: AccountBalanceStatDto;
+}
+
+export interface GetBatchAccountBalancesResponseDto {
+  accounts: AccountBalancesInfoDto[];
 }
 
 export interface BatchPaymentItem {
@@ -70,6 +102,7 @@ export interface MultisigAccountResponseDto {
   accountId: string;
   name: string;
   description?: string;
+  logo?: string;
   publicKeys: string[];
   threshold: number;
   companyId: number;

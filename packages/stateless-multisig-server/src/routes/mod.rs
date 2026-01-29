@@ -25,6 +25,11 @@ pub fn create_routes() -> Router<AppState> {
             "/multisig/{account_id}/balances",
             get(multisig::get_account_balances),
         )
+        // Get balances for multiple accounts
+        .route(
+            "/multisig/balances",
+            post(multisig::get_batch_account_balances),
+        )
         // Mint tokens from faucet
         .route("/mint", post(multisig::mint_tokens))
         // Create transaction proposals (returns summary for signing)

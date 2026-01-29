@@ -1,17 +1,19 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { BaseContainer } from "../Common/BaseContainer";
 import GeneralStatistics from "./Overview/GeneralStatistics";
 import TopInteractedAddresses from "./Overview/TopInteractedAddresses";
 import SpendingAverageChart from "./Overview/SpendingAverageChart";
 import { LineChart, Line, XAxis, Tooltip, ResponsiveContainer } from "recharts";
 import TransactionHistory from "./Overview/TransactionHistory";
+import { useGetBatchAccountBalances, useListAccountsByCompany } from "@/services/api/multisig";
+import { useGetMyCompany } from "@/services/api/company";
 
-const BalanceOverviewHeader = () => {
+const BalanceOverviewHeader = ({ totalBalance = 0 }: { totalBalance?: number }) => {
   // Generate the last 12 months of data (11 months before current month + current month)
   const generateChartData = () => {
     const currentDate = new Date();
     const data = [];
-    const currentBalance = 5254217052;
+    const currentBalanceValue = totalBalance || 5254217052;
 
     // Start from 11 months ago
     for (let i = 11; i >= 0; i--) {
@@ -23,9 +25,9 @@ const BalanceOverviewHeader = () => {
       // Generate balance values that vary and trend toward the current balance
       // Start lower and gradually increase with some variation
       const progress = (11 - i) / 11; // 0 to 1
-      const baseBalance = 2500000000 + progress * (currentBalance - 2500000000);
-      const variation = Math.sin(i * 0.5) * 400000000; // Add wave variation
-      const balance = Math.max(2000000000, Math.floor(baseBalance + variation));
+      const baseBalance = Math.max(0, currentBalanceValue * 0.5) + progress * (currentBalanceValue * 0.5);
+      const variation = Math.sin(i * 0.5) * (currentBalanceValue * 0.1); // Add wave variation
+      const balance = Math.max(0, Math.floor(baseBalance + variation));
 
       data.push({
         month: month,
@@ -37,7 +39,7 @@ const BalanceOverviewHeader = () => {
 
     // Update the current month's balance to match the header
     if (data.length > 0) {
-      data[data.length - 1].balance = currentBalance;
+      data[data.length - 1].balance = currentBalanceValue;
     }
 
     return data;
@@ -63,8 +65,11 @@ const BalanceOverviewHeader = () => {
         <div className="space-y-2">
           <p className="text-sm text-text-secondary">Total Balance</p>
           <div className="flex items-start gap-1">
-            <span className="text-2xl font-semibold text-text-primary">$</span>
-            <span className="text-4xl font-medium text-text-primary tracking-tight">5,254,217,052</span>
+            <span className="text-3xl font-medium text-text-primary">$</span>
+            <span className="text-4xl font-bold text-text-primary tracking-tight">
+              {totalBalance}
+              {totalBalance >= 1000000 ? "M" : ""}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-green-500">+$126.40</span>
@@ -82,9 +87,9 @@ const BalanceOverviewHeader = () => {
           </div>
           <div className="flex items-center gap-1">
             <span className="text-xl font-semibold text-text-primary">$</span>
-            <span className="text-2xl font-medium text-text-primary tracking-tight leading-none">14,217,052</span>
+            <span className="text-2xl font-medium text-text-primary tracking-tight leading-none">0</span>
           </div>
-          <p className="text-sm font-semibold text-green-500 leading-none">+$750.20</p>
+          <p className="text-sm font-semibold text-green-500 leading-none">+$0.00</p>
         </div>
 
         <div className="flex gap-3 mt-4">
@@ -127,6 +132,22 @@ const BalanceOverviewHeader = () => {
 
 export const Overview = () => {
   const [timePeriod, setTimePeriod] = useState<"month" | "year">("month");
+  const { data: myCompany } = useGetMyCompany();
+  const { data: multisigAccounts } = useListAccountsByCompany(myCompany?.id, { enabled: !!myCompany?.id });
+  const getBalances = useGetBatchAccountBalances();
+  const [totalBalance, setTotalBalance] = useState<number>(0);
+
+  useEffect(() => {
+    if (multisigAccounts && multisigAccounts.length !== 0) {
+      (async () => {
+        const { accounts } = await getBalances.mutateAsync({
+          accountIds: multisigAccounts.map(acc => acc.accountId),
+        });
+        const total = accounts.reduce((acc, curr) => acc + Number(curr.stats.totalUSD), 0);
+        setTotalBalance(total);
+      })();
+    }
+  }, [multisigAccounts]);
 
   return (
     <div className="w-full">
@@ -134,7 +155,7 @@ export const Overview = () => {
         header={
           <div className="flex flex-col w-full p-5 gap-4">
             <span className="text-text-primary text-2xl leading-none text-left w-full">Overview</span>
-            <BalanceOverviewHeader />
+            <BalanceOverviewHeader totalBalance={totalBalance} />
           </div>
         }
         childrenClassName="px-3 py-5"

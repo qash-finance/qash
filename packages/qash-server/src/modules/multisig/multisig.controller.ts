@@ -18,9 +18,11 @@ import {
   SubmitSignatureDto,
   SubmitRejectionDto,
   MintTokensDto,
+  GetBatchAccountBalancesDto,
   MultisigAccountResponseDto,
   MultisigProposalResponseDto,
   ExecuteTransactionResponseDto,
+  GetBatchAccountBalancesResponseDto,
 } from './dto/multisig.dto';
 import { ParaJwtAuthGuard } from '../auth/guards/para-jwt-auth.guard';
 import { Public } from '../auth/decorators/public.decorator';
@@ -99,6 +101,20 @@ export class MultisigController {
   async getAccountBalances(@Param('accountId') accountId: string): Promise<{ balances: any[] }> {
     const balances = await this.multisigService.getAccountBalances(accountId);
     return { balances };
+  }
+
+  @Post('accounts/balances')
+  @ApiOperation({ summary: 'Get balances for multiple accounts' })
+  @ApiResponse({
+    status: 200,
+    description: 'Balances for multiple accounts',
+    type: GetBatchAccountBalancesResponseDto,
+  })
+  async getBatchAccountBalances(
+    @Body() dto: GetBatchAccountBalancesDto,
+  ): Promise<GetBatchAccountBalancesResponseDto> {
+    const accounts = await this.multisigService.getBatchAccountBalances(dto.accountIds);
+    return { accounts };
   }
 
   @Get('accounts/:accountId/members')

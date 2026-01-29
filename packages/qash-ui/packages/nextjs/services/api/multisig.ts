@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiServerWithAuth } from "./index";
+import { QASH_TOKEN_ADDRESS, QASH_TOKEN_DECIMALS } from "../utils/constant";
 import type {
   CreateMultisigAccountDto,
   MultisigAccountResponseDto,
@@ -12,6 +13,11 @@ import type {
   SubmitSignatureDto,
   SubmitRejectionDto,
   ExecuteTransactionResponseDto,
+  GetBatchAccountBalancesDto,
+  GetBatchAccountBalancesResponseDto,
+  AccountBalancesInfoDto,
+  AccountBalanceStatDto,
+  TokenStatDto,
 } from "@qash/types/dto/multisig";
 
 // ==========================================================================
@@ -28,6 +34,65 @@ export interface ConsumableNote {
   assets: ConsumableNoteAsset[];
   sender: string;
   note_type: string;
+}
+
+// ==========================================================================
+// Helper Functions
+// ==========================================================================
+
+/**
+ * Calculates balance statistics for an account
+ * Groups tokens together, normalizes decimals, and calculates USD values
+ */
+function calculateAccountStats(balances: any[]): AccountBalanceStatDto {
+  const tokenMap = new Map<string, { amount: number; symbol?: string }>();
+
+  // Extract base QASH token address (without routing params after underscore)
+  const baseQashAddress = QASH_TOKEN_ADDRESS.split('_')[0];
+
+  // Group tokens by faucet_id
+  for (const balance of balances) {
+    const faucetId = balance.faucet_id;
+    let amount = balance.amount;
+
+    // Normalize QASH token by dividing by decimals
+    const faucetIdBase = faucetId.split('_')[0];
+    const isQashToken =
+      faucetIdBase.toLowerCase() === baseQashAddress.toLowerCase() ||
+      faucetId.toLowerCase() === QASH_TOKEN_ADDRESS.toLowerCase();
+
+    if (isQashToken) {
+      amount = amount / Math.pow(10, QASH_TOKEN_DECIMALS);
+    }
+
+    if (tokenMap.has(faucetId)) {
+      const existing = tokenMap.get(faucetId)!;
+      existing.amount += amount;
+    } else {
+      tokenMap.set(faucetId, {
+        amount,
+        symbol: isQashToken ? "QASH" : undefined,
+      });
+    }
+  }
+
+  // Convert to array and calculate USD values
+  const tokens: TokenStatDto[] = Array.from(tokenMap.entries()).map(
+    ([faucetId, { amount, symbol }]) => ({
+      faucetId,
+      symbol,
+      amount,
+      amountUSD: amount, // 1 token = $1
+    })
+  );
+
+  // Calculate total USD value
+  const totalUSD = tokens.reduce((sum, token) => sum + token.amountUSD, 0);
+
+  return {
+    totalUSD,
+    tokens,
+  };
 }
 
 // ==========================================================================
@@ -74,6 +139,51 @@ export const getAccountBalances = async (accountId: string) => {
   return apiServerWithAuth.getData<{ balances: any[] }>(
     `/multisig/accounts/${accountId}/balances`
   );
+};
+
+// POST: Get balances for multiple accounts
+export const getBatchAccountBalances = async (
+  data: GetBatchAccountBalancesDto
+): Promise<GetBatchAccountBalancesResponseDto> => {
+  const response = await apiServerWithAuth.postData<{
+    accounts: Array<{
+      account_id: string;
+      balances: any[];
+    }>;
+  }>(`/multisig/accounts/balances`, data);
+
+  // Extract base QASH token address (without routing params after underscore)
+  const baseQashAddress = QASH_TOKEN_ADDRESS.split('_')[0];
+
+  // Add stats to each account and normalize amounts
+  const accountsWithStats: AccountBalancesInfoDto[] = response.accounts.map(
+    (account) => {
+      // Normalize amounts in balances
+      const normalizedBalances = account.balances.map((b) => {
+        const faucetIdBase = b.faucet_id.split('_')[0];
+        const isQashToken =
+          faucetIdBase.toLowerCase() === baseQashAddress.toLowerCase() ||
+          b.faucet_id.toLowerCase() === QASH_TOKEN_ADDRESS.toLowerCase();
+
+        return {
+          faucetId: b.faucet_id,
+          amount: isQashToken
+            ? b.amount / Math.pow(10, QASH_TOKEN_DECIMALS)
+            : b.amount,
+        };
+      });
+
+      return {
+        accountId: account.account_id,
+        balances: normalizedBalances,
+        stats: calculateAccountStats(account.balances),
+      };
+    }
+  );
+
+  return {
+    accounts: accountsWithStats,
+  };
 };
 
 // GET: List members for a multisig account
@@ -316,6 +426,19 @@ export function useGetAccountBalances(
     staleTime: 10000,
     refetchOnMount: true,
     refetchOnWindowFocus: false,
+  });
+}
+
+/**
+ * React Query hook to get balances for multiple accounts
+ */
+export function useGetBatchAccountBalances() {
+  return useMutation<
+    GetBatchAccountBalancesResponseDto,
+    Error,
+    GetBatchAccountBalancesDto
+  >({
+    mutationFn: (data) => getBatchAccountBalances(data),
   });
 }
 

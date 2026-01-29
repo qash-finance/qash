@@ -104,6 +104,31 @@ export class MidenClientService {
   }
 
   /**
+   * Get balances for multiple accounts
+   */
+  async getBatchAccountBalances(
+    accountIds: string[],
+  ): Promise<Array<{ accountId: string; balances: any[] }>> {
+    try {
+      this.logger.debug(
+        `Getting balances for ${accountIds.length} accounts`,
+      );
+
+      const response = await this.client.post('/multisig/balances', {
+        account_ids: accountIds,
+      });
+
+      return response.data.accounts || [];
+    } catch (error) {
+      this.logger.error('Failed to get batch account balances', error);
+      throw new HttpException(
+        `Failed to get batch account balances: ${error.response?.data?.message || error.message}`,
+        error.response?.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
    * Create a consume notes proposal
    */
   async createConsumeProposal(

@@ -22,4 +22,13 @@ export const envValidator = Joi.object({
 
   // Admin
   ADMIN_EMAIL: Joi.string().email().required(),
+
+  // S3 / Supabase S3-Compatible Storage
+  S3_ENDPOINT: Joi.string().optional(),
+  S3_REGION: Joi.string().optional(),
+  S3_ACCESS_KEY_ID: Joi.string().optional(),
+  S3_SECRET_ACCESS_KEY: Joi.string().optional(),
+  S3_AVATAR_BUCKET: Joi.string().default('user-avatars'),
+  S3_COMPANY_LOGO_BUCKET: Joi.string().default('company-logos'),
+  S3_MULTISIG_LOGO_BUCKET: Joi.string().default('multisig-logos'),
 });
