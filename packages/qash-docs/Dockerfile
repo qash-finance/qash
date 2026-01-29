@@ -12,7 +12,7 @@ WORKDIR /app
 
 # Copy workspace root files
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
-COPY packages/qash-docs/package.json ./packages/qash-docs/
+COPY packages/qash-docs/package.json packages/qash-docs/.env.example ./packages/qash-docs/
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile

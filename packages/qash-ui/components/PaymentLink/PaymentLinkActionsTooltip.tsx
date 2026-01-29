@@ -6,6 +6,7 @@ import { PaymentLink, PaymentLinkStatus } from "@/types/payment-link";
 interface PaymentLinkActionsTooltipProps {
   link: PaymentLink;
   onEdit?: () => void;
+  onViewDetail?: () => void;
   onToggleStatus?: (isActive: boolean) => void;
   onRemove?: () => void;
 }

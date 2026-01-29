@@ -48,8 +48,8 @@ RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 COPY --from=builder /app/pnpm-lock.yaml /app/pnpm-workspace.yaml /app/package.json ./
 COPY --from=builder /app/packages/qash-server/package.json ./packages/qash-server/
 
-# Install production dependencies only
-RUN pnpm install --prod --frozen-lockfile
+# Install production dependencies only (ignore scripts to skip husky)
+RUN pnpm install --prod --frozen-lockfile --ignore-scripts
 
 WORKDIR /app/packages/qash-server
 
