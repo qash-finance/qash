@@ -13,6 +13,7 @@ import MemberCard from "./MemberCard";
 import { useGetMultisigAccount, useGetAccountMembers } from "@/services/api/multisig";
 import { useRemoveTeamMember } from "@/services/api/team-member";
 import toast from "react-hot-toast";
+import { useGetMyCompany } from "@/services/api/company";
 
 // Map server role enum to UI labels
 const mapRole = (role?: string): string[] => {
@@ -35,6 +36,7 @@ const TeamAccountContainer = () => {
   const searchParams = useSearchParams();
   const accountId = searchParams.get("team-account") || undefined;
   const removeTeamMember = useRemoveTeamMember();
+  const { data: myCompany } = useGetMyCompany();
 
   const { data: account, isLoading: accountLoading } = useGetMultisigAccount(accountId, { enabled: !!accountId });
   const { data: accountMembers, isLoading: membersLoading } = useGetAccountMembers(accountId, { enabled: !!accountId });
@@ -56,6 +58,15 @@ const TeamAccountContainer = () => {
   return (
     <div className="flex flex-col gap-5 w-[900px]">
       {/* Header Section */}
+      <div className="flex flex-row gap-3">
+        <img
+          src="/arrow/thin-arrow-left.svg"
+          alt="Back"
+          className="w-6 h-6 cursor-pointer"
+          onClick={() => window.history.back()}
+        />
+        <span className="text-text-secondary">{myCompany?.companyName}</span> / <span>{account?.name}</span>
+      </div>
       <div className="flex items-center justify-between w-full">
         <div className="flex gap-3 items-center">
           <img src={account?.logo ? account.logo : "/logo/qash-icon-dark.svg"} alt="Team Avatar" className="w-12" />
@@ -103,7 +114,7 @@ const TeamAccountContainer = () => {
       </div>
 
       <div className="w-full flex justify-between items-center">
-        <span className="text-2xl font-bold">Member</span>
+        <span className="text-2xl font-bold">Multi-Owner Account Member</span>
         <div className="bg-app-background border border-primary-divider flex flex-row gap-2 items-center pr-1 pl-3 py-1 rounded-lg w-[300px]">
           <div className="flex flex-row gap-2 flex-1">
             <input
@@ -154,15 +165,7 @@ const TeamAccountContainer = () => {
             });
           };
 
-          return (
-            <MemberCard
-              key={member.id}
-              member={member}
-              onMenuClick={onMenuClick}
-              onEdit={handleEdit}
-              onRemove={handleRemove}
-            />
-          );
+          return <MemberCard key={member.id} member={member} onMenuClick={onMenuClick} />;
         })}
       </div>
     </div>

@@ -87,7 +87,7 @@ const MemberRow = ({
     <div className="flex items-center justify-between py-2">
       <div className="flex gap-2 items-center">
         <div
-          className={`w-6 h-6 rounded-full bg-gradient-to-br ${avatarGradient ?? "from-gray-400 to-gray-600"} flex items-center justify-center text-white text-xs font-bold`}
+          className={`w-7 h-7 rounded-full bg-gradient-to-br ${avatarGradient ?? "from-gray-400 to-gray-600"} flex items-center justify-center text-white text-xs font-bold`}
         >
           {initials}
         </div>
@@ -96,7 +96,7 @@ const MemberRow = ({
             <p className="text-sm font-medium text-text-primary">{name}</p>
             {companyRole && <span className="text-xs font-semibold text-primary-blue">{companyRole}</span>}
           </div>
-          <p className="text-xs font-medium text-text-secondary">{email}</p>
+          <p className="text-xs font-medium text-text-secondary leading-none">{email}</p>
         </div>
       </div>
       <div className="flex items-center gap-1">
@@ -483,12 +483,16 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
               {/* Header with Avatar and Title */}
               <div className="flex flex-col gap-2 border-b border-primary-divider pb-2">
                 <div className="w-16 h-16 rounded-full border border-primary-divider flex items-center justify-center bg-background">
-                  <img src="/setting/new-account.svg" alt="Account" className="w-full h-full" />
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="Account logo" className="w-full h-full object-cover" />
+                  ) : (
+                    <img src="/setting/new-account.svg" alt="Account" className="w-full h-full" />
+                  )}
                 </div>
                 <div className="flex flex-col gap-2">
-                  <h3 className="text-4xl font-medium text-text-primary">Payroll</h3>
+                  <h3 className="text-4xl font-medium text-text-primary">{accountName}</h3>
                   <p className="text-base font-medium text-text-secondary">
-                    Handles salary distribution and automates payroll transactions.
+                    {accountDescription || "No description provided."}
                   </p>
                 </div>
               </div>
@@ -510,10 +514,10 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
                 </div>
 
                 {/* Deploy Fee Card */}
-                <div className="flex-1 bg-background rounded-lg px-4 py-2 flex flex-col gap-1 justify-center shadow-sm">
+                {/* <div className="flex-1 bg-background rounded-lg px-4 py-2 flex flex-col gap-1 justify-center shadow-sm">
                   <p className="text-2xl font-semibold text-text-primary">~0.004</p>
                   <p className="text-base font-medium text-text-secondary">Deploy fee</p>
-                </div>
+                </div> */}
               </div>
 
               {/* Members List */}
@@ -614,16 +618,6 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
               </div>
 
               <div className="w-full flex items-center justify-center gap-2 flex-row px-20">
-                <SecondaryButton
-                  text="View on Explorer"
-                  buttonClassName="flex-1"
-                  icon="/misc/globe.svg"
-                  variant="light"
-                  iconPosition="left"
-                  onClick={() => {
-                    window.open(`${MIDEN_EXPLORER_URL}/account/${createdAccountId}`, "_blank");
-                  }}
-                />
                 <PrimaryButton
                   text="View Account"
                   containerClassName="flex-1"

@@ -11,8 +11,8 @@ export function ProcessingTransactionModal({ isOpen, onClose, zIndex }: ModalPro
     <BaseModal isOpen={isOpen} onClose={onClose} zIndex={zIndex}>
       <div className="bg-background rounded-2xl w-[350px] flex flex-col items-center justify-center px-2 py-10 gap-2">
         <img src="/modal/sending.gif" alt="loading" className="w-20" />
-        <span className="text-text-primary text-xl">Processing your transfer</span>
-        <span className="text-text-secondary">Just a moment, we’re sending your crypto…</span>
+        <span className="text-text-primary text-xl">Processing your action</span>
+        <span className="text-text-secondary">Just a moment, interacting with blockchain...</span>
       </div>
     </BaseModal>
   );

@@ -79,7 +79,7 @@ const TeamSettings = () => {
       {/** Employee or Client tab */}
       <div className="w-full flex flex-row border-b border-primary-divider relative">
         <div
-          className="flex items-center justify-center px-10 py-3 w-[180px] cursor-pointer group transition-colors duration-300"
+          className="flex items-center justify-center px-10 py-3 w-[250px] cursor-pointer group transition-colors duration-300"
           onClick={() => setActiveTab("account")}
         >
           <p
@@ -87,11 +87,11 @@ const TeamSettings = () => {
               activeTab === "account" ? "text-text-strong-950" : "text-text-soft-400 group-hover:text-text-soft-500"
             }`}
           >
-            Account
+            Multi-Owner Accounts
           </p>
         </div>
         <div
-          className="flex items-center justify-center px-10 py-3 w-[180px] cursor-pointer transition-colors duration-300"
+          className="flex items-center justify-center px-10 py-3 w-[250px] cursor-pointer transition-colors duration-300"
           onClick={() => setActiveTab("member")}
         >
           <p
@@ -99,14 +99,14 @@ const TeamSettings = () => {
               activeTab === "member" ? "text-text-strong-950" : "text-text-soft-400"
             }`}
           >
-            Member
+            Company Member
           </p>
         </div>
         <div
           className="absolute bottom-0 h-[3px] bg-primary-blue transition-all duration-300"
           style={{
-            width: "180px",
-            left: activeTab === "account" ? "0px" : "180px",
+            width: "250px",
+            left: activeTab === "account" ? "0px" : "250px",
           }}
         />
       </div>

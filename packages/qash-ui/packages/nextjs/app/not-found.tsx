@@ -62,13 +62,18 @@ export default function NotFound() {
       <div className="absolute right-[35px] top-[15px] w-fit flex flex-row gap-1">
         {[
           {
-            handle: "@qash_finance",
-            link: "https://x.com/qash_finance",
+            handle: "@0xQash",
+            link: "https://x.com/0xQash",
             icon: "/social/twitter.svg",
             height: "14.118px",
           },
-          { handle: "@qash", link: "https://github.com/q3x", icon: "/social/github.svg", height: "14.694px" },
-          { handle: "@q3xfinance", link: "https://t.me/q3xfinance", icon: "/social/telegram.svg", height: "16.579px" },
+          {
+            handle: "@qash-finance",
+            link: "https://github.com/qash-finance",
+            icon: "/social/github.svg",
+            height: "14.694px",
+          },
+          // { handle: "@q3xfinance", link: "https://t.me/q3xfinance", icon: "/social/telegram.svg", height: "16.579px" },
         ].map(social => (
           <div key={social.link} className="flex items-center gap-1 w-fit bg-[#FFFFFF] rounded-full px-4 py-2">
             <img alt="" className="w-3" src={social.icon} />
@@ -98,8 +103,8 @@ export default function NotFound() {
 
         <div className="w-[180px]">
           <SecondaryButton
-            text="Take me Home"
-            icon="/sidebar/home.svg"
+            text="Take Me Home"
+            icon="/misc/home-icon.svg"
             iconPosition="left"
             onClick={() => router.push("/")}
             variant="dark"

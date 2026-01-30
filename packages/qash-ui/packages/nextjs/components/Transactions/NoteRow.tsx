@@ -110,7 +110,7 @@ export function NoteRow({
       {/* Claim Note Button */}
       <div className="flex items-center justify-end">
         <PrimaryButton
-          text={isInProposal ? "In Proposal" : "Claim note"}
+          text={isInProposal ? "In Proposal" : "Claim"}
           onClick={handleClaimClick}
           loading={isLoading}
           disabled={isInProposal || isLoading}

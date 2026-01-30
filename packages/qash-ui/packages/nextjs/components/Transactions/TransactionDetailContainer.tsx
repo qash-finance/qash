@@ -7,6 +7,7 @@ import {
   useSubmitSignature,
   useSubmitRejection,
   useGetMultisigAccount,
+  useGetConsumableNotes,
 } from "@/services/api/multisig";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
@@ -18,6 +19,7 @@ import { ApproveVote, ConfirmVote, FinalVoteApproved, FinalVoteRejected, RejectV
 import { useClient, useWallet } from "@getpara/react-sdk";
 import { bytesToHex, fromHexSig, hexToBytes } from "@/utils";
 import { keccak_256 } from "@noble/hashes/sha3.js";
+import { QASH_TOKEN_ADDRESS, QASH_TOKEN_DECIMALS, QASH_TOKEN_SYMBOL } from "@/services/utils/constant";
 
 const TransactionDetailContainer = () => {
   const router = useRouter();
@@ -32,6 +34,15 @@ const TransactionDetailContainer = () => {
   // Mutation hooks for voting
   const { mutate: submitSignature, isPending: isSignaturePending } = useSubmitSignature();
   const { mutate: submitRejection, isPending: isRejectionPending } = useSubmitRejection();
+
+  const {
+    data: consumableNotesData = { notes: [] },
+    isLoading: notesLoading,
+    refetch: refetchNotes,
+  } = useGetConsumableNotes(multisigAccount?.accountId || "", {
+    enabled: !!multisigAccount?.accountId,
+  });
+  console.log("🚀 ~ TransactionDetailContainer ~ consumableNotesData:", consumableNotesData);
 
   // Action handlers
   const handleCancelProposal = async () => {
@@ -221,30 +232,36 @@ const TransactionDetailContainer = () => {
       );
     });
 
-  // DEBUG: Log voting status
-  if (proposal) {
-    console.log("=== PROPOSAL VOTING DEBUG ===");
-    console.log("Current Wallet Public Key:", wallet?.publicKey);
-    console.log("Proposal ID:", proposal.id);
-    console.log("Proposal Status:", proposal.status);
-    console.log("Approvers:", approvers);
-    console.log("Approvers count:", approvers.length);
-    console.log("Signatures:", proposal.signatures);
-    console.log("Signatures count:", proposal.signatures?.length || 0);
-    console.log("Rejections:", proposal.rejections);
-    console.log("Rejections count:", proposal.rejections?.length || 0);
-    console.log("hasUserApproved:", hasUserApproved);
-    console.log("hasUserRejected:", hasUserRejected);
-    console.log("==============================");
-  }
+  // Helper function to extract token info from consumable notes
+  const getNoteTokenInfo = (noteId: string) => {
+    const consumableNote = consumableNotesData?.notes?.find(
+      (note: any) => note.note_id.toLowerCase() === noteId.toLowerCase(),
+    );
+
+    if (!consumableNote || !consumableNote.assets || consumableNote.assets.length === 0) {
+      return null;
+    }
+
+    const asset = consumableNote.assets[0];
+    const isQashToken = QASH_TOKEN_ADDRESS.includes(asset.faucet_id);
+
+    if (!isQashToken) {
+      return null;
+    }
+
+    const normalizedAmount = asset.amount / Math.pow(10, QASH_TOKEN_DECIMALS);
+
+    return {
+      symbol: QASH_TOKEN_SYMBOL,
+      amount: normalizedAmount,
+    };
+  };
 
   // Helper function to render appropriate vote component based on proposal status and user state
   const renderVoteComponent = () => {
     if (!proposal) return null;
 
     const { status } = proposal;
-
-    console.log("renderVoteComponent - Status:", status, "Approved:", hasUserApproved, "Rejected:", hasUserRejected);
 
     // PENDING status with user voting states
     if (status === "PENDING" && !hasUserApproved && !hasUserRejected) {
@@ -284,7 +301,6 @@ const TransactionDetailContainer = () => {
       return <FinalVoteRejected />;
     }
 
-    console.log("Rendering: null (no matching status)");
     return null;
   };
 
@@ -345,7 +361,14 @@ const TransactionDetailContainer = () => {
               {/* Account Row */}
               <div className="flex gap-4 items-center">
                 <p className="text-sm text-text-secondary font-medium w-16">Account</p>
-                <p className="text-sm text-text-primary leading-none font-semibold">{proposal.accountId}</p>
+                <div className="flex gap-2 items-center flex-row">
+                  <img
+                    src={multisigAccount?.logo ? multisigAccount.logo : "/client-invoice/payroll-icon.svg"}
+                    alt="Multisig Account"
+                    className="w-5 h-5 rounded-lg"
+                  />
+                  <p className="text-sm text-text-primary leading-none font-semibold">{multisigAccount?.name}</p>
+                </div>
               </div>
 
               {/* Member Count Row */}
@@ -427,26 +450,35 @@ const TransactionDetailContainer = () => {
               )}
               {proposal.proposalType === "CONSUME" &&
                 proposal.noteIds &&
-                proposal.noteIds.map((noteId, idx) => (
-                  <div
-                    key={idx}
-                    className="grid grid-cols-[1fr_1.5fr_1.5fr_2fr_1.5fr] gap-3 px-4 py-3 border-b border-primary-divider last:border-b-0 items-center"
-                  >
-                    <p className="text-sm text-text-primary font-medium">NOTE{String(idx + 1).padStart(4, "0")}</p>
-                    <p className="text-sm text-text-primary font-medium">{noteId.slice(0, 16)}...</p>
-                    <div>
-                      <span className="inline-block bg-amber-100 text-amber-600 px-3 py-1 rounded-full text-sm font-medium">
-                        Consume
-                      </span>
+                proposal.noteIds.map((noteId, idx) => {
+                  const noteTokenInfo = getNoteTokenInfo(noteId);
+                  return (
+                    <div
+                      key={idx}
+                      className="grid grid-cols-[1fr_1.5fr_1.5fr_1fr] gap-3 px-4 py-3 border-b border-primary-divider last:border-b-0 items-center"
+                    >
+                      <p className="text-sm text-text-primary font-medium">NOTE{String(idx + 1).padStart(4, "0")}</p>
+                      <p className="text-sm text-text-primary font-medium">{noteId.slice(0, 16)}...</p>
+                      <div>
+                        <span className="inline-block bg-amber-100 text-amber-600 px-3 py-1 rounded-full text-sm font-medium">
+                          Consume
+                        </span>
+                      </div>
+                      <div className="flex flex-col gap-1 text-right">
+                        {noteTokenInfo ? (
+                          <p className="text-sm text-text-primary font-semibold">
+                            {noteTokenInfo.amount} {noteTokenInfo.symbol}
+                          </p>
+                        ) : (
+                          <div className="flex flex-col items-end justify-end gap-1">
+                            <div className="h-2 bg-neutral-300 rounded-full w-20 animate-pulse"></div>
+                            <div className="h-2 bg-neutral-300 rounded-full w-10 animate-pulse"></div>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex flex-col gap-1 text-right">
-                      <p className="text-sm text-text-primary font-semibold">Note</p>
-                    </div>
-                    <div className="flex justify-end">
-                      <SecondaryButton text="View Details" variant="light" buttonClassName="px-4" onClick={() => {}} />
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
             </div>
           </div>
 

@@ -155,7 +155,8 @@ const PaymentLinkDetailPage = () => {
       const publicKey = wallet?.publicKey;
 
       if (!publicKey) {
-        throw new Error("Wallet public key is missing");
+        console.error("Wallet public key is missing");
+        return;
       }
 
       await loginWithPara(jwtResult.token, publicKey);
@@ -351,6 +352,7 @@ const PaymentLinkDetailPage = () => {
         <div className="flex flex-col gap-5 py-5 w-[80%]">
           <PaymentLinkPreview
             recipient={paymentLink.company.companyName}
+            recipientAvatar={paymentLink.company.logo || "/logo/qash-icon-dark.svg"}
             paymentWalletAddress={paymentLink.paymentWalletAddress}
             amount={paymentLink.amount}
             title={paymentLink.title}

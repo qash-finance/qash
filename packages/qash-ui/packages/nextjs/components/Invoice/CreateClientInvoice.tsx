@@ -1048,10 +1048,17 @@ const CreateClientInvoice = () => {
                   </div>
                 ) : !multisigAccounts || multisigAccounts.length === 0 ? (
                   <div className="w-full py-6 flex flex-col items-center justify-center gap-3">
-                    <p className="text-center text-text-secondary font-medium">No multisig accounts found</p>
-                    <p className="text-center text-xs text-text-secondary">
+                    <p className="text-center text-text-secondary font-medium leading-none">
+                      No multisig accounts found
+                    </p>
+                    <p className="text-center text-sm text-text-secondary leading-none">
                       Create a multisig account first to receive payment
                     </p>
+                    <PrimaryButton
+                      text="Create Multisig Account"
+                      onClick={() => openModal("CREATE_ACCOUNT")}
+                      containerClassName="w-50"
+                    />
                   </div>
                 ) : (
                   multisigAccounts.map(account => (

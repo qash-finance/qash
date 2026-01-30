@@ -65,7 +65,8 @@ export default function TeamInvitePage() {
       const publicKey = wallet?.publicKey;
 
       if (!publicKey) {
-        throw new Error("Wallet public key is missing");
+        console.error("Wallet public key is missing");
+        return;
       }
 
       await loginWithPara(jwtResult.token, publicKey);

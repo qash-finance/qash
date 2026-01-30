@@ -18,11 +18,14 @@ import { useRouter } from "next/navigation";
 import { PaymentLinkPreview } from "./PaymentLinkPreview";
 import { useMidenProvider } from "@/contexts/MidenProvider";
 import { useAuth } from "@/services/auth/context";
+import { useGetMyCompany } from "@/services/api/company";
+import { useListAccountsByCompany } from "@/services/api/multisig";
 
 interface CreatePaymentLinkFormData {
   title: string;
   description: string;
   amount: string;
+  walletAddress: string;
 }
 
 interface FormInputProps {
@@ -95,12 +98,15 @@ const NetworkBadge = ({ networkId }: { networkId: string }) => {
 const CreatePaymentLinkContainer = () => {
   const router = useRouter();
   const { user } = useAuth();
-  const { address: walletAddress } = useMidenProvider();
   const [selectedToken, setSelectedToken] = useState<AssetWithMetadata | null>(null);
   const [isQRCodeCollapsed, setIsQRCodeCollapsed] = useState(true);
   const [isWalletAddressCollapsed, setIsWalletAddressCollapsed] = useState(false);
   const { openModal } = useModal();
   const { mutateAsync, isPending } = useCreatePaymentLink();
+  const { data: myCompany } = useGetMyCompany();
+  const { data: multisigAccounts, isLoading: accountsLoading } = useListAccountsByCompany(myCompany?.id, {
+    enabled: !!myCompany?.id,
+  });
 
   const {
     register,
@@ -115,11 +121,12 @@ const CreatePaymentLinkContainer = () => {
       title: "",
       description: "",
       amount: "",
+      walletAddress: "",
     },
   });
 
   const handleCreatePaymentLink = async (data: CreatePaymentLinkFormData) => {
-    if (!walletAddress) {
+    if (!data.walletAddress) {
       toast.error("Please connect your wallet");
       return;
     }
@@ -143,7 +150,7 @@ const CreatePaymentLinkContainer = () => {
         title: data.title,
         description: data.description,
         amount: data.amount,
-        paymentWalletAddress: walletAddress,
+        paymentWalletAddress: data.walletAddress,
         acceptedTokens,
       };
 
@@ -154,6 +161,15 @@ const CreatePaymentLinkContainer = () => {
       router.push("/payment-link");
     } catch (error: any) {
       toast.error(error?.message || "Failed to create payment link");
+    }
+  };
+
+  const handleMultisigAccountSelect = (accountId: string) => {
+    setValue("walletAddress", accountId);
+    // Auto-fill wallet address with the selected account's ID (Bech32 format)
+    const selectedAccount = multisigAccounts?.find(acc => acc.accountId === accountId);
+    if (selectedAccount) {
+      setValue("walletAddress", selectedAccount.accountId);
     }
   };
 
@@ -206,17 +222,48 @@ const CreatePaymentLinkContainer = () => {
               )}
             </div>
 
-            <div className={`${inputContainerClass} flex flex-col gap-5`}>
-              <div className="flex justify-between items-center">
-                <p className="text-sm text-text-primary">Accept payment on</p>
-                {/* <div className="flex flex-row gap-2 items-center">
-                  <img alt="" className="w-4 h-4" src="/misc/blue-setting-icon.svg" />
-                  <p className="text-primary-blue text-sm">Manage payment method</p>
-                </div> */}
+            <div className={`${inputContainerClass} flex flex-col gap-2 h-73 overflow-y-auto`}>
+              <div className="flex flex-col justify-between">
+                <p className="text-sm text-text-primary">Accept payment on Miden Network</p>
+                <p className="text-sm text-text-secondary">Choose account you want to receive your funds.</p>
               </div>
-              <div className="flex flex-row gap-0.5 flex-1">
-                <ChainItem text="Miden" icon="/chain/miden.svg" isSelected={false} onClick={() => {}} />
-              </div>
+
+              {multisigAccounts?.map(account => (
+                <button
+                  key={account.accountId}
+                  onClick={() => handleMultisigAccountSelect(account.accountId)}
+                  disabled={accountsLoading}
+                  className={`w-full flex gap-2 items-center px-4 py-3 rounded-2xl border transition-all ${
+                    accountsLoading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                  } border-primary-divider`}
+                >
+                  {/* Radio Button */}
+                  <div
+                    className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 bg-primary-blue"
+                    style={{
+                      background: watch("walletAddress") === account.accountId ? "var(--primary-blue)" : "white",
+                      border:
+                        watch("walletAddress") === account.accountId ? "none" : "2px solid var(--primary-divider)",
+                    }}
+                  >
+                    {watch("walletAddress") === account.accountId && (
+                      <div className="w-2.5 h-2.5 bg-white rounded-full" />
+                    )}
+                  </div>
+
+                  <img
+                    src={account.logo ? account.logo : "/client-invoice/payroll-icon.svg"}
+                    alt="account icon"
+                    className="w-8"
+                  />
+
+                  {/* Content */}
+                  <div className="flex-1 text-left">
+                    <p className="text-base font-medium">{account.name}</p>
+                    <p className="text-xs font-medium text-text-secondary break-all italic">{account.accountId}</p>
+                  </div>
+                </button>
+              ))}
             </div>
 
             {/* Token Selector */}
@@ -270,7 +317,7 @@ const CreatePaymentLinkContainer = () => {
           <PrimaryButton
             text="Create Payment Link"
             onClick={handleSubmit(handleCreatePaymentLink)}
-            disabled={!isValid || !selectedToken}
+            disabled={!isValid || !selectedToken || watch("walletAddress") === ""}
             loading={isPending}
           />
         </div>
@@ -282,8 +329,9 @@ const CreatePaymentLinkContainer = () => {
           </div>
 
           <PaymentLinkPreview
-            recipient={user?.teamMembership?.company?.companyName || "Your Company"}
-            paymentWalletAddress={walletAddress || ""}
+            recipient={myCompany?.companyName || "Your Company"}
+            recipientAvatar={myCompany?.logo ? myCompany.logo : "/logo/qash-icon-dark.svg"}
+            paymentWalletAddress={watch("walletAddress") || ""}
             amount={watch("amount") || ""}
             title={watch("title") || ""}
             description={watch("description") || ""}

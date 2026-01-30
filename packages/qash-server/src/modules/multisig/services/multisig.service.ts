@@ -615,7 +615,7 @@ export class MultisigService {
   }
 
   /**
-   * Cancel a proposal (deletes signatures, unlinks bills, sets status to CANCELLED)
+   * Cancel a proposal (deletes signatures, unlinks bills, sets status to CANCELLED, clears noteIds, records rejection)
    * Uses optimistic locking via status validation
    */
   async cancelProposal(
@@ -652,6 +652,15 @@ export class MultisigService {
       );
     }
 
+    // Get team member for rejection record and activity log
+    const teamMember = await this.prisma.teamMember.findUnique({
+      where: { userId: user.internalUserId },
+    });
+
+    if (!teamMember) {
+      throw new NotFoundException(`Team member not found for user ${user.email}`);
+    }
+
     // Use transaction for atomic operation with optimistic locking
     const updatedProposal = await this.prisma.$transaction(async (tx) => {
       // Re-check status to prevent race conditions (optimistic locking)
@@ -671,6 +680,15 @@ export class MultisigService {
         where: { proposalId: proposal.id },
       });
 
+      // Create rejection record for the person who cancelled
+      await tx.multisigRejection.create({
+        data: {
+          proposalId: proposal.id,
+          teamMemberId: teamMember.id,
+          reason: 'Proposal cancelled',
+        },
+      });
+
       // Unlink bills and reset their status to PENDING
       if (proposal.bills.length > 0) {
         await tx.bill.updateMany({
@@ -682,43 +700,45 @@ export class MultisigService {
         });
       }
 
-      // Update proposal status to CANCELLED
+      // Update proposal status to CANCELLED and clear noteIds
       return tx.multisigProposal.update({
         where: { uuid: proposalUuid },
-        data: { status: 'CANCELLED' },
+        data: { 
+          status: 'CANCELLED',
+          noteIds: [], // Clear noteIds so notes can be claimed again
+        },
         include: {
           account: true,
           signatures: true,
           bills: true,
+          rejections: {
+            include: {
+              teamMember: true,
+            },
+          },
         },
       });
-    });
-
-    // Get team member for activity log
-    const teamMember = await this.prisma.teamMember.findUnique({
-      where: { userId: user.internalUserId },
     });
 
     // Log activity
-    if (teamMember) {
-      await this.activityLogService.logActivity({
-        companyId: user.company.id,
-        teamMemberId: teamMember.id,
-        action: ActivityActionEnum.CANCEL,
-        entityType: ActivityEntityTypeEnum.MULTISIG_PROPOSAL,
-        entityId: proposal.id,
-        entityUuid: proposal.uuid,
-        description: `Cancelled payment proposal (${proposal.bills.length} bills unlinked, ${proposal.signatures.length} signatures deleted)`,
-        metadata: {
-          accountId: proposal.accountId,
-          billUUIDs: proposal.bills.map((b) => b.uuid),
-          signaturesDeleted: proposal.signatures.length,
-        },
-      });
-    }
+    await this.activityLogService.logActivity({
+      companyId: user.company.id,
+      teamMemberId: teamMember.id,
+      action: ActivityActionEnum.CANCEL,
+      entityType: ActivityEntityTypeEnum.MULTISIG_PROPOSAL,
+      entityId: proposal.id,
+      entityUuid: proposal.uuid,
+      description: `Cancelled payment proposal (${proposal.bills.length} bills unlinked, ${proposal.signatures.length} signatures deleted)`,
+      metadata: {
+        accountId: proposal.accountId,
+        billUUIDs: proposal.bills.map((b) => b.uuid),
+        signaturesDeleted: proposal.signatures.length,
+        cancelledBy: `${teamMember.firstName} ${teamMember.lastName}`,
+      },
+    });
 
     this.logger.log(
-      `Proposal ${proposalUuid} cancelled: ${proposal.bills.length} bills unlinked, ${proposal.signatures.length} signatures deleted`,
+      `Proposal ${proposalUuid} cancelled: ${proposal.bills.length} bills unlinked, ${proposal.signatures.length} signatures deleted, noteIds cleared`,
     );
 
     return this.mapProposalToDto(updatedProposal, updatedProposal.account.threshold);
@@ -1026,12 +1046,15 @@ export class MultisigService {
         `Rejection threshold reached (${rejectionCount} >= ${rejectionThreshold}) for proposal ${proposalId}`,
       );
 
-      // Atomic transaction: update status, delete signatures, unlink bills
+      // Atomic transaction: update status, delete signatures, unlink bills, clear noteIds
       await this.prisma.$transaction(async (tx) => {
-        // Update proposal status to REJECTED
+        // Update proposal status to REJECTED and clear noteIds
         await tx.multisigProposal.update({
           where: { id: proposalId },
-          data: { status: 'REJECTED' },
+          data: { 
+            status: 'REJECTED',
+            noteIds: [], // Clear noteIds so notes can be claimed again
+          },
         });
 
         // Delete all signatures (no longer valid if rejected)

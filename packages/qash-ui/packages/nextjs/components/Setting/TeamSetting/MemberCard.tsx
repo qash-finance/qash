@@ -68,14 +68,16 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, onMenuClick, onEdit, on
         </div>
 
         {/* Menu Button */}
-        <img
-          src="/misc/vertical-three-dot-icon.svg"
-          alt="Menu"
-          className="w-6 cursor-pointer"
-          onClick={handleMenuClick}
-          data-tooltip-id={tooltipId}
-          data-tooltip-content={member.id}
-        />
+        {(onEdit || onRemove) && (
+          <img
+            src="/misc/vertical-three-dot-icon.svg"
+            alt="Menu"
+            className="w-6 cursor-pointer"
+            onClick={handleMenuClick}
+            data-tooltip-id={tooltipId}
+            data-tooltip-content={member.id}
+          />
+        )}
       </div>
 
       {/* Per-card tooltip (if handlers provided) */}

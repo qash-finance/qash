@@ -58,7 +58,8 @@ export default function LoginContainer() {
       const publicKey = wallet?.publicKey;
 
       if (!publicKey) {
-        throw new Error("Wallet public key is missing");
+        console.error("Wallet public key is missing");
+        return;
       }
 
       // Send JWT and publicKey to backend

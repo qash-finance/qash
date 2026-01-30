@@ -35,7 +35,7 @@ const statusConfig: Record<string, { label: string; bgColor: string; borderColor
     textColor: "text-blue-700",
   },
   [MultisigProposalStatusEnum.EXECUTED]: {
-    label: "Executed",
+    label: "Completed",
     bgColor: "bg-green-50",
     borderColor: "border-green-400",
     textColor: "text-green-700",
@@ -109,10 +109,19 @@ export function ProposalRow({
     ? `${proposal.amount}`
     : proposal.bills?.reduce((sum, b) => sum + parseFloat(b.amount || "0"), 0) || 0;
 
-  // Fetch consumable notes if this is a CONSUME proposal
-  const { data: consumableNotesData = { notes: [] } } = useGetConsumableNotes(proposal.accountId, {
-    enabled: proposal.proposalType === "CONSUME",
-  });
+  // Check if this is a history proposal (completed, failed, or cancelled)
+  const isHistoryProposal =
+    status === MultisigProposalStatusEnum.EXECUTED ||
+    status === MultisigProposalStatusEnum.FAILED ||
+    status === MultisigProposalStatusEnum.CANCELLED;
+
+  // Fetch consumable notes if this is a CONSUME proposal and NOT a history proposal
+  const { data: consumableNotesData = { notes: [] }, isLoading: notesLoading } = useGetConsumableNotes(
+    proposal.accountId,
+    {
+      enabled: proposal.proposalType === "CONSUME" && !isHistoryProposal,
+    },
+  );
 
   // Find the first note that matches this proposal's noteIds
   const proposalNote =
@@ -149,18 +158,28 @@ export function ProposalRow({
 
       {/* Bills/Amount Count */}
       <div className="flex items-center justify-center">
-        {proposal.proposalType === "CONSUME" && proposalNote ? (
-          // Show asset info for CONSUME proposals
-          <div className="flex items-center justify-center">
-            <img
-              src={QASH_TOKEN_ADDRESS.startsWith(faucetId) ? "/token/qash.svg" : "/tokens/unknown-token.svg"}
-              alt="Token"
-              className="w-6 h-6 mr-2"
-            />
-            <span className="text-sm font-medium text-text-strong-950">
-              {displayAmount} {QASH_TOKEN_ADDRESS.startsWith(faucetId) ? "QASH" : formatAddress(faucetId)}
-            </span>
-          </div>
+        {proposal.proposalType === "CONSUME" ? (
+          isHistoryProposal ? (
+            // For history proposals, show placeholder since note may no longer exist
+            <span className="text-sm font-medium text-text-secondary">—</span>
+          ) : notesLoading ? (
+            <div className="flex flex-col items-end justify-end gap-1">
+              <div className="h-2 bg-neutral-300 rounded-full w-20 animate-pulse"></div>
+              <div className="h-2 bg-neutral-300 rounded-full w-10 animate-pulse"></div>
+            </div>
+          ) : proposalNote ? (
+            // Show asset info for CONSUME proposals
+            <div className="flex items-center justify-center">
+              <img
+                src={QASH_TOKEN_ADDRESS.startsWith(faucetId) ? "/token/qash.svg" : "/tokens/unknown-token.svg"}
+                alt="Token"
+                className="w-6 h-6 mr-2"
+              />
+              <span className="text-sm font-medium text-text-strong-950">
+                {displayAmount} {QASH_TOKEN_ADDRESS.startsWith(faucetId) ? "QASH" : formatAddress(faucetId)}
+              </span>
+            </div>
+          ) : null
         ) : billCount > 0 ? (
           <div className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-blue-50 border border-blue-200">
             <span className="text-sm font-semibold text-blue-600">

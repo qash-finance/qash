@@ -702,11 +702,26 @@ export function useCancelProposal() {
     {
       mutationFn: ({ proposalUuid }) => cancelProposal(proposalUuid),
       onSuccess: (data) => {
+        // Invalidate company-wide proposals list
         queryClient.invalidateQueries({ queryKey: ["multisig", "proposals"] });
+        
+        // Invalidate account-specific proposals list
         queryClient.invalidateQueries({
           queryKey: ["multisig", "accounts", data.accountId, "proposals"],
         });
+        
+        // Invalidate individual proposal query (fixes detail page showing stale data)
+        queryClient.invalidateQueries({ 
+          queryKey: ["multisig", "proposals", data.id] 
+        });
+        
+        // Invalidate bills list
         queryClient.invalidateQueries({ queryKey: ["bills"] });
+        
+        // Invalidate consumable notes (to remove notes from consume tab)
+        queryClient.invalidateQueries({
+          queryKey: ["multisig", "accounts", data.accountId, "notes"],
+        });
       },
     }
   );

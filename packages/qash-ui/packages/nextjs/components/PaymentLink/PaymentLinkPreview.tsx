@@ -43,6 +43,7 @@ const SubIcon = ({
 
 interface PaymentLinkPreviewProps {
   recipient: string;
+  recipientAvatar: string;
   paymentWalletAddress: string;
   amount: string;
   title: string;
@@ -55,6 +56,7 @@ interface PaymentLinkPreviewProps {
 
 export const PaymentLinkPreview = ({
   recipient,
+  recipientAvatar,
   paymentWalletAddress,
   amount,
   title,
@@ -74,16 +76,9 @@ export const PaymentLinkPreview = ({
         header={
           <header className="flex items-center w-full justify-between px-5 py-2">
             <div className="flex flex-1 gap-2 items-center">
-              <img
-                src={blo(turnBechToHex(walletAddress || ""))}
-                alt="Recipient avatar"
-                className="w-[24px] rounded-full"
-              />
+              <img src={recipientAvatar} alt="Recipient avatar" className="w-[24px] rounded-full" />
               <div className="flex flex-col">
-                <div className="flex items-center gap-1">
-                  <span className="text-sm truncate text-text-primary leading-none">{recipient}</span>
-                  <img src="/logo/miden.svg" className="w-4" alt="miden logo icon" />
-                </div>
+                <span className="text-sm truncate text-text-primary leading-none">{recipient}</span>
                 <div className="flex items-center gap-1">
                   <span className="text-sm truncate text-text-secondary leading-none">
                     {formatAddress(paymentWalletAddress || "0x")}

@@ -22,12 +22,12 @@ import { useClient, useWallet } from "@getpara/react-sdk";
 import { useRouter } from "next/navigation";
 
 // Previously a fixed enum - we now allow any multisig account id
-type SubTabType = "pending" | "history" | "consume-notes";
+type SubTabType = "pending" | "history" | "receive";
 
 const subTabs: { id: SubTabType; label: string }[] = [
-  { id: "pending", label: "Pending to approve" },
+  { id: "pending", label: "Pending Transactions" },
   { id: "history", label: "History" },
-  { id: "consume-notes", label: "Consume Notes" },
+  { id: "receive", label: "Receive" },
 ];
 
 export function TransactionsContainer() {
@@ -317,7 +317,7 @@ export function TransactionsContainer() {
   // Render the appropriate sub-tab content based on activeSubTab
   const renderSubtab = () => {
     switch (activeSubTab) {
-      case "consume-notes":
+      case "receive":
         return (
           <>
             {notesLoading ? (
@@ -326,6 +326,7 @@ export function TransactionsContainer() {
               </div>
             ) : consumableNotesData.notes.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-text-secondary">
+                <img src="/misc/hexagon-magnifer-icon.svg" alt="No Proposals" className="w-25" />
                 <p className="text-lg font-medium">No consumable notes</p>
                 <p className="text-sm">No notes available to consume on this account</p>
               </div>
@@ -333,7 +334,13 @@ export function TransactionsContainer() {
               <>
                 {consumableNotesData.notes.map(note => {
                   const isNoteInProposal = allProposals.some(
-                    proposal => proposal.proposalType === "CONSUME" && proposal.noteIds?.includes(note.note_id),
+                    proposal =>
+                      proposal.proposalType === "CONSUME" &&
+                      proposal.noteIds?.includes(note.note_id) &&
+                      // Exclude cancelled, failed, and rejected proposals
+                      proposal.status !== "CANCELLED" &&
+                      proposal.status !== "FAILED" &&
+                      proposal.status !== "REJECTED",
                   );
 
                   return (
@@ -362,7 +369,8 @@ export function TransactionsContainer() {
               </div>
             ) : pendingProposals.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-text-secondary">
-                <p className="text-lg font-medium">No pending proposals</p>
+                <img src="/misc/hexagon-magnifer-icon.svg" alt="No Proposals" className="w-25" />
+                <p className="text-lg font-medium">No pending transactions</p>
                 <p className="text-sm">Create a proposal from the Bills page to get started</p>
               </div>
             ) : (
@@ -394,6 +402,7 @@ export function TransactionsContainer() {
               </div>
             ) : historyProposals.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-text-secondary">
+                <img src="/misc/hexagon-magnifer-icon.svg" alt="No Proposals" className="w-25" />
                 <p className="text-lg font-medium">No transaction history</p>
                 <p className="text-sm">Executed, failed, and cancelled proposals will appear here</p>
               </div>
