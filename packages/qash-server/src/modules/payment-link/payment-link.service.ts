@@ -66,15 +66,14 @@ export class PaymentLinkService {
         throw new BadRequestException(ErrorPaymentLink.NotFound);
       }
 
-      // Transform company to public-safe format (only companyName and metadata)
-      const publicCompany = this.companyService.transformToPublicFormat(
-        link.company,
-      );
-
       // Return payment link with transformed company data (no records, minimal company info)
       return {
         ...link,
-        company: publicCompany,
+        company: {
+          companyName: link.company.companyName,
+          companyLogo: link.company.logo,
+          metadata: link.company.metadata,
+        },
       };
     } catch (error) {
       handleError(error, this.logger);

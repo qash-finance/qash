@@ -352,7 +352,9 @@ const PaymentLinkDetailPage = () => {
         <div className="flex flex-col gap-5 py-5 w-[80%]">
           <PaymentLinkPreview
             recipient={paymentLink.company.companyName}
-            recipientAvatar={paymentLink.company.logo || "/logo/qash-icon-dark.svg"}
+            recipientAvatar={
+              paymentLink.company.companyLogo ? paymentLink.company.companyLogo : "/logo/qash-icon-dark.svg"
+            }
             paymentWalletAddress={paymentLink.paymentWalletAddress}
             amount={paymentLink.amount}
             title={paymentLink.title}

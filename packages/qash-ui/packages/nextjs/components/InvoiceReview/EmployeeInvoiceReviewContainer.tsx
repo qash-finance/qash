@@ -10,7 +10,7 @@ import Welcome from "../Common/Welcome";
 import { useAuth } from "@/services/auth/context";
 import { useModal } from "@/contexts/ModalManagerProvider";
 import { ConfirmAndReviewInvoiceModalProps } from "@/types/modal";
-import { useModal as useParaModal } from "@getpara/react-sdk";
+import { useModal as useParaModal, useWallet } from "@getpara/react-sdk";
 import { useParaMiden } from "miden-para-react";
 import { useAccount as useParaAccount } from "@getpara/react-sdk";
 import { SecondaryButton } from "../Common/SecondaryButton";
@@ -99,6 +99,7 @@ export const EmployeeInvoiceReviewContainer = () => {
   const [successMessage, setSuccessMessage] = useState("");
   const [authenticatingWithPara, setAuthenticatingWithPara] = useState(false);
   const [switchingAccount, setSwitchingAccount] = useState(false);
+  const { data: wallet } = useWallet();
 
   const autoReviewKeyRef = useRef<string | null>(null);
 
@@ -119,10 +120,16 @@ export const EmployeeInvoiceReviewContainer = () => {
         throw new Error("Failed to get JWT token from Para");
       }
 
-      console.log("Para JWT issued:", { keyId: jwtResult.keyId });
+      // Extract wallet public key
+      const publicKey = wallet?.publicKey;
+
+      if (!publicKey) {
+        console.error("Wallet public key is missing");
+        return;
+      }
 
       // Send JWT to backend
-      await loginWithPara(jwtResult.token);
+      await loginWithPara(jwtResult.token, publicKey);
 
       await refreshUser();
 

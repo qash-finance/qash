@@ -78,6 +78,7 @@ export interface PaymentLinkResponseDto {
   records?: PaymentLinkRecordDto[];
   company: {
     companyName: string;
+    companyLogo?: string;
     metadata?: Record<string, any>;
   };
   createdAt: Date | string;
