@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import Image from "next/image";
+import { useListAccountsByCompany } from "@/services/api/multisig";
+import { useGetMyCompany } from "@/services/api/company";
 
 // Account data type
 interface Account {
@@ -29,43 +31,30 @@ const profileIcon =
 
 const Accounts: React.FC<AccountsProps> = ({ accounts, onAccountSelect }) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const { data: company } = useGetMyCompany();
 
-  // Default accounts data
-  const defaultAccounts: Account[] = [
-    {
-      id: "1",
-      name: "Payroll",
-      label: "Account 1",
-      balance: "$ 54,217,052",
-      avatar: {
-        backgroundColor: "#068DFF",
-        icon: profileIcon,
-      },
-      isSelected: true,
-    },
-    {
-      id: "2",
-      name: "Operations",
-      label: "Account 2",
-      balance: "$ 4,217,052",
-      avatar: {
-        backgroundColor: "#3FDEC9",
-        icon: profileIcon,
-      },
-    },
-    {
-      id: "3",
-      name: "Marketing",
-      label: "Account 3",
-      balance: "$ 17,052",
-      avatar: {
-        backgroundColor: "#8C71F6",
-        icon: profileIcon,
-      },
-    },
-  ];
+  // Fetch accounts from API
+  const { data: apiAccounts = [], isLoading } = useListAccountsByCompany(company?.id, { enabled: !!company?.id });
 
-  const displayAccounts = accounts || defaultAccounts;
+  // Avatar colors for visual variety
+  const avatarColors = ["#068DFF", "#3FDEC9", "#8C71F6", "#FF6B6B", "#FFA500"];
+
+  // Transform API accounts to component format
+  const transformedAccounts: Account[] = useMemo(() => {
+    return apiAccounts.map((apiAccount, index) => ({
+      id: apiAccount.accountId,
+      name: apiAccount.accountId.substring(0, 12) + "...",
+      label: apiAccount.name,
+      balance: "$ 0.00", // TODO: Fetch balance from API
+      avatar: {
+        backgroundColor: avatarColors[index % avatarColors.length],
+        icon: profileIcon,
+      },
+      isSelected: index === 0,
+    }));
+  }, [apiAccounts]);
+
+  const displayAccounts = accounts || transformedAccounts;
 
   // Filter accounts based on search query
   const filteredAccounts = displayAccounts.filter(
@@ -87,6 +76,8 @@ const Accounts: React.FC<AccountsProps> = ({ accounts, onAccountSelect }) => {
         <input
           type="text"
           placeholder="Search by name"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
           className="flex-1 bg-transparent text-text-primary placeholder-text-secondary outline-none text-sm"
         />
         <img src="/misc/blue-search-icon.svg" alt="search" className="w-3.5 h-3.5" />
@@ -94,46 +85,48 @@ const Accounts: React.FC<AccountsProps> = ({ accounts, onAccountSelect }) => {
 
       {/* Accounts List */}
       <div className="flex flex-col gap-0 w-full">
-        {filteredAccounts.map((account, index) => (
-          <div
-            key={account.id}
-            onClick={() => handleAccountClick(account)}
-            className={`flex items-center gap-3 p-4 cursor-pointer transition-all ${
-              account.isSelected
-                ? "bg-[rgba(6,110,255,0.1)] border-l-4 border-[#066EFF] rounded-sm"
-                : "hover:bg-[rgba(255,255,255,0.05)]"
-            }`}
-          >
-            {/* Avatar */}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8 text-text-secondary">Loading accounts...</div>
+        ) : filteredAccounts.length > 0 ? (
+          filteredAccounts.map((account, index) => (
             <div
-              className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden"
-              style={{ backgroundColor: account.avatar.backgroundColor }}
+              key={account.id}
+              onClick={() => handleAccountClick(account)}
+              className={`flex items-center gap-3 p-4 cursor-pointer transition-all ${
+                account.isSelected
+                  ? "bg-[rgba(6,110,255,0.1)] border-l-4 border-[#066EFF] rounded-sm"
+                  : "hover:bg-[rgba(255,255,255,0.05)]"
+              }`}
             >
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="white" className="w-8 h-8">
-                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-              </svg>
-            </div>
-
-            {/* Account Info */}
-            <div className="flex-1 flex flex-col justify-center min-w-0">
-              <p className="text-[16px] font-semibold leading-6 truncate">{account.name}</p>
-              <p
-                className={`text-[14px] font-medium leading-5 truncate ${
-                  account.isSelected ? "text-primary-blue" : "text-text-secondary"
-                }`}
+              {/* Avatar */}
+              <div
+                className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden"
+                style={{ backgroundColor: account.avatar.backgroundColor }}
               >
-                {account.label}
-              </p>
-            </div>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="white" className="w-8 h-8">
+                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                </svg>
+              </div>
 
-            {/* Balance */}
-            <div className="flex flex-col items-end justify-center flex-shrink-0">
-              <p className="text-[16px] font-medium leading-6 whitespace-nowrap">{account.balance}</p>
-            </div>
-          </div>
-        ))}
+              {/* Account Info */}
+              <div className="flex-1 flex flex-col justify-center min-w-0">
+                <p className="text-[16px] font-semibold leading-6 truncate">{account.name}</p>
+                <p
+                  className={`text-[14px] font-medium leading-5 truncate ${
+                    account.isSelected ? "text-primary-blue" : "text-text-secondary"
+                  }`}
+                >
+                  {account.label}
+                </p>
+              </div>
 
-        {filteredAccounts.length === 0 && (
+              {/* Balance */}
+              <div className="flex flex-col items-end justify-center flex-shrink-0">
+                <p className="text-[16px] font-medium leading-6 whitespace-nowrap">{account.balance}</p>
+              </div>
+            </div>
+          ))
+        ) : (
           <div className="flex items-center justify-center py-8 text-text-secondary">No accounts found</div>
         )}
       </div>

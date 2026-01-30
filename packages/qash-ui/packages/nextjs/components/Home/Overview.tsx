@@ -79,7 +79,7 @@ const BalanceOverviewHeader = ({ totalBalance = 0 }: { totalBalance?: number }) 
           </div>
         </div>
 
-        <div className="space-y-1">
+        {/* <div className="space-y-1">
           <div className="flex items-center gap-2">
             <img src="/misc/earn-icon.svg" alt="Earn Icon" className="w-5" />
             <span className="text-sm text-text-secondary">Earn Balance</span>
@@ -99,7 +99,7 @@ const BalanceOverviewHeader = ({ totalBalance = 0 }: { totalBalance?: number }) 
           <button className="px-6 py-2.5 bg-primary-blue text-white font-semibold rounded-xl border border-[#B4D3FF] transition-colors">
             Earn
           </button>
-        </div>
+        </div> */}
       </div>
 
       <div className="flex-1 flex flex-col gap-3">

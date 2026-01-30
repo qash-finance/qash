@@ -46,7 +46,7 @@ export function TokenList() {
   return (
     <section className="flex flex-col gap-3 items-center self-stretch p-3 rounded-2xl bg-background flex-[1_0_0] max-sm:p-2">
       <div className="w-full">
-        <span className="text-text-primary text-2xl text-center w-full">My Assets</span>
+        <span className="text-text-primary text-2xl text-center w-full">Assets</span>
       </div>
       {/* Tab Navigation */}
       <TabContainer

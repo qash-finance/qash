@@ -5,6 +5,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Sector } from "recha
 import { PieSectorDataItem } from "recharts/types/polar/Pie";
 import { useGetBatchAccountBalances, useListAccountsByCompany, useGetMultisigAccount } from "@/services/api/multisig";
 import { useGetMyCompany } from "@/services/api/company";
+import Link from "next/link";
 
 interface Transaction {
   id: string;
@@ -211,60 +212,85 @@ const TransactionHistory = () => {
         <h3 className="text-base font-medium">All Accounts</h3>
 
         <div className="w-full flex flex-row bg-background border-t border-primary-divider rounded-2xl h-full justify-center items-center gap-6">
-          {/* Donut Chart Section */}
-          <div className="flex items-center justify-center h-64 flex-1/3">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={accounts.map(acc => ({ name: acc.name, value: acc.percentage }))}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
-                  paddingAngle={2}
-                  dataKey="value"
-                  isAnimationActive={true}
-                >
-                  {accounts.map(account => (
-                    <Cell key={`cell-${account.id}`} fill={account.color} />
-                  ))}
-                </Pie>
-                <Tooltip content={() => null} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+          {accounts.length === 0 ? (
+            <div className="flex flex-col gap-3 items-center justify-center w-full h-full py-12">
+              {/* Icon */}
+              <img src="/misc/hexagon-contact-icon.svg" alt="No Multisig Account" className="w-20 h-20" />
 
-          {/* Account Items */}
-          <div className="space-y-px flex-2/3">
-            <div className="flex items-center px-4 py-2 gap-4 border-b border-primary-divider text-text-secondary">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">Weight</span>
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium">Account</p>
-              </div>
-              <div className="flex-1 text-right">
-                <p className="text-sm font-medium">Balance</p>
-              </div>
-            </div>
-            {accounts.map((account, index) => (
-              <div
-                key={account.id}
-                className={`flex items-center px-4 py-3 gap-4 ${index !== accounts.length - 1 ? "border-b border-primary-divider" : ""}`}
+              {/* Message */}
+              <p className="text-sm font-medium text-text-secondary">
+                You need to create a multisig account to access this feature.
+              </p>
+
+              {/* Button */}
+              <Link
+                href="/settings/multisig"
+                onClick={e => {
+                  // Optional: handle click event if needed
+                }}
+                className="bg-text-primary hover:bg-text-primary/90 text-white font-semibold rounded-xl px-4 py-2.5 text-sm transition-colors"
               >
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: account.color }}></div>
-                  <span className="text-sm font-medium">{account.percentage}%</span>
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{account.name}</p>
-                </div>
-                <div className="flex-1 text-right">
-                  <p className="text-sm font-medium">{account.balance}</p>
-                </div>
+                Create account
+              </Link>
+            </div>
+          ) : (
+            <>
+              {/* Donut Chart Section */}
+              <div className="flex items-center justify-center h-64 flex-1/3">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={accounts.map(acc => ({ name: acc.name, value: acc.percentage }))}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={2}
+                      dataKey="value"
+                      isAnimationActive={true}
+                    >
+                      {accounts.map(account => (
+                        <Cell key={`cell-${account.id}`} fill={account.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={() => null} />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-            ))}
-          </div>
+
+              {/* Account Items */}
+              <div className="space-y-px flex-2/3">
+                <div className="flex items-center px-4 py-2 gap-4 border-b border-primary-divider text-text-secondary">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">Weight</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Account</p>
+                  </div>
+                  <div className="flex-1 text-right">
+                    <p className="text-sm font-medium">Balance</p>
+                  </div>
+                </div>
+                {accounts.map((account, index) => (
+                  <div
+                    key={account.id}
+                    className={`flex items-center px-4 py-3 gap-4 ${index !== accounts.length - 1 ? "border-b border-primary-divider" : ""}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: account.color }}></div>
+                      <span className="text-sm font-medium">{account.percentage}%</span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{account.name}</p>
+                    </div>
+                    <div className="flex-1 text-right">
+                      <p className="text-sm font-medium">{account.balance}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

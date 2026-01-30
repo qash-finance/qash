@@ -30,6 +30,7 @@ import { handleError } from 'src/common/utils/errors';
 import { randomUUID } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { CompanyModel } from 'src/database/generated/models';
+import { TeamMember } from 'src/database/generated/browser';
 
 @Injectable()
 export class TeamMemberService {
@@ -921,7 +922,7 @@ export class TeamMemberService {
    * Send invitation email
    */
   private async sendInvitationEmail(
-    teamMember: any,
+    teamMember: TeamMember,
     company: CompanyModel,
     invitationToken: string,
     toEmail: string,
@@ -933,6 +934,7 @@ export class TeamMemberService {
       company,
       invitationToken,
       teamMemberCount,
+      toEmail
     );
 
     const mailgunDomain = this.configService.get<string>('MAILGUN_DOMAIN');
@@ -953,14 +955,15 @@ export class TeamMemberService {
    * Get invitation email template
    */
   private getInvitationEmailTemplate(
-    teamMember: any,
+    teamMember: TeamMember,
     company: CompanyModel,
     invitationToken: string,
     teamMemberCount: number,
+    toEmail: string,
   ): string {
     const frontendUrl =
       this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
-    const acceptUrl = `${frontendUrl}/team-invite?token=${invitationToken}&company=${encodeURIComponent(company.companyName)}&teamMemberCount=${teamMemberCount}&email=${encodeURIComponent(teamMember.user?.email || '')}`;
+    const acceptUrl = `${frontendUrl}/team-invite?token=${invitationToken}&company=${encodeURIComponent(company.companyName)}&teamMemberCount=${teamMemberCount}&email=${encodeURIComponent(toEmail)}${company.logo ? `&companyLogo=${encodeURIComponent(company.logo)}` : ''}`;
     const firstName = teamMember.firstName || 'there';
 
     return `

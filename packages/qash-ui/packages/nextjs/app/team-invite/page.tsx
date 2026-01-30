@@ -27,7 +27,7 @@ interface TeamInvitePageProps {
 export default function TeamInvitePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, loginWithPara, refreshUser, isAuthenticated } = useAuth();
+  const { user, loginWithPara, refreshUser, isAuthenticated, isLoading } = useAuth();
   const { openModal } = useModal();
   const [isAccepted, setIsAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +41,7 @@ export default function TeamInvitePage() {
   const memberCount = parseInt(searchParams.get("teamMemberCount") || "0");
   const token = searchParams.get("token");
   const intendedEmail = searchParams.get("email");
+  const companyLogo = searchParams.get("companyLogo");
 
   const { mutate: acceptInviteByToken, isPending } = useAcceptInvitationByToken();
 
@@ -178,7 +179,11 @@ export default function TeamInvitePage() {
       <div className="flex items-center justify-center h-screen bg-background">
         <div className="bg-app-background px-10 py-8 rounded-[24px] w-[510px]">
           {/* Team Icon */}
-          <img src="/logo/qash-icon-dark.svg " alt="Team Icon" className="w-30 mb-6 mx-auto" />
+          <img
+            src={companyLogo ? companyLogo : "/logo/qash-icon-dark.svg"}
+            alt="Team Icon"
+            className="w-30 mb-6 mx-auto"
+          />
 
           {/* Content */}
           <div className="space-y-3">
@@ -213,7 +218,7 @@ export default function TeamInvitePage() {
             </div>
 
             {/* Sign In Button */}
-            <PrimaryButton text="Sign in" onClick={handleSignIn} />
+            <PrimaryButton text="Sign in" onClick={handleSignIn} loading={isLoading} />
           </div>
         </div>
       </div>
@@ -239,7 +244,11 @@ export default function TeamInvitePage() {
     <div className="flex items-center justify-center h-screen bg-background">
       <div className="bg-app-background px-10 py-8 rounded-[24px] w-[510px]">
         {/* Team Icon */}
-        <img src="/logo/qash-icon-dark.svg " alt="Team Icon" className="w-30 mb-6 mx-auto" />
+        <img
+          src={companyLogo ? companyLogo : "/logo/qash-icon-dark.svg"}
+          alt="Team Icon"
+          className="w-30 mb-6 mx-auto"
+        />
 
         {/* Content */}
         <div className="space-y-3">
