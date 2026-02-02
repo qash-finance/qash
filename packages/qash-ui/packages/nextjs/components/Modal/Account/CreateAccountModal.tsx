@@ -23,7 +23,7 @@ interface MemberItem {
   role: TeamMemberRoleEnum;
   publicKey: string;
   companyRole?: string;
-  avatar?: string;
+  profilePicture?: string;
 }
 
 const TabHeader = ({ activeTab }: { activeTab: "detail" | "member" | "review" }) => {
@@ -69,15 +69,13 @@ const TabHeader = ({ activeTab }: { activeTab: "detail" | "member" | "review" })
 };
 
 const MemberRow = ({
-  initials,
-  avatarGradient,
+  profilePicture,
   name,
   email,
   companyRole,
   role,
 }: {
-  initials?: string;
-  avatarGradient?: string;
+  profilePicture?: string;
   name: string;
   email: string;
   companyRole: string;
@@ -86,11 +84,7 @@ const MemberRow = ({
   return (
     <div className="flex items-center justify-between py-2">
       <div className="flex gap-2 items-center">
-        <div
-          className={`w-7 h-7 rounded-full bg-gradient-to-br ${avatarGradient ?? "from-gray-400 to-gray-600"} flex items-center justify-center text-white text-xs font-bold`}
-        >
-          {initials}
-        </div>
+        <img src={profilePicture} alt="avatar" className="w-8 h-8 rounded-full" />
         <div className="flex flex-col">
           <div className="flex gap-1 items-center">
             <p className="text-sm font-medium text-text-primary">{name}</p>
@@ -143,6 +137,7 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
             role: currentUserMember.role,
             companyRole: currentUserMember.position,
             publicKey: currentUserMember.user!.publicKey,
+            profilePicture: currentUserMember.profilePicture || undefined,
           },
         ]);
         setIsInitialized(true);
@@ -380,7 +375,7 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
                         >
                           <div className="flex gap-2 items-center flex-1">
                             <img
-                              src="/misc/default-team-member-avatar.svg"
+                              src={member.profilePicture || "/misc/default-team-member-avatar.svg"}
                               alt="avatar"
                               className="w-8 h-8 rounded-full"
                             />
@@ -526,8 +521,7 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
                   selectedMembers.map(member => (
                     <MemberRow
                       key={member.id}
-                      initials={member.name.substring(0, 2).toUpperCase()}
-                      avatarGradient="from-blue-400 to-blue-600"
+                      profilePicture={member.profilePicture || "/misc/default-team-member-avatar.svg"}
                       name={member.name}
                       companyRole={member.companyRole || ""}
                       email={member.email}

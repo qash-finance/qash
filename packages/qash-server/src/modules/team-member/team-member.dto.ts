@@ -143,6 +143,24 @@ export class UpdateTeamMemberDto implements SharedTypes.UpdateTeamMemberDto {
   metadata?: any;
 }
 
+export class UpdateAvatarDto {
+  @ApiProperty({
+    description: 'Avatar URL',
+    example: 'https://supabase.co/storage/v1/object/public/avatars/user-123.jpg',
+  })
+  @IsUrl()
+  @IsNotEmpty()
+  profilePicture: string;
+}
+
+export class UpdateAvatarResponseDto {
+  @ApiProperty({
+    description: 'Updated profile picture URL',
+    example: 'https://supabase.co/storage/v1/object/public/avatars/user-123.jpg',
+  })
+  profilePicture: string;
+}
+
 export class UpdateTeamMemberRoleDto implements SharedTypes.UpdateTeamMemberRoleDto {
   @ApiProperty({
     description: 'New role for team member',

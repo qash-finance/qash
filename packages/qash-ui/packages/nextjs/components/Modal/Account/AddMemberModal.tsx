@@ -8,7 +8,6 @@ import BaseModal from "../BaseModal";
 import { CustomCheckbox } from "@/components/Common/CustomCheckbox";
 import { SecondaryButton } from "@/components/Common/SecondaryButton";
 import { CustomBlueCheckbox } from "@/components/Common/Checkbox/CustomBlueCheckbox";
-import { MemberRoleTooltip } from "@/components/Common/ToolTip/MemberRoleTooltip";
 import { TeamMemberRoleEnum, TeamMemberStatusEnum } from "@qash/types/enums";
 import { useGetCompanyTeamMembers } from "@/services/api/team-member";
 import { useGetMyCompany } from "@/services/api/company";
@@ -20,7 +19,7 @@ interface MemberData {
   email: string;
   role: TeamMemberRoleEnum;
   companyRole?: string;
-  avatar?: string;
+  profilePicture?: string;
   status: TeamMemberStatusEnum;
   isSelected?: boolean;
 }
@@ -49,18 +48,22 @@ const MemberRow = ({
 
   return (
     <div
-      className={`flex items-center justify-between p-2 hover:bg-app-background rounded-lg transition-colors w-full ${member.status !== TeamMemberStatusEnum.ACTIVE ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-      onClick={() => member.status === TeamMemberStatusEnum.ACTIVE && onSelect(member.id)}
+      className={`flex items-center justify-between p-2 hover:bg-app-background rounded-lg transition-colors w-full ${member.status !== TeamMemberStatusEnum.ACTIVE || member.role === TeamMemberRoleEnum.VIEWER ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+      onClick={() =>
+        member.status === TeamMemberStatusEnum.ACTIVE &&
+        member.role !== TeamMemberRoleEnum.VIEWER &&
+        onSelect(member.id)
+      }
     >
       <div className="flex gap-3 items-center flex-1">
         <CustomBlueCheckbox
           checked={member.isSelected ?? false}
           onChange={() => onSelect(member.id)}
-          disabled={member.status !== TeamMemberStatusEnum.ACTIVE}
+          disabled={member.status !== TeamMemberStatusEnum.ACTIVE || member.role === TeamMemberRoleEnum.VIEWER}
         />
         <div className="flex gap-1 items-center flex-1">
           <img
-            src={member.avatar || "/misc/default-team-member-avatar.svg"}
+            src={member.profilePicture || "/misc/default-team-member-avatar.svg"}
             alt="avatar"
             className="w-8 h-8 rounded-full"
           />
@@ -113,12 +116,13 @@ export function AddMemberModal({
         .filter(tm => tm.user!.email !== user?.email)
         .map(tm => {
           const isSelected = selectedMembers.some(sm => String(sm.id) === String(tm.id));
-          // Only allow selection if member is ACTIVE
-          const selectable = tm.status === TeamMemberStatusEnum.ACTIVE;
+          // Only allow selection if member is ACTIVE and not a VIEWER
+          const selectable = tm.status === TeamMemberStatusEnum.ACTIVE && tm.role !== TeamMemberRoleEnum.VIEWER;
           return {
             id: tm.id,
             name: `${tm.firstName} ${tm.lastName}`,
             email: tm.user!.email,
+            profilePicture: tm.profilePicture || undefined,
             role: tm.role,
             companyRole: tm.position,
             status: tm.status,
@@ -130,7 +134,9 @@ export function AddMemberModal({
   }, [teamMembersData, user]);
 
   const selectedCount = members.filter(m => m.isSelected).length;
-  const totalCount = members.length;
+  const selectableCount = members.filter(
+    m => m.status === TeamMemberStatusEnum.ACTIVE && m.role !== TeamMemberRoleEnum.VIEWER,
+  ).length;
 
   const filteredMembers = useMemo(() => {
     if (!search) return members;
@@ -143,7 +149,11 @@ export function AddMemberModal({
   const handleSelectMember = (id: number) => {
     setMembers(prev =>
       prev.map(m =>
-        m.id === id ? (m.status === TeamMemberStatusEnum.ACTIVE ? { ...m, isSelected: !m.isSelected } : m) : m,
+        m.id === id
+          ? m.status === TeamMemberStatusEnum.ACTIVE && m.role !== TeamMemberRoleEnum.VIEWER
+            ? { ...m, isSelected: !m.isSelected }
+            : m
+          : m,
       ),
     );
   };
@@ -153,7 +163,13 @@ export function AddMemberModal({
   };
 
   const handleSelectAll = () => {
-    setMembers(prev => prev.map(m => (m.status === TeamMemberStatusEnum.ACTIVE ? { ...m, isSelected: true } : m)));
+    setMembers(prev =>
+      prev.map(m =>
+        m.status === TeamMemberStatusEnum.ACTIVE && m.role !== TeamMemberRoleEnum.VIEWER
+          ? { ...m, isSelected: true }
+          : m,
+      ),
+    );
   };
 
   const handleDeselectAll = () => {
@@ -215,16 +231,16 @@ export function AddMemberModal({
             <div className="flex gap-1 items-center px-3 py-2">
               <p className="text-sm font-medium text-text-primary">
                 {selectedCount}
-                <span className="text-text-secondary">/{totalCount}</span>
+                <span className="text-text-secondary">/{selectableCount}</span>
               </p>
               <p className="text-sm font-medium text-text-secondary">Selected</p>
             </div>
             <button
-              onClick={selectedCount === totalCount ? handleDeselectAll : handleSelectAll}
+              onClick={selectedCount === selectableCount ? handleDeselectAll : handleSelectAll}
               className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-app-background transition-colors"
             >
               <p className="text-sm font-medium text-primary-blue">
-                {selectedCount === totalCount ? "Deselect all" : "Select all"}
+                {selectedCount === selectableCount ? "Deselect all" : "Select all"}
               </p>
             </button>
           </div>

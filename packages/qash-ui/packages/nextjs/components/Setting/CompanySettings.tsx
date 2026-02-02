@@ -8,7 +8,8 @@ import { CountryDropdown } from "../Common/Dropdown/CountryDropdown";
 import { CompanyInfoDto as CompanyInfo } from "@qash/types/dto/company";
 import toast from "react-hot-toast";
 import SettingHeader from "./SettingHeader";
-import { useUpdateCompany } from "@/services/api/company";
+import { useGetMyCompany, useUpdateCompany } from "@/services/api/company";
+import { useUploadCompanyLogo } from "@/services/api/upload";
 
 interface CompanyFormData {
   companyName: string;
@@ -29,6 +30,10 @@ export default function CompanySettings() {
   const [selectedCountry, setSelectedCountry] = useState<string>("");
   const [hasChanges, setHasChanges] = useState(false);
   const { mutate: updateCompany, isPending: isUpdating } = useUpdateCompany();
+  const uploadLogoMutation = useUploadCompanyLogo();
+  const { data: myCompany } = useGetMyCompany();
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
 
   const {
     register,
@@ -106,6 +111,40 @@ export default function CompanySettings() {
     }
   };
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!["image/jpeg", "image/png"].includes(file.type)) {
+      toast.error("Only JPEG and PNG files are allowed");
+      return;
+    }
+
+    // Validate file size (max 10MB for company logo)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("File size must be less than 10MB");
+      return;
+    }
+
+    setLogoFile(file);
+
+    try {
+      const result = await uploadLogoMutation.mutateAsync(file);
+      setLogoUrl(result.url);
+      toast.success("Logo uploaded successfully");
+    } catch (error) {
+      toast.error("Failed to upload logo");
+      setLogoFile(null);
+    }
+  };
+
+  useEffect(() => {
+    if (myCompany?.logo && myCompany && !logoUrl) {
+      setLogoUrl(myCompany.logo);
+    }
+  }, [myCompany]);
+
   return (
     <div className="flex flex-col">
       <SettingHeader
@@ -121,6 +160,42 @@ export default function CompanySettings() {
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-0">
         {/* First Section */}
         <div className="flex flex-col gap-3 pb-6 border-b border-primary-divider">
+          {/* Avatar Upload */}
+          <div className="w-full flex items-center justify-center">
+            <div className="flex gap-4 items-center flex-col">
+              <label className="bg-[#ebf4ff] border border-primary-blue border-dashed rounded-full shrink-0 w-[86px] h-[86px] flex items-center justify-center relative overflow-hidden cursor-pointer hover:bg-blue-50 transition-colors">
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                ) : (
+                  <img src="/misc/blue-upload-icon.svg" alt="Upload" className="w-6 h-6" />
+                )}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png"
+                  onChange={handleLogoUpload}
+                  disabled={uploadLogoMutation.isPending}
+                  className="hidden"
+                />
+              </label>
+              <label
+                className="border border-primary-divider rounded-lg px-3 py-1.5 w-fit font-barlow font-medium text-[14px] text-text-primary leading-[20px] tracking-[-0.56px] hover:bg-base-container-sub-background transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  pointerEvents: uploadLogoMutation.isPending ? "none" : "auto",
+                  opacity: uploadLogoMutation.isPending ? 0.5 : 1,
+                }}
+              >
+                {uploadLogoMutation.isPending ? "Uploading..." : "Upload photo"}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png"
+                  onChange={handleLogoUpload}
+                  disabled={uploadLogoMutation.isPending}
+                  className="hidden"
+                />
+              </label>
+            </div>
+          </div>
+
           {/* Company Name */}
           <InputOutlined
             label="Company name"

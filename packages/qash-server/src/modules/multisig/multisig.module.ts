@@ -7,9 +7,10 @@ import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from '../auth/auth.module';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { CompanyModule } from '../company/company.module';
+import { BillModule } from '../bill/bill.module';
 
 @Module({
-  imports: [ConfigModule, AuthModule, ActivityLogModule, CompanyModule],
+  imports: [ConfigModule, AuthModule, ActivityLogModule, CompanyModule, BillModule],
   controllers: [MultisigController],
   providers: [MultisigService, MidenClientService, PrismaService],
   exports: [MultisigService, MidenClientService],

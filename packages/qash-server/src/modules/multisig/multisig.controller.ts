@@ -25,7 +25,6 @@ import {
   GetBatchAccountBalancesResponseDto,
 } from './dto/multisig.dto';
 import { ParaJwtAuthGuard } from '../auth/guards/para-jwt-auth.guard';
-import { Public } from '../auth/decorators/public.decorator';
 import { CompanyAuth } from '../auth/decorators/company-auth.decorator';
 import { CurrentUser, UserWithCompany } from '../auth/decorators/current-user.decorator';
 

@@ -19,7 +19,6 @@ model User {
   isActive  Boolean      @default(true) @map("is_active")
   lastLogin DateTime?    @map("last_login") @db.Timestamp(6)
   publicKey String?      @map("public_key") @db.Text
-  avatar    String?      @db.Text
 
   teamMembership TeamMember? // 1:1 relationship, each user is a company team member
   invitedMembers TeamMember[] @relation("TeamMemberInviter")
@@ -678,6 +677,7 @@ enum InvoiceStatusEnum {
 
 enum BillStatusEnum {
   PENDING
+  PROPOSED
   PAID
   OVERDUE
   CANCELLED

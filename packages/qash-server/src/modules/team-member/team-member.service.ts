@@ -19,6 +19,8 @@ import {
   AcceptInvitationDto,
   BulkInviteTeamMembersDto,
   AcceptInvitationByTokenDto,
+  UpdateAvatarDto,
+  UpdateAvatarResponseDto,
 } from './team-member.dto';
 import {
   TeamMemberRoleEnum,
@@ -409,6 +411,55 @@ export class TeamMemberService {
       });
     } catch (error) {
       this.logger.error(`Failed to update team member ${teamMemberId}:`, error);
+      handleError(error, this.logger);
+    }
+  }
+
+  /**
+   * Update team member avatar
+   */
+  async updateAvatar(
+    teamMemberId: number,
+    userId: number,
+    avatarUrl: string,
+  ): Promise<UpdateAvatarResponseDto> {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const teamMember =
+          await this.teamMemberRepository.findByIdWithRelations(
+            teamMemberId,
+            tx,
+          );
+        if (!teamMember) {
+          throw new NotFoundException(ErrorTeamMember.NotFound);
+        }
+
+        // Check if user can update: own profile or admin
+        const canManage = await this.teamMemberRepository.hasPermission(
+          teamMember.companyId,
+          userId,
+          [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN],
+          tx,
+        );
+
+        const isOwnProfile = teamMember.userId === userId;
+
+        if (!canManage && !isOwnProfile) {
+          throw new ForbiddenException(ErrorTeamMember.InsufficientPermissions);
+        }
+
+        const updated = await this.teamMemberRepository.updateById(
+          teamMemberId,
+          { profilePicture: avatarUrl },
+          tx,
+        );
+
+        return {
+          profilePicture: updated.profilePicture || '',
+        };
+      });
+    } catch (error) {
+      this.logger.error(`Failed to update avatar for team member ${teamMemberId}:`, error);
       handleError(error, this.logger);
     }
   }

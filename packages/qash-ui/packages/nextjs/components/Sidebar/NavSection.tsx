@@ -11,6 +11,7 @@ interface NavItemData {
   link?: string;
   hasSubmenu?: boolean;
   submenuType?: string;
+  badgeCount?: number;
 }
 
 interface NavSectionsProps {
@@ -28,6 +29,7 @@ interface NavItemProps {
   hasSubmenu?: boolean;
   onClick?: () => void;
   onSubmenuClick?: () => void;
+  badgeCount?: number;
 }
 
 const NavItem: React.FC<NavItemProps> = ({
@@ -39,7 +41,9 @@ const NavItem: React.FC<NavItemProps> = ({
   hasSubmenu = false,
   onClick,
   onSubmenuClick,
+  badgeCount,
 }) => {
+  console.log("🚀 ~ NavItem ~ badgeCount:", badgeCount);
   const [isHovered, setIsHovered] = useState(false);
   const baseClasses =
     "flex gap-1.5 items-center h-11 p-2.5 w-full whitespace-nowrap rounded-xl transition-all duration-200 ease-in-out justify-between";
@@ -108,6 +112,11 @@ const NavItem: React.FC<NavItemProps> = ({
           />
         )} */}
         {disabled && <ComingSoonBadge size="small" />}
+        {badgeCount !== undefined && badgeCount > 0 && (
+          <div className="text-white rounded-full bg-red-600 w-8 h-6 flex items-center justify-center text-sm font-semibold">
+            {badgeCount}
+          </div>
+        )}
       </button>
     </div>
   );
@@ -125,6 +134,7 @@ export const NavSections: React.FC<NavSectionsProps> = ({ sections, onItemClick,
           isActive={item.isActive}
           disabled={item.disabled}
           hasSubmenu={item.hasSubmenu}
+          badgeCount={item.badgeCount}
           onClick={() => onItemClick?.(itemIdx)}
           onSubmenuClick={() => onSubmenuClick?.(itemIdx)}
         />

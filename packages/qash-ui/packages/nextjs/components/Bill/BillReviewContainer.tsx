@@ -122,13 +122,15 @@ const BillReviewContainer = () => {
   const [selectedInvoices, setSelectedInvoices] = useState<any[]>([]);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
 
-  const { register, watch } = useForm({
+  const { register, watch, getValues } = useForm({
     defaultValues: {
       searchTerm: "",
+      proposalDescription: "",
     },
   });
 
   const searchTerm = watch("searchTerm");
+  const proposalDescription = watch("proposalDescription");
 
   const tokenTotals = React.useMemo(() => {
     const map = new Map<string, { total: number; totalUsd: number }>();
@@ -197,11 +199,18 @@ const BillReviewContainer = () => {
       return toast.error("No invoices selected for payment");
     }
 
+    const description = getValues("proposalDescription").trim();
+
+    if (description.length === 0) {
+      return toast.error("Proposal description cannot be empty");
+    }
+
+    if (description.length > 500) {
+      return toast.error("Proposal description cannot exceed 500 characters");
+    }
+
     try {
       openModal("PROCESSING_TRANSACTION");
-
-      const totalAmount = tokenTotals.reduce((sum, t) => sum + t.total, 0);
-      const description = `Payment for ${selectedInvoices.length} invoice(s) - Total: ${totalAmount}`;
 
       // Build payments array from selected invoices
       const payments = selectedInvoices.map(inv => ({
@@ -213,7 +222,7 @@ const BillReviewContainer = () => {
       await createProposalMutation.mutateAsync({
         accountId,
         billUUIDs: selectedInvoices.map(inv => inv.bill.uuid),
-        description,
+        description: description,
         payments,
       } as CreateProposalFromBillsDto);
 
@@ -337,6 +346,16 @@ const BillReviewContainer = () => {
             <div className=" flex flex-col gap-2 justify-between">
               <span className="font-bold text-3xl">Payment Overview</span>
               <span className="text-text-secondary ">Make sure the details are correct before proceeding.</span>
+              <textarea
+                {...register("proposalDescription")}
+                placeholder={`Payment for ${selectedInvoices.length} invoice(s)`}
+                aria-label="Proposal description"
+                maxLength={500}
+                className="w-full min-h-[96px] p-3 rounded-lg border border-primary-divider bg-white text-sm text-text-primary resize-none focus:outline-none"
+              />
+              {proposalDescription && proposalDescription.length > 0 && (
+                <div className="text-xs text-text-secondary mt-1">{proposalDescription.length}/500</div>
+              )}
             </div>
 
             <div className="flex flex-col gap-3">

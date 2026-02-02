@@ -125,6 +125,7 @@ export type InvoiceStatusEnum = (typeof InvoiceStatusEnum)[keyof typeof InvoiceS
 
 export const BillStatusEnum = {
   PENDING: 'PENDING',
+  PROPOSED: 'PROPOSED',
   PAID: 'PAID',
   OVERDUE: 'OVERDUE',
   CANCELLED: 'CANCELLED',

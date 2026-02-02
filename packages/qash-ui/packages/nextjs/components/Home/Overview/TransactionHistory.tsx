@@ -224,7 +224,7 @@ const TransactionHistory = () => {
 
               {/* Button */}
               <Link
-                href="/settings/multisig"
+                href="/setting"
                 onClick={e => {
                   // Optional: handle click event if needed
                 }}

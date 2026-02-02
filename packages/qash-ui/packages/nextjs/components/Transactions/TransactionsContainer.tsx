@@ -79,6 +79,20 @@ export function TransactionsContainer() {
   // Get current selected account
   const currentAccount = multisigAccounts.find(a => a.accountId === activeTab);
 
+  // Calculate pending proposal count for each account
+  const pendingCountByAccount = useMemo(() => {
+    const counts = new Map<string, number>();
+    multisigAccounts.forEach(account => {
+      const count = allProposals.filter(
+        p =>
+          p.accountId === account.accountId &&
+          (p.status === MultisigProposalStatusEnum.PENDING || p.status === MultisigProposalStatusEnum.READY),
+      ).length;
+      counts.set(account.accountId, count);
+    });
+    return counts;
+  }, [allProposals, multisigAccounts]);
+
   // Filter proposals by active account and status
   const pendingProposals = useMemo(() => {
     return allProposals
@@ -451,23 +465,31 @@ export function TransactionsContainer() {
       ) : (
         <>
           <div className="w-full flex flex-row border-b border-primary-divider">
-            {multisigAccounts.map(account => (
-              <button
-                key={account.accountId}
-                onClick={() => {
-                  setActiveTab(account.accountId);
-                  setActiveSubTab("pending");
-                  setSelectedNoteIds([]);
-                }}
-                className={`flex items-center justify-center px-6 py-3 cursor-pointer group transition-colors duration-300 border-b-[3px] ${
-                  activeTab === account.accountId
-                    ? "border-primary-blue text-text-strong-950"
-                    : "border-transparent text-text-soft-400 hover:text-text-soft-500"
-                }`}
-              >
-                <p className="font-medium text-base leading-6 transition-colors duration-300">{account.name}</p>
-              </button>
-            ))}
+            {multisigAccounts.map(account => {
+              const pendingCount = pendingCountByAccount.get(account.accountId) || 0;
+              return (
+                <button
+                  key={account.accountId}
+                  onClick={() => {
+                    setActiveTab(account.accountId);
+                    setActiveSubTab("pending");
+                    setSelectedNoteIds([]);
+                  }}
+                  className={`flex items-center justify-center gap-2 px-6 py-3 cursor-pointer group transition-colors duration-300 border-b-[3px] ${
+                    activeTab === account.accountId
+                      ? "border-primary-blue text-text-strong-950"
+                      : "border-transparent text-text-soft-400 hover:text-text-soft-500"
+                  }`}
+                >
+                  <p className="font-medium text-base leading-6 transition-colors duration-300">{account.name}</p>
+                  {pendingCount > 0 && (
+                    <span className="inline-flex items-center justify-center min-w-6 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-600 text-white">
+                      {pendingCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           <BaseContainer

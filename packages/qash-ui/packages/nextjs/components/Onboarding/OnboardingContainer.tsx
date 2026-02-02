@@ -57,7 +57,6 @@ export default function OnboardingContainer() {
   const [selectedCompanyType, setSelectedCompanyType] = useState<string>("");
   const [selectedCountry, setSelectedCountry] = useState<string>("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  console.log("🚀 ~ OnboardingContainer ~ logoUrl:", logoUrl);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const {
     register,

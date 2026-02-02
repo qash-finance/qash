@@ -75,6 +75,12 @@ export class BillStatsDto implements SharedTypes.BillStatsDto {
   totalPending: number;
 
   @ApiProperty({
+    description: 'Total number of proposed bills',
+    example: 5,
+  })
+  totalProposed: number;
+
+  @ApiProperty({
     description: 'Total number of paid bills',
     example: 30,
   })
@@ -97,6 +103,12 @@ export class BillStatsDto implements SharedTypes.BillStatsDto {
     example: '45000.00',
   })
   pendingAmount: string;
+
+  @ApiProperty({
+    description: 'Total amount of proposed bills',
+    example: '15000.00',
+  })
+  proposedAmount: string;
 
   @ApiProperty({
     description: 'Total amount of paid bills',

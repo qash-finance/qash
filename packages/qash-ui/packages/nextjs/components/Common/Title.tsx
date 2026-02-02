@@ -2,17 +2,18 @@ import React, { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { MODAL_IDS } from "@/types/modal";
 import { useModal } from "@/contexts/ModalManagerProvider";
-import { useGetNotificationsInfinite } from "@/services/api/notification";
-import { useWalletConnect } from "@/hooks/web3/useWalletConnect";
 import { useTitle } from "@/contexts/TitleProvider";
 import { ActionButton } from "./ActionButton";
+import { Tooltip } from "react-tooltip";
+import { useAuth } from "@/services/auth/context";
+import { TeamMemberRoleEnum } from "@qash/types/enums";
 
 export const Title = () => {
   const { openModal } = useModal();
   const pathname = usePathname();
-  const { walletAddress, isConnected } = useWalletConnect();
   const router = useRouter();
   const { title, showBackArrow, onBackClick, resetTitle } = useTitle();
+  const { user } = useAuth();
 
   // Reset title when route changes
   useEffect(() => {
@@ -20,20 +21,10 @@ export const Title = () => {
   }, [pathname]);
 
   // Calculate unread count
-  const { data } = useGetNotificationsInfinite(walletAddress, 20);
-  const unreadCount = data?.pages
-    ? data.pages.flatMap(page => page.notifications).filter((item: any) => item.status === "UNREAD").length
-    : 0;
-
-  const dashboardTabs = [
-    { id: "pending-receive", label: "Receive", href: "/dashboard/pending-receive" },
-    {
-      id: "pending-request",
-      label: "Payment Request",
-      href: "/dashboard/pending-request",
-    },
-    { id: "cancel-transaction", label: "Cancel Payment", href: "/dashboard/cancel-transaction" },
-  ];
+  // const { data } = useGetNotificationsInfinite(walletAddress, 20);
+  // const unreadCount = data?.pages
+  //   ? data.pages.flatMap(page => page.notifications).filter((item: any) => item.status === "UNREAD").length
+  //   : 0;
 
   return (
     <div className="flex flex-row gap-2 mx-[24px] pt-1">
@@ -42,9 +33,6 @@ export const Title = () => {
           <img src="/arrow/thin-arrow-left.svg" alt="back" className="w-5 cursor-pointer" onClick={onBackClick} />
         )}
         <div className="leading-none text-text-secondary text-lg flex-1">{title}</div>
-        {pathname.startsWith("/dashboard/schedule-payment") && (
-          <ActionButton text="Create recurring payment" icon="/plus-icon.svg" onClick={() => router.push("/send")} />
-        )}
       </div>
 
       {/* <button
@@ -54,6 +42,64 @@ export const Title = () => {
         <img src="/misc/dark-shopping-bag.svg" alt="coin-icon" className="w-5 h-5 " />
         Batch
       </button> */}
+
+      {user && user.teamMembership?.role === TeamMemberRoleEnum.VIEWER && (
+        <>
+          <div
+            className="flex flex-row justify-center items-center rounded-full px-4 bg-[#F7E3DA] gap-1"
+            data-tooltip-id="user-role-tooltip"
+          >
+            <img src="/misc/orange-eye-icon.svg" alt="divider" className="w-6" />
+            <span className="text-[#E97135]">Viewer</span>
+          </div>
+
+          {/* Batch Action Tooltip */}
+          <Tooltip
+            id="user-role-tooltip"
+            style={{
+              zIndex: 20,
+              borderRadius: "16px",
+              padding: "0",
+            }}
+            arrowColor="#444444"
+            place="bottom"
+            border="none"
+            opacity={1}
+            render={({ content }) => {
+              return <div className="bg-[#444444] px-4 py-2 rounded-xl">Viewer can only view in this team.</div>;
+            }}
+          />
+        </>
+      )}
+
+      {user && user.teamMembership?.role === TeamMemberRoleEnum.REVIEWER && (
+        <>
+          <div
+            className="flex flex-row justify-center items-center rounded-full px-6 bg-[#CBE5F8] gap-1"
+            data-tooltip-id="user-role-tooltip"
+          >
+            <img src="/misc/blue-note-icon.svg" alt="divider" className="w-6" />
+            <span className="text-[#1E8FFF]">Reviewer</span>
+          </div>
+
+          {/* Batch Action Tooltip */}
+          <Tooltip
+            id="user-role-tooltip"
+            style={{
+              zIndex: 20,
+              borderRadius: "16px",
+              padding: "0",
+            }}
+            arrowColor="#444444"
+            place="bottom"
+            border="none"
+            opacity={1}
+            render={({ content }) => {
+              return <div className="bg-[#444444] px-4 py-2 rounded-xl">Reviewer can only vote proposal</div>;
+            }}
+          />
+        </>
+      )}
 
       <button
         className="cursor-pointer flex flex-row gap-1 items-center justify-center px-6 py-2 bg-background rounded-lg leading-none"
@@ -68,9 +114,9 @@ export const Title = () => {
         onClick={() => openModal(MODAL_IDS.NOTIFICATION)}
       >
         <img src="/notification/notification.gif" alt="bell" className="w-5 h-5" />
-        {isConnected && unreadCount > 0 && (
+        {/* {isConnected && unreadCount > 0 && (
           <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-[#FF2323] rounded-full" />
-        )}
+        )} */}
       </div>
     </div>
   );

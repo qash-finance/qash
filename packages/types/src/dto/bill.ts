@@ -19,10 +19,12 @@ export interface BillQueryDto {
 export interface BillStatsDto {
   totalBills: number;
   totalPending: number;
+  totalProposed: number;
   totalPaid: number;
   totalOverdue: number;
   totalAmount: string;
   pendingAmount: string;
+  proposedAmount: string;
   paidAmount: string;
   overdueAmount: string;
 }

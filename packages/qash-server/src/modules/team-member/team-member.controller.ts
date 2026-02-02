@@ -38,6 +38,8 @@ import {
   UpdateTeamMemberRoleDto,
   AcceptInvitationDto,
   AcceptInvitationByTokenDto,
+  UpdateAvatarDto,
+  UpdateAvatarResponseDto,
 } from './team-member.dto';
 import { CompanyAuth } from '../auth/decorators/company-auth.decorator';
 import { Public } from '../auth/decorators/public.decorator';
@@ -305,6 +307,39 @@ export class TeamMemberController {
     } catch (error) {
       this.logger.error(
         `Update team member role ${teamMemberId} failed for user ${user.sub}:`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  @Put('team-members/avatar/:id')
+  @ApiOperation({
+    summary: 'Update team member avatar',
+    description: 'Update profile picture for a team member (Owner/Admin or own profile)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Avatar updated successfully',
+    type: UpdateAvatarResponseDto,
+  })
+  @ApiNotFoundResponse({ description: 'Team member not found' })
+  @ApiForbiddenResponse({ description: 'Insufficient permissions' })
+  async updateAvatar(
+    @Param('id', ParseIntPipe) teamMemberId: number,
+    @CurrentUser('withCompany') user: UserWithCompany,
+    @Body() updateAvatarDto: UpdateAvatarDto,
+  ): Promise<UpdateAvatarResponseDto> {
+    try {
+      const result = await this.teamMemberService.updateAvatar(
+        teamMemberId,
+        user.internalUserId,
+        updateAvatarDto.profilePicture,
+      );
+      return result as UpdateAvatarResponseDto;
+    } catch (error) {
+      this.logger.error(
+        `Update avatar for team member ${teamMemberId} failed for user ${user.sub}:`,
         error,
       );
       throw error;

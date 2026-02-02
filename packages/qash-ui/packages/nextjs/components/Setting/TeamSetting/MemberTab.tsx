@@ -8,7 +8,7 @@ import { useModal } from "@/contexts/ModalManagerProvider";
 import { MemberActionTooltip } from "@/components/Common/ToolTip/MemberActionTooltip";
 import toast from "react-hot-toast";
 import type { TeamMemberResponseDto } from "@qash/types/dto/team-member";
-import { TeamMemberStatusEnum } from "@qash/types/enums";
+import { TeamMemberRoleEnum, TeamMemberStatusEnum } from "@qash/types/enums";
 
 interface Member {
   id: string;
@@ -22,19 +22,18 @@ interface MemberTabProps {
   onMenuClick: (memberId: string) => void;
 }
 
-const roleDisplay = (role?: string) => {
-  if (!role) return "";
+const roleDisplay = (role?: string): TeamMemberRoleEnum => {
   switch (role) {
     case "OWNER":
-      return "Owner";
+      return TeamMemberRoleEnum.OWNER;
     case "ADMIN":
-      return "Admin";
+      return TeamMemberRoleEnum.ADMIN;
     case "REVIEWER":
-      return "Reviewer";
+      return TeamMemberRoleEnum.REVIEWER;
     case "VIEWER":
-      return "Viewer";
+      return TeamMemberRoleEnum.VIEWER;
     default:
-      return role;
+      return TeamMemberRoleEnum.VIEWER;
   }
 };
 
@@ -98,6 +97,7 @@ const MemberTab: React.FC<MemberTabProps> = ({ onMenuClick }) => {
             companyRole: m.position || "",
             role: [roleDisplay(m.role)],
             status: m.status,
+            profilePicture: m.profilePicture || undefined,
           };
 
           const handleEdit = () => openModal("EDIT_TEAM_MEMBER", { id: Number(m.id) });

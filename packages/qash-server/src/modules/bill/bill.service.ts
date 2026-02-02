@@ -409,6 +409,20 @@ export class BillService {
         throw new NotFoundException(ErrorBill.BillsNotFoundOrNotPayable);
       }
 
+      // Check if any bill has a proposed transaction status
+      const proposedBills = bills.filter(
+        (bill) => bill.status === BillStatusEnum.PROPOSED,
+      );
+
+      if (proposedBills.length > 0) {
+        const proposedBillIds = proposedBills
+          .map((bill) => bill.uuid)
+          .join(', ');
+        throw new ConflictException(
+          `Bills with IDs [${proposedBillIds}] have pending multisig proposals and cannot be paid. Please cancel the proposals first.`,
+        );
+      }
+
       // Calculate total amount
       const totalAmount = bills
         .reduce((sum, bill) => sum + parseFloat(bill.invoice.total), 0)
@@ -610,4 +624,92 @@ export class BillService {
     );
   }
   //#endregion DELETE METHODS
+
+  //#region MULTISIG INTEGRATION METHODS
+  // *************************************************
+  // *** MULTISIG INTEGRATION METHODS ***
+  // *************************************************
+
+  /**
+   * Update bills status to PROPOSED when linked to a multisig proposal
+   * Called by MultisigService when a proposal is created with bills
+   */
+  async updateBillsStatusToProposed(
+    billUUIDs: string[],
+    proposalId: number,
+    tx: PrismaTransactionClient,
+  ): Promise<void> {
+    try {
+      if (billUUIDs.length === 0) {
+        return;
+      }
+
+      // Update all bills to PROPOSED status and link to proposal
+      const model = tx || this.prisma;
+      await model.bill.updateMany({
+        where: {
+          uuid: {
+            in: billUUIDs,
+          },
+        },
+        data: {
+          status: BillStatusEnum.PROPOSED,
+          multisigProposalId: proposalId,
+        },
+      });
+
+      this.logger.log(
+        `Updated ${billUUIDs.length} bills to PROPOSED status for proposal ${proposalId}`,
+      );
+    } catch (error) {
+      this.logger.error('Error updating bills to PROPOSED status:', error);
+      handleError(error, this.logger);
+    }
+  }
+
+  /**
+   * Revert bills from PROPOSED back to PENDING when proposal is cancelled/failed
+   * Called by MultisigService when a proposal is cancelled or fails
+   */
+  async revertBillsFromProposed(
+    proposalId: number,
+    tx: PrismaTransactionClient,
+  ): Promise<void> {
+    try {
+      const model = tx || this.prisma;
+
+      // Find all bills linked to this proposal
+      const billsToRevert = await model.bill.findMany({
+        where: {
+          multisigProposalId: proposalId,
+          status: BillStatusEnum.PROPOSED,
+        },
+      });
+
+      if (billsToRevert.length === 0) {
+        return;
+      }
+
+      // Revert all bills back to PENDING and remove proposal link
+      await model.bill.updateMany({
+        where: {
+          multisigProposalId: proposalId,
+          status: BillStatusEnum.PROPOSED,
+        },
+        data: {
+          status: BillStatusEnum.PENDING,
+          multisigProposalId: null,
+        },
+      });
+
+      this.logger.log(
+        `Reverted ${billsToRevert.length} bills from PROPOSED to PENDING for cancelled proposal ${proposalId}`,
+      );
+    } catch (error) {
+      this.logger.error('Error reverting bills from PROPOSED status:', error);
+      handleError(error, this.logger);
+    }
+  }
+
+  //#endregion MULTISIG INTEGRATION METHODS
 }

@@ -24,6 +24,7 @@ import {
 import { UserWithCompany } from '../../auth/decorators/current-user.decorator';
 import { ActivityActionEnum, ActivityEntityTypeEnum, BillStatusEnum } from '../../../database/generated/client';
 import { ActivityLogService } from 'src/modules/activity-log/activity-log.service';
+import { BillService } from 'src/modules/bill/bill.service';
 
 @Injectable()
 export class MultisigService {
@@ -33,6 +34,7 @@ export class MultisigService {
     private readonly prisma: PrismaService,
     private readonly midenClient: MidenClientService,
     private readonly activityLogService: ActivityLogService,
+    private readonly billService: BillService,
   ) {}
 
   /**
@@ -570,6 +572,13 @@ export class MultisigService {
         },
       });
 
+      // Update bills status to PROPOSED
+      await this.billService.updateBillsStatusToProposed(
+        dto.billUUIDs,
+        newProposal.id,
+        tx,
+      );
+
       // Re-fetch the proposal including linked bills and signatures so callers receive updated relations
       const proposalWithBills = await tx.multisigProposal.findUnique({
         where: { id: newProposal.id },
@@ -698,6 +707,9 @@ export class MultisigService {
             status: BillStatusEnum.PENDING,
           },
         });
+
+        // Log via BillService for consistency
+        await this.billService.revertBillsFromProposed(proposal.id, tx);
       }
 
       // Update proposal status to CANCELLED and clear noteIds

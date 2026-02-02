@@ -187,6 +187,38 @@ export function useUpdateTeamMemberRole() {
 }
 
 /**
+ * Update team member avatar
+ */
+export async function updateAvatar(
+	teamMemberId: number,
+	profilePicture: string
+): Promise<{ profilePicture: string }> {
+	const url = `/kyb/team-members/avatar/${teamMemberId}`;
+	return apiServerWithAuth.putData<{ profilePicture: string }>(url, { profilePicture });
+}
+
+/**
+ * React Query hook to update team member avatar
+ */
+export function useUpdateAvatar() {
+	const queryClient = useQueryClient();
+	const { refreshUser } = useAuth();
+
+	return useMutation<
+		{ profilePicture: string },
+		Error,
+		{ teamMemberId: number; profilePicture: string }
+	>({
+		mutationFn: ({ teamMemberId, profilePicture }) =>
+			updateAvatar(teamMemberId, profilePicture),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+			refreshUser();
+		},
+	});
+}
+
+/**
  * Remove team member
  */
 export async function removeTeamMember(teamMemberId: number): Promise<void> {

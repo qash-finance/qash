@@ -1,17 +1,15 @@
 import React from "react";
 import { Tooltip } from "react-tooltip";
 import { MemberActionTooltip } from "@/components/Common/ToolTip/MemberActionTooltip";
-import { TeamMemberStatusEnum } from "@qash/types/enums";
-
-type Role = string;
-
+import { TeamMemberRoleEnum, TeamMemberStatusEnum } from "@qash/types/enums";
 interface Member {
   id: string;
   name: string;
   email: string;
   companyRole: string;
-  role: Role[];
+  role: TeamMemberRoleEnum[];
   status: TeamMemberStatusEnum;
+  profilePicture?: string;
 }
 
 interface MemberCardProps {
@@ -21,11 +19,20 @@ interface MemberCardProps {
   onRemove?: () => void;
 }
 
-const Chip = ({ label }: { label: Role }) => (
+const Chip = ({ label }: { label: TeamMemberRoleEnum }) => (
   <div className="px-3 py-1 rounded-full w-fit flex items-center gap-1 border-b border-primary-divider bg-background">
-    {label === "Owner" && <img src="/misc/purple-crown-icon.svg" alt="Owner" className="w-5" />}
-    {label === "Admin" && <img src="/misc/green-shield-icon.svg" alt="Admin" className="w-5" />}
-    {label === "Reviewer" && <img src="/misc/blue-note-icon.svg" alt="Reviewer" className="w-5" />}
+    {label.toUpperCase() === TeamMemberRoleEnum.OWNER && (
+      <img src="/misc/purple-crown-icon.svg" alt="Owner" className="w-5" />
+    )}
+    {label.toUpperCase() === TeamMemberRoleEnum.ADMIN && (
+      <img src="/misc/green-shield-icon.svg" alt="Admin" className="w-5" />
+    )}
+    {label.toUpperCase() === TeamMemberRoleEnum.REVIEWER && (
+      <img src="/misc/blue-note-icon.svg" alt="Reviewer" className="w-5" />
+    )}
+    {label.toUpperCase() === TeamMemberRoleEnum.VIEWER && (
+      <img src="/misc/orange-eye-icon.svg" alt="Reviewer" className="w-5" />
+    )}
     <span className="text-sm font-medium">{label}</span>
   </div>
 );
@@ -45,7 +52,10 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, onMenuClick, onEdit, on
         {/* Account Info */}
         <div className="flex flex-col gap-4 flex-1">
           {/* Avatar */}
-          <img src={"/client-invoice/accounting-icon.svg"} className="w-10" />
+          <img
+            src={member.profilePicture ? member.profilePicture : "/client-invoice/accounting-icon.svg"}
+            className="w-10"
+          />
 
           {/* Account Details */}
           <div className="flex flex-col gap-1">

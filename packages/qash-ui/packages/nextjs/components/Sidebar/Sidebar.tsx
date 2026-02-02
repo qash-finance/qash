@@ -15,7 +15,12 @@ import toast from "react-hot-toast";
 import TeamSidebar from "./TeamSidebar";
 import { useGetMyCompany } from "@/services/api/company";
 import { useGetTeamStats } from "@/services/api/team-member";
-import { useGetBatchAccountBalances, useGetMultisigAccount, useListAccountsByCompany } from "@/services/api/multisig";
+import {
+  useGetBatchAccountBalances,
+  useGetMultisigAccount,
+  useListAccountsByCompany,
+  useListProposalsByCompany,
+} from "@/services/api/multisig";
 
 export const MOVE_CRYPTO_SIDEBAR_OFFSET = 290;
 
@@ -64,6 +69,7 @@ export const actionItems = [
     disabled: false,
     hasSubmenu: false,
     submenuType: SubmenuType.Null,
+    badgeCount: 0,
   },
   {
     icon: "/sidebar/contact-book.svg",
@@ -72,6 +78,7 @@ export const actionItems = [
     isActive: false,
     link: SidebarLink.ContactBook,
     disabled: false,
+    badgeCount: 0,
   },
   {
     icon: "/sidebar/payroll.svg",
@@ -80,6 +87,7 @@ export const actionItems = [
     isActive: false,
     link: SidebarLink.Payroll,
     disabled: false,
+    badgeCount: 0,
   },
   {
     icon: "/sidebar/invoice.svg",
@@ -88,6 +96,7 @@ export const actionItems = [
     isActive: false,
     link: SidebarLink.Invoice,
     disabled: false,
+    badgeCount: 0,
   },
   {
     icon: "/sidebar/bill.svg",
@@ -96,6 +105,7 @@ export const actionItems = [
     isActive: false,
     link: SidebarLink.Bill,
     disabled: false,
+    badgeCount: 0,
   },
   {
     icon: "/sidebar/payment-link.svg",
@@ -104,6 +114,7 @@ export const actionItems = [
     isActive: false,
     link: SidebarLink.PaymentLink,
     disabled: false,
+    badgeCount: 0,
   },
   {
     icon: "/sidebar/transactions.svg",
@@ -112,6 +123,7 @@ export const actionItems = [
     isActive: false,
     link: SidebarLink.Transactions,
     disabled: false,
+    badgeCount: 0,
   },
   {
     icon: "/sidebar/payroll.svg",
@@ -119,6 +131,7 @@ export const actionItems = [
     label: "Earn",
     isActive: false,
     disabled: true,
+    badgeCount: 0,
   },
   {
     icon: "/sidebar/credit-card.svg",
@@ -127,6 +140,7 @@ export const actionItems = [
     isActive: false,
     link: SidebarLink.CreditCard,
     disabled: true,
+    badgeCount: 0,
   },
   {
     icon: "/sidebar/setting.svg",
@@ -135,6 +149,7 @@ export const actionItems = [
     isActive: false,
     link: SidebarLink.Setting,
     disabled: false,
+    badgeCount: 0,
   },
 ];
 
@@ -151,6 +166,14 @@ export const Sidebar: React.FC<NavProps> = ({ onActionItemClick }) => {
   const { logoutAsync } = useMidenProvider();
   const getBalances = useGetBatchAccountBalances();
   const [totalBalance, setTotalBalance] = useState<number>(0);
+
+  const {
+    data: allProposals = [],
+    isLoading: proposalsLoading,
+    refetch: refetchProposals,
+  } = useListProposalsByCompany(myCompany?.id, {
+    enabled: !!myCompany?.id,
+  });
 
   // **************** Effect ****************
   useEffect(() => {
@@ -201,6 +224,21 @@ export const Sidebar: React.FC<NavProps> = ({ onActionItemClick }) => {
       })();
     }
   }, [multisigAccounts]);
+
+  useEffect(() => {
+    // Update badge count for Transactions item based on allProposals length
+    setActions(prev =>
+      prev.map(item => {
+        if (item.link === SidebarLink.Transactions) {
+          return {
+            ...item,
+            badgeCount: allProposals.length,
+          };
+        }
+        return item;
+      }),
+    );
+  }, [allProposals]);
 
   // **************** Handlers ****************
   const handleActionItemClick = (itemIndex: number) => {
