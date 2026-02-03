@@ -1,9 +1,12 @@
 import React, { useState } from "react";
-import { Header } from "./Header";
 import { EmployeeContact } from "./EmployeeContact";
 import { ClientContact } from "./ClientContact";
 import { createShapeElement } from "../Common/ToolTip/ShapeSelectionTooltip";
 import { CategoryShapeEnum } from "@qash/types/enums";
+import { PageHeader } from "../Common/PageHeader";
+import { useModal } from "@/contexts/ModalManagerProvider";
+import { MODAL_IDS } from "@/types/modal";
+import { PrimaryButton } from "../Common/PrimaryButton";
 
 export const CategoryTab = ({ label }: { label: React.ReactNode }) => {
   return (
@@ -17,11 +20,7 @@ export const CategoryTab = ({ label }: { label: React.ReactNode }) => {
 export const CategoryBadge = ({ shape, color, name }: { shape: CategoryShapeEnum; color: string; name: string }) => {
   // Special design for "Client" - just orange text without background or icon
   if (name === "Client") {
-    return (
-      <span className="font-semibold text-[#F5A623]">
-        {name}
-      </span>
-    );
+    return <span className="font-semibold text-[#F5A623]">{name}</span>;
   }
 
   return (
@@ -38,6 +37,7 @@ export const CategoryBadge = ({ shape, color, name }: { shape: CategoryShapeEnum
 };
 
 const ContactBookContainer = () => {
+  const { openModal } = useModal();
   const [activeContactTab, setActiveContactTab] = useState<"employee" | "client">("employee");
 
   const renderTabContent = () => {
@@ -51,9 +51,19 @@ const ContactBookContainer = () => {
 
   return (
     <div className="w-full h-full p-5 flex flex-col items-start gap-4">
-      <div className="w-full flex flex-col gap-4 px-5">
-        <Header />
-      </div>
+      <PageHeader
+        icon="/sidebar/contact-book.svg"
+        label="Contact Book"
+        button={
+          <PrimaryButton
+            text="Add contact"
+            icon="/misc/plus-icon.svg"
+            iconPosition="left"
+            onClick={() => openModal(MODAL_IDS.CHOOSE_CONTACT_TYPE)}
+            containerClassName="w-[140px]"
+          />
+        }
+      />
 
       {/** Employee or Client tab */}
       <div className="w-full flex flex-row border-b border-primary-divider relative">

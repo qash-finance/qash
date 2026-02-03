@@ -375,7 +375,7 @@ export function InviteTeamMember({ isOpen, onClose, zIndex }: ModalProp<Validati
                         <button
                           type="button"
                           data-tooltip-id={`role-tooltip-${member.id}`}
-                          className="flex items-center justify-center hover:opacity-80 transition-opacity cursor-poi"
+                          className="flex items-center justify-center hover:opacity-80 transition-opacity cursor-pointer"
                           onClick={() => setSelectedMemberIdForRole(member.id)}
                         >
                           <img src="/arrow/chevron-down.svg" alt="chevron right" className="w-5" />
@@ -383,7 +383,7 @@ export function InviteTeamMember({ isOpen, onClose, zIndex }: ModalProp<Validati
                         <Tooltip
                           id={`role-tooltip-${member.id}`}
                           clickable
-                          style={{ zIndex: 20, borderRadius: "16px", padding: "0" }}
+                          style={{ zIndex: zIndex ? zIndex + 10 : 1000, borderRadius: "16px", padding: "0" }}
                           place="left"
                           noArrow
                           border="none"

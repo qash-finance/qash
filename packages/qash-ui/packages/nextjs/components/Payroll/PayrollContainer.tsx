@@ -1,7 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { useGetPayrolls, useDeletePayroll } from "@/services/api/payroll";
-import { Header } from "./Header";
 import { BaseContainer } from "../Common/BaseContainer";
 import { Table } from "../Common/Table";
 import PayrollActionTooltip from "../Common/ToolTip/PayrollActionTooltip";
@@ -11,6 +10,8 @@ import { useGetAllEmployeeGroups } from "@/services/api/employee";
 import { CategoryShapeEnum } from "@qash/types/enums";
 import { useRouter } from "next/navigation";
 import { useModal } from "@/contexts/ModalManagerProvider";
+import { PageHeader } from "../Common/PageHeader";
+import { PrimaryButton } from "../Common/PrimaryButton";
 
 const PayrollContainer = () => {
   const router = useRouter();
@@ -100,7 +101,21 @@ const PayrollContainer = () => {
 
   return (
     <div className="w-full h-full p-5 flex flex-col items-start gap-4">
-      <Header />
+      <PageHeader
+        icon="/sidebar/payroll.svg"
+        label="Payroll"
+        button={
+          <PrimaryButton
+            text="New payroll"
+            icon="/misc/plus-icon.svg"
+            iconPosition="left"
+            onClick={() => {
+              router.push("/payroll/create");
+            }}
+            containerClassName="w-[125px]"
+          />
+        }
+      />
 
       <BaseContainer
         header={

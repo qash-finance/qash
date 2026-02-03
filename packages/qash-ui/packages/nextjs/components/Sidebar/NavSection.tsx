@@ -43,7 +43,6 @@ const NavItem: React.FC<NavItemProps> = ({
   onSubmenuClick,
   badgeCount,
 }) => {
-  console.log("🚀 ~ NavItem ~ badgeCount:", badgeCount);
   const [isHovered, setIsHovered] = useState(false);
   const baseClasses =
     "flex gap-1.5 items-center h-11 p-2.5 w-full whitespace-nowrap rounded-xl transition-all duration-200 ease-in-out justify-between";

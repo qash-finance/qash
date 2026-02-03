@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, use } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { NavSections } from "./NavSection";
 import { Connect } from "./Connect";
 import { useRouter, usePathname } from "next/navigation";
@@ -163,6 +163,10 @@ export const Sidebar: React.FC<NavProps> = ({ onActionItemClick }) => {
   const [showMoveCryptoSidebar, setShowMoveCryptoSidebar] = useState(false);
   const [showTeamSidebar, setShowTeamSidebar] = useState(false);
   const { isAuthenticated, user, logout } = useAuth();
+
+  // Memoized handlers to avoid recreating functions each render (prevents effect loops in children)
+  const handleOpenTeamSidebar = useCallback(() => setShowTeamSidebar(true), []);
+  const handleCloseTeamSidebar = useCallback(() => setShowTeamSidebar(false), []);
   const { logoutAsync } = useMidenProvider();
   const getBalances = useGetBatchAccountBalances();
   const [totalBalance, setTotalBalance] = useState<number>(0);
@@ -315,7 +319,7 @@ export const Sidebar: React.FC<NavProps> = ({ onActionItemClick }) => {
 
             <div
               className="w-full shadow-md flex items-center justify-center rounded-xl bg-background flex-col my-3 mx-2 cursor-pointer"
-              onClick={() => setShowTeamSidebar(true)}
+              onClick={handleOpenTeamSidebar}
             >
               <div className="flex p-3 justify-between w-full items-center border-b border-primary-divider">
                 <div className="flex flex-row gap-2">
@@ -400,7 +404,7 @@ export const Sidebar: React.FC<NavProps> = ({ onActionItemClick }) => {
         <MoveCryptoSidebar isOpen={showMoveCryptoSidebar} onClose={() => setShowMoveCryptoSidebar(false)} />
       </Suspense> */}
       <Suspense fallback={<div>Loading...</div>}>
-        <TeamSidebar isOpen={showTeamSidebar} onClose={() => setShowTeamSidebar(false)} />
+        <TeamSidebar isOpen={showTeamSidebar} onClose={handleCloseTeamSidebar} />
       </Suspense>
     </>
   );

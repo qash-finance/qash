@@ -20,6 +20,7 @@ import { bytesToHex, fromHexSig, hexToBytes } from "@/utils";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { useClient, useWallet } from "@getpara/react-sdk";
 import { useRouter } from "next/navigation";
+import { PageHeader } from "../Common/PageHeader";
 
 // Previously a fixed enum - we now allow any multisig account id
 type SubTabType = "pending" | "history" | "receive";
@@ -446,12 +447,8 @@ export function TransactionsContainer() {
   };
 
   return (
-    <div className="flex flex-col w-full gap-6 px-4 py-2 items-start h-full">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-8 py-4">
-        <img src="/sidebar/transactions.svg" alt="Transactions" className="w-6" />
-        <h1 className="text-2xl font-semibold text-text-primary">Transactions</h1>
-      </div>
+    <div className="flex flex-col w-full gap-3 p-4 items-start h-full">
+      <PageHeader icon="/sidebar/transactions.svg" label="Transactions" button={null} />
 
       {/* Main Tabs - Based on Multisig Accounts */}
       {accountsLoading ? (

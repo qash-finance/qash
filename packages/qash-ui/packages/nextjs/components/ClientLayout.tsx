@@ -14,7 +14,6 @@ import { useMobileDetection } from "@/hooks/web3/useMobileDetection";
 import { FloatingActionButton } from "./Common/FloatingActionButton";
 import { TourProviderWrapper } from "@/contexts/TourProvider";
 // import { MidenSdkProvider } from "@/contexts/MidenSdkProvider";
-import Background from "./Common/Background";
 import { SocketProvider } from "@/contexts/SocketProvider";
 import { usePathname, useRouter } from "next/navigation";
 import { TransactionProviderC } from "@/contexts/TransactionProvider";
@@ -175,7 +174,6 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
                             </div>
                           )}
                           {!isFullscreen && <FloatingActionButton imgSrc="/token/qash.svg" />}
-                          {!isFullscreen && <Background />}
                         </TitleProvider>
                       </TransactionProviderC>
                     </AccountProvider>

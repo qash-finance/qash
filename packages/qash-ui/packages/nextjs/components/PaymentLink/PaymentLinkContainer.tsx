@@ -19,6 +19,7 @@ import toast from "react-hot-toast";
 import { PaymentLinkActionsTooltip } from "./PaymentLinkActionsTooltip";
 import { SecondaryButton } from "../Common/SecondaryButton";
 import { Badge, BadgeStatus } from "../Common/Badge";
+import { PageHeader } from "../Common/PageHeader";
 
 const tabs = [
   { id: "all", label: "All links", title: "All payment links", description: "Share these links for payments." },
@@ -261,21 +262,21 @@ const PaymentLinkContainer = () => {
     <div className="flex flex-col w-full h-full p-4 items-center justify-start gap-5">
       {/* Header */}
       <div className="w-full flex flex-col gap-5 px-7">
-        <div className="w-full flex flex-row items-center justify-between">
-          <div className="flex flex-row items-center gap-2">
-            <img src="/sidebar/payment-link.svg" alt="Payment Link" />
-            <h1 className="text-2xl font-bold">Payment Link</h1>
-          </div>
-          <PrimaryButton
-            text="Create payment link"
-            icon="/misc/plus-icon.svg"
-            iconPosition="left"
-            onClick={() => {
-              router.push("/payment-link/create");
-            }}
-            containerClassName="w-[190px]"
-          />
-        </div>
+        <PageHeader
+          icon="/sidebar/payment-link.svg"
+          label="Payment Links"
+          button={
+            <PrimaryButton
+              text="Create payment link"
+              icon="/misc/plus-icon.svg"
+              iconPosition="left"
+              onClick={() => {
+                router.push("/payment-link/create");
+              }}
+              containerClassName="w-[200px]"
+            />
+          }
+        />
         <div className="w-full flex flex-row gap-2">
           <Card title="All payment links" amount={allLinks.length.toString()} />
           <Card title="Active links" amount={activeLinks.length.toString()} />

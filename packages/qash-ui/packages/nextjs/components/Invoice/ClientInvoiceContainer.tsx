@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import { useModal } from "@/contexts/ModalManagerProvider";
 import { PrimaryButton } from "../Common/PrimaryButton";
 import { cancelB2BInvoice } from "@/services/api/invoice";
+import { PageHeader } from "../Common/PageHeader";
 
 type Tab = "all" | "sent" | "paid";
 
@@ -221,24 +222,23 @@ const ClientInvoiceContainer = () => {
 
   return (
     <div className="flex flex-col w-full h-full justify-start items-start p-5 gap-5">
-      <div className="flex flex-col w-full px-5 gap-10">
-        <div className="flex flex-row justify-between items-center">
-          <div className="flex flex-row gap-3">
-            <img src="/sidebar/bill.svg" alt="Bill Placeholder" className="w-6" />
-            <span className="font-bold text-2xl">Invoices</span>
-          </div>
-          <PrimaryButton
-            text="Create invoice"
-            icon="/misc/plus-icon.svg"
-            iconPosition="left"
-            onClick={() => {
-              router.push("/invoice/create");
-            }}
-            containerClassName="w-[140px]"
-            buttonClassName="py-2.5"
-          />
-        </div>
-
+      <div className="flex flex-col w-full px-5 gap-5">
+        <PageHeader
+          icon="/sidebar/invoice.svg"
+          label="Invoices"
+          button={
+            <PrimaryButton
+              text="Create invoice"
+              icon="/misc/plus-icon.svg"
+              iconPosition="left"
+              onClick={() => {
+                router.push("/invoice/create");
+              }}
+              containerClassName="w-[140px]"
+              // buttonClassName="py-2"
+            />
+          }
+        />
         <div className="flex flex-row w-full gap-2">
           <Card
             title="All invoices"

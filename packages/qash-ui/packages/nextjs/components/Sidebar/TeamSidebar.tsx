@@ -36,8 +36,7 @@ export default function TeamSidebar({ isOpen, onClose }: TeamSidebarProps) {
   };
 
   const handleAddMember = () => {
-    // TODO: Implement add member logic
-    console.log("Add member");
+    openModal("INVITE_TEAM_MEMBER");
   };
 
   return (
@@ -72,7 +71,12 @@ export default function TeamSidebar({ isOpen, onClose }: TeamSidebarProps) {
                 className="w-10"
                 src={myCompany?.logo ? myCompany.logo : "/logo/qash-icon-dark.svg"}
               />
-              <img alt="cheveron Left" className="w-5" src="/arrow/double-chevron-left.svg" onClick={onClose} />
+              <img
+                alt="cheveron Left"
+                className="w-5 cursor-pointer"
+                src="/arrow/double-chevron-left.svg"
+                onClick={onClose}
+              />
             </div>
 
             <h2 className="text-[24px] font-medium leading-[24px] text-text-primary">{myCompany?.companyName}</h2>

@@ -20,6 +20,7 @@ import { useInvoice } from "@/hooks/server/useInvoice";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { useModal } from "@/contexts/ModalManagerProvider";
+import { PageHeader } from "../Common/PageHeader";
 
 type Tab = "all" | "pending" | "paid";
 
@@ -234,11 +235,8 @@ const BillContainer = () => {
 
   return (
     <div className="flex flex-col w-full h-full justify-start items-start p-5 gap-5">
-      <div className="flex flex-col w-full px-5 gap-10">
-        <div className="flex flex-row gap-3">
-          <img src="/sidebar/bill.svg" alt="Bill Placeholder" className="w-6" />
-          <span className="font-bold text-2xl">Bills</span>
-        </div>
+      <div className="flex flex-col w-full px-5 gap-5">
+        <PageHeader icon="/sidebar/bill.svg" label="Bill" button={null} />
         <div className="flex flex-row w-full gap-2">
           <Card
             title="All bills"
