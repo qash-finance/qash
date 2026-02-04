@@ -14,21 +14,22 @@ import { useGetMultisigAccount, useGetAccountMembers } from "@/services/api/mult
 import { useRemoveTeamMember } from "@/services/api/team-member";
 import toast from "react-hot-toast";
 import { useGetMyCompany } from "@/services/api/company";
+import { TeamMemberRoleEnum } from "@qash/types/enums";
 
 // Map server role enum to UI labels
-const mapRole = (role?: string): string[] => {
+const mapRole = (role?: string): TeamMemberRoleEnum[] => {
   if (!role) return [];
   switch (role) {
     case "OWNER":
-      return ["Owner"];
+      return [TeamMemberRoleEnum.OWNER];
     case "ADMIN":
-      return ["Admin"];
+      return [TeamMemberRoleEnum.ADMIN];
     case "REVIEWER":
-      return ["Reviewer"];
+      return [TeamMemberRoleEnum.REVIEWER];
     case "VIEWER":
-      return ["Viewer"];
+      return [TeamMemberRoleEnum.VIEWER];
     default:
-      return [role];
+      return [];
   }
 };
 const TeamAccountContainer = () => {
@@ -76,7 +77,7 @@ const TeamAccountContainer = () => {
           </div>
         </div>
 
-        {/* <div className="flex flex-row gap-2 w-fit">
+        <div className="flex flex-row gap-2 w-fit">
           <SecondaryButton
             text="Deposit"
             icon="/arrow/thin-arrow-down.svg"
@@ -85,7 +86,7 @@ const TeamAccountContainer = () => {
             buttonClassName="py-1 w-fit px-3"
           />
 
-          <PrimaryButton
+          {/* <PrimaryButton
             text="Add new members"
             icon="/misc/plus-icon.svg"
             iconPosition="left"
@@ -100,8 +101,8 @@ const TeamAccountContainer = () => {
             onClick={() => {}}
             variant="light"
             buttonClassName="py-1 w-fit px-3"
-          />
-        </div> */}
+          /> */}
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -142,6 +143,7 @@ const TeamAccountContainer = () => {
             companyRole: m.position || "",
             role: mapRole(m.role),
             status: m.status,
+            profilePicture: m.profilePicture,
           };
 
           const handleEdit = () => openModal("EDIT_TEAM_MEMBER", { id: Number(m.id) });

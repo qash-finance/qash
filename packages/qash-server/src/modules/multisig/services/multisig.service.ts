@@ -20,6 +20,8 @@ import {
   MultisigAccountResponseDto,
   MultisigProposalResponseDto,
   ExecuteTransactionResponseDto,
+  SubmitZoroswapOrderDto,
+  SubmitZoroswapOrderResponseDto,
 } from '../dto/multisig.dto';
 import { UserWithCompany } from '../../auth/decorators/current-user.decorator';
 import { ActivityActionEnum, ActivityEntityTypeEnum, BillStatusEnum } from '../../../database/generated/client';
@@ -1413,5 +1415,65 @@ export class MultisigService {
         companyName: company.companyName,
       },
     };
+  }
+
+  /**
+   * Submit a zoroswap order
+   * 
+   * Sends order parameters to the stateless Miden server.
+   * The server will build the zoroswap note, send to Zoro AMM server,
+   * and return the P2ID note result.
+   */
+  async submitZoroswapOrder(
+    dto: SubmitZoroswapOrderDto,
+    user: UserWithCompany,
+  ): Promise<SubmitZoroswapOrderResponseDto> {
+    this.logger.log(
+      `Submitting zoroswap order for company ${user.company.id}`,
+    );
+
+    // Validate required fields
+    if (!dto.accountId?.trim() || !dto.recipientAccountId?.trim()) {
+      throw new BadRequestException('Account IDs are required');
+    }
+
+    if (!dto.faucetIdIn?.trim() || !dto.faucetIdOut?.trim()) {
+      throw new BadRequestException('Faucet IDs are required');
+    }
+
+    if (dto.amountIn <= 0 || dto.minAmountOut <= 0) {
+      throw new BadRequestException('Amounts must be greater than 0');
+    }
+
+    if (dto.deadline <= 0) {
+      throw new BadRequestException('Deadline must be valid');
+    }
+
+    try {
+      // Submit order to Miden server (which will build note and send to Zoro server)
+      const result = await this.midenClient.submitZoroswapOrder(
+        dto.accountId,
+        dto.faucetIdIn,
+        dto.amountIn,
+        dto.faucetIdOut,
+        dto.minAmountOut,
+        dto.recipientAccountId,
+        dto.deadline,
+      );
+
+      this.logger.log(
+        `Zoroswap order submitted successfully with order ID: ${result.orderId}`,
+      );
+
+      return {
+        success: result.success,
+        message: result.message,
+        orderId: result.orderId,
+        p2idNote: result.p2idNote,
+      };
+    } catch (error) {
+      this.logger.error('Failed to submit zoroswap order', error);
+      throw error;
+    }
   }
 }

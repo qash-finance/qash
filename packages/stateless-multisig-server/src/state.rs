@@ -1,4 +1,5 @@
 use miden_client::address::NetworkId;
+use miden_client::crypto::FeltRng;
 use miden_client::rpc::Endpoint;
 use miden_objects::account::auth::PublicKeyCommitment;
 use tokio::sync::{mpsc, oneshot};
@@ -80,6 +81,10 @@ pub enum ClientCommand {
         faucet_id: String,
         amount: u64,
         respond_to: oneshot::Sender<Result<String, String>>, // Returns transaction ID
+    },
+    /// Get a random Word for note generation
+    GetRandomWord {
+        respond_to: oneshot::Sender<Result<miden_client::Word, String>>,
     },
 }
 
@@ -254,6 +259,15 @@ impl ClientHandle {
                 amount,
                 respond_to: tx,
             })
+            .await
+            .map_err(|e| e.to_string())?;
+        rx.await.map_err(|e| e.to_string())?
+    }
+
+    pub async fn get_random_word(&self) -> Result<miden_client::Word, String> {
+        let (tx, rx) = oneshot::channel();
+        self.sender
+            .send(ClientCommand::GetRandomWord { respond_to: tx })
             .await
             .map_err(|e| e.to_string())?;
         rx.await.map_err(|e| e.to_string())?
@@ -447,6 +461,10 @@ async fn run_client_loop(
             } => {
                 let result = mint_tokens_impl(&mut client, &account_id, &faucet_id, amount).await;
                 let _ = respond_to.send(result);
+            }
+            ClientCommand::GetRandomWord { respond_to } => {
+                let random_word = client.rng().draw_word();
+                let _ = respond_to.send(Ok(random_word));
             }
         }
     }

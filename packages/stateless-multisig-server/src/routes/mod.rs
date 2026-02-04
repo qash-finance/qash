@@ -3,7 +3,7 @@ use axum::{
     routing::{get, post},
 };
 
-use crate::handlers::{health, multisig};
+use crate::handlers::{health, multisig, orders};
 use crate::state::AppState;
 
 pub fn create_routes() -> Router<AppState> {
@@ -47,4 +47,6 @@ pub fn create_routes() -> Router<AppState> {
         )
         // Execute multisig transaction with signatures
         .route("/multisig/execute", post(multisig::execute_transaction))
+        // Zoroswap order endpoints
+        .route("/orders/submit", post(orders::submit_order))
 }

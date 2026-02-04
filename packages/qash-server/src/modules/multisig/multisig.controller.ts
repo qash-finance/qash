@@ -23,6 +23,8 @@ import {
   MultisigProposalResponseDto,
   ExecuteTransactionResponseDto,
   GetBatchAccountBalancesResponseDto,
+  SubmitZoroswapOrderDto,
+  SubmitZoroswapOrderResponseDto,
 } from './dto/multisig.dto';
 import { ParaJwtAuthGuard } from '../auth/guards/para-jwt-auth.guard';
 import { CompanyAuth } from '../auth/decorators/company-auth.decorator';
@@ -303,6 +305,25 @@ export class MultisigController {
     @CurrentUser('withCompany') user: UserWithCompany,
   ): Promise<MultisigProposalResponseDto> {
     return this.multisigService.cancelProposal(proposalUuid, user);
+  }
+
+  // ============================================================================
+  // Zoroswap Endpoints
+  // ============================================================================
+
+  @Post('orders')
+  @CompanyAuth()
+  @ApiOperation({ summary: 'Submit a zoroswap order' })
+  @ApiResponse({
+    status: 201,
+    description: 'Zoroswap order submitted successfully',
+    type: SubmitZoroswapOrderResponseDto,
+  })
+  async submitZoroswapOrder(
+    @Body() dto: SubmitZoroswapOrderDto,
+    @CurrentUser('withCompany') user: UserWithCompany,
+  ): Promise<SubmitZoroswapOrderResponseDto> {
+    return this.multisigService.submitZoroswapOrder(dto, user);
   }
 
   // ============================================================================

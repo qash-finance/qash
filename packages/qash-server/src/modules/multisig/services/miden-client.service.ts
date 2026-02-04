@@ -336,4 +336,56 @@ export class MidenClientService {
       );
     }
   }
+
+  /**
+   * Submit a zoroswap order
+   * 
+   * Sends order parameters to the stateless Miden server.
+   * The server will:
+   * 1. Build the zoroswap note from the parameters
+   * 2. Send it to the Zoro AMM server for execution
+   * 3. Return the P2ID note result
+   */
+  async submitZoroswapOrder(
+    accountId: string,
+    faucetIdIn: string,
+    amountIn: number,
+    faucetIdOut: string,
+    minAmountOut: number,
+    recipientAccountId: string,
+    deadline: number,
+  ): Promise<{ success: boolean; orderId?: string; message: string; p2idNote?: string }> {
+    try {
+      this.logger.debug(
+        `Submitting zoroswap order: ${amountIn} from ${faucetIdIn} to ${faucetIdOut}`,
+      );
+
+      const response = await this.client.post('/orders/submit', {
+        account_id: accountId,
+        faucet_id_in: faucetIdIn,
+        amount_in: amountIn,
+        faucet_id_out: faucetIdOut,
+        min_amount_out: minAmountOut,
+        recipient_account_id: recipientAccountId,
+        deadline,
+      });
+
+      this.logger.log(
+        `Zoroswap order submitted successfully. Order ID: ${response.data.order_id}`,
+      );
+
+      return {
+        success: response.data.success,
+        orderId: response.data.order_id,
+        message: response.data.message,
+        p2idNote: response.data.p2id_note,
+      };
+    } catch (error) {
+      this.logger.error('Failed to submit zoroswap order', error);
+      throw new HttpException(
+        `Failed to submit zoroswap order: ${error.response?.data?.message || error.message}`,
+        error.response?.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
+  }
+}

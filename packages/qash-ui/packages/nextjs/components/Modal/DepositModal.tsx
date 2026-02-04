@@ -1,14 +1,21 @@
 "use client";
 import React, { useState } from "react";
 import { ValidatingModalProps } from "@/types/modal";
-import { ModalProp } from "@/contexts/ModalManagerProvider";
+import { ModalProp, useModal } from "@/contexts/ModalManagerProvider";
 import BaseModal from "./BaseModal";
 import { PrimaryButton } from "../Common/PrimaryButton";
+import { useWallet } from "@getpara/react-sdk";
+import { formatAddress } from "@/services/utils/miden/address";
+import { useMiden } from "@/hooks/web3/useMiden";
+import { useMidenProvider } from "@/contexts/MidenProvider";
 
 export function DepositModal({ isOpen, onClose, zIndex }: ModalProp<ValidatingModalProps>) {
+  const { address } = useMidenProvider();
   const [amount, setAmount] = useState("100,000.00");
   const [selectedToken, setSelectedToken] = useState("USDT");
   const [availableBalance] = useState("200,000");
+
+  const { openModal } = useModal();
 
   const handlePercentageClick = (percentage: number) => {
     const balanceNum = 200000;
@@ -32,7 +39,7 @@ export function DepositModal({ isOpen, onClose, zIndex }: ModalProp<ValidatingMo
             {/* Wallet Address Button */}
             <div className="bg-background border-t border-primary-divider rounded-lg flex gap-2 items-center px-4 py-1.5">
               <img src="/chain/miden.svg" alt="token" className="w-6 h-6 rounded-full bg-[#FFEDE4] p-0.5" />
-              <span className=" text-sm">0x097...0fdb7</span>
+              <span className=" text-sm">{formatAddress(address || "")}</span>
             </div>
 
             {/* Close Button */}
@@ -52,7 +59,7 @@ export function DepositModal({ isOpen, onClose, zIndex }: ModalProp<ValidatingMo
             {/* Amount Header */}
             <div className="flex items-center justify-between">
               <label className="  text-text-secondary text-sm">Amount</label>
-              <button className="p-1 hover:bg-[#2a2a2a] rounded-lg transition-colors">
+              <button className="p-1 rounded-lg transition-colors cursor-pointer hover:bg-primary-divider/10">
                 <img src="/modal/reset-icon.svg" alt="refresh" className="w-4 h-4" />
               </button>
             </div>
@@ -67,7 +74,12 @@ export function DepositModal({ isOpen, onClose, zIndex }: ModalProp<ValidatingMo
               />
 
               {/* Token Selector */}
-              <button className="bg-app-background rounded-full flex gap-2 items-center px-4 py-1.5">
+              <button
+                className="bg-app-background rounded-full flex gap-2 items-center px-2 py-1.5 cursor-pointer"
+                onClick={() => {
+                  openModal("SELECT_TOKEN");
+                }}
+              >
                 <img src="/token/qash.svg" className="w-6 h-6" />
                 <span className="text-base">{selectedToken}</span>
                 <img src="/arrow/chevron-down.svg" alt="dropdown" className="w-4 h-4" />

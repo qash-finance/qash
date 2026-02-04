@@ -42,7 +42,6 @@ const TransactionDetailContainer = () => {
   } = useGetConsumableNotes(multisigAccount?.accountId || "", {
     enabled: !!multisigAccount?.accountId,
   });
-  console.log("🚀 ~ TransactionDetailContainer ~ consumableNotesData:", consumableNotesData);
 
   // Action handlers
   const handleCancelProposal = async () => {

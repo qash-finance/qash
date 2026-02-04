@@ -5,6 +5,7 @@ mod multisig_auth;
 mod routes;
 mod state;
 mod storage;
+mod zoro;
 
 use axum::Router;
 use std::net::SocketAddr;

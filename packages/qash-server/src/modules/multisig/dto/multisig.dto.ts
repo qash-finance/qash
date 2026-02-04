@@ -493,3 +493,92 @@ export class ExecuteTransactionResponseDto implements SharedTypes.ExecuteTransac
   @ApiProperty({ required: false })
   error?: string;
 }
+// ============================================================================
+// Zoroswap DTOs
+// ============================================================================
+
+export class SubmitZoroswapOrderDto {
+  @ApiProperty({
+    description: 'Multisig account ID that will execute the swap (bech32 format)',
+    example: 'account0x...',
+  })
+  @IsString()
+  @IsNotEmpty()
+  accountId: string;
+
+  @ApiProperty({
+    description: 'Faucet ID of the input asset (hex string)',
+    example: '0x...',
+  })
+  @IsString()
+  @IsNotEmpty()
+  faucetIdIn: string;
+
+  @ApiProperty({
+    description: 'Amount to swap from (in smallest units)',
+    example: 300000000,
+  })
+  @IsInt()
+  @Min(1)
+  amountIn: number;
+
+  @ApiProperty({
+    description: 'Faucet ID of the output asset (hex string)',
+    example: '0x...',
+  })
+  @IsString()
+  @IsNotEmpty()
+  faucetIdOut: string;
+
+  @ApiProperty({
+    description: 'Minimum amount of output asset expected (in smallest units, for slippage protection)',
+    example: 250000000,
+  })
+  @IsInt()
+  @Min(1)
+  minAmountOut: number;
+
+  @ApiProperty({
+    description: 'Recipient account ID that will receive the P2ID note with swap result (bech32 format)',
+    example: 'account0x...',
+  })
+  @IsString()
+  @IsNotEmpty()
+  recipientAccountId: string;
+
+  @ApiProperty({
+    description: 'Deadline timestamp in milliseconds (Unix time). Swap will fail if not executed before this time.',
+    example: 1707052800000,
+  })
+  @IsInt()
+  @Min(1)
+  deadline: number;
+}
+
+export class SubmitZoroswapOrderResponseDto {
+  @ApiProperty({
+    description: 'Whether the order was successfully submitted',
+    example: true,
+  })
+  success: boolean;
+
+  @ApiProperty({
+    description: 'Status message from the server',
+    example: 'Order submitted successfully',
+  })
+  message: string;
+
+  @ApiProperty({
+    description: 'Unique order ID for tracking',
+    example: 'order_550e8400-e29b-41d4-a716-446655440000',
+    required: false,
+  })
+  orderId?: string;
+
+  @ApiProperty({
+    description: 'The P2ID note returned by the Zoro server (serialized, if successful)',
+    example: 'note_hex_string...',
+    required: false,
+  })
+  p2idNote?: string;
+}
