@@ -66,6 +66,7 @@ import InviteTeamMember from "@/components/Modal/TeamMember/InviteTeamMember";
 import RemoveTeamMember from "@/components/Modal/TeamMember/RemoveTeamMember";
 import EditTeamMember from "@/components/Modal/TeamMember/EditTeamMember";
 import ChooseAccountModal from "@/components/Modal/Account/ChooseAccountModal";
+import ReviewPlanModal from "@/components/Modal/ReviewPlanModal";
 import { Group } from "./group-payment";
 import { CompanyGroupResponseDto, CompanyContactResponseDto } from "@qash/types/dto/employee";
 import { BatchTransaction } from "@/services/store/batchTransactions";
@@ -146,6 +147,7 @@ export const MODAL_IDS = {
   REMOVE_TEAM_MEMBER: "REMOVE_TEAM_MEMBER",
   EDIT_TEAM_MEMBER: "EDIT_TEAM_MEMBER",
   CHOOSE_ACCOUNT: "CHOOSE_ACCOUNT",
+  REVIEW_PLAN: "REVIEW_PLAN",
 } as const;
 
 export type ModalId = keyof typeof MODAL_IDS;
@@ -528,6 +530,8 @@ export interface ChooseAccountModalProps extends BaseModalProps {
   onConfirm?: (account: MultisigAccountResponseDto) => void;
 }
 
+export interface ReviewPlanModalProps extends BaseModalProps {}
+
 export type ModalPropsMap = {
   [MODAL_IDS.SELECT_TOKEN]: SelectTokenModalProps;
   [MODAL_IDS.EDIT_TRANSACTION]: EditTransactionModalProps;
@@ -594,6 +598,7 @@ export type ModalPropsMap = {
   [MODAL_IDS.REMOVE_TEAM_MEMBER]: RemoveTeamMemberProps;
   [MODAL_IDS.EDIT_TEAM_MEMBER]: EditTeamMemberProps;
   [MODAL_IDS.CHOOSE_ACCOUNT]: ChooseAccountModalProps;
+  [MODAL_IDS.REVIEW_PLAN]: ReviewPlanModalProps;
 };
 
 export type ModalProps = ModalPropsMap[keyof ModalPropsMap];
@@ -665,4 +670,5 @@ export const modalRegistry = {
   [MODAL_IDS.REMOVE_TEAM_MEMBER]: RemoveTeamMember,
   [MODAL_IDS.EDIT_TEAM_MEMBER]: EditTeamMember,
   [MODAL_IDS.CHOOSE_ACCOUNT]: ChooseAccountModal,
+  [MODAL_IDS.REVIEW_PLAN]: ReviewPlanModal,
 } as const;
