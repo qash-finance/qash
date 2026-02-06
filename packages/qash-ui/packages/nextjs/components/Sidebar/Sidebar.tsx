@@ -21,6 +21,7 @@ import {
   useListAccountsByCompany,
   useListProposalsByCompany,
 } from "@/services/api/multisig";
+import { MultisigProposalStatusEnum } from "@qash/types/enums";
 
 export const MOVE_CRYPTO_SIDEBAR_OFFSET = 290;
 
@@ -230,13 +231,16 @@ export const Sidebar: React.FC<NavProps> = ({ onActionItemClick }) => {
   }, [multisigAccounts]);
 
   useEffect(() => {
-    // Update badge count for Transactions item based on allProposals length
+    // Update badge count for Transactions item based on number of pending proposals
+    const pendingCount = allProposals.filter(
+      p => p.status === MultisigProposalStatusEnum.READY || p.status === MultisigProposalStatusEnum.PENDING,
+    ).length;
     setActions(prev =>
       prev.map(item => {
         if (item.link === SidebarLink.Transactions) {
           return {
             ...item,
-            badgeCount: allProposals.length,
+            badgeCount: pendingCount,
           };
         }
         return item;

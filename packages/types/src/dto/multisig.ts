@@ -6,6 +6,7 @@
  */
 
 import { MultisigProposalStatusEnum, MultisigProposalTypeEnum } from '../enums/index.js';
+import { TokenDto } from './token.js';
 
 // Request DTOs
 export interface CreateMultisigAccountDto {
@@ -21,6 +22,7 @@ export interface CreateConsumeProposalDto {
   accountId: string;
   description: string;
   noteIds: string[];
+  tokens: TokenDto[];
 }
 
 export interface CreateSendProposalDto {
@@ -29,6 +31,7 @@ export interface CreateSendProposalDto {
   recipientId: string;
   faucetId: string;
   amount: number;
+  tokens: TokenDto[];
 }
 
 export interface MintTokensDto {
@@ -77,12 +80,14 @@ export interface CreateBatchSendProposalDto {
   accountId: string;
   description: string;
   payments: BatchPaymentItem[];
+  tokens: TokenDto[];
 }
 
 export interface CreateProposalFromBillsDto {
   accountId: string;
   billUUIDs: string[];
   description: string;
+  tokens: TokenDto[];
 }
 
 export interface SubmitSignatureDto {
@@ -153,6 +158,7 @@ export interface MultisigProposalResponseDto {
   signaturesCount: number;
   threshold: number;
   noteIds?: string[];
+  tokens: TokenDto[];
   recipientId?: string;
   faucetId?: string;
   amount?: string;

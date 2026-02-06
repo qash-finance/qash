@@ -805,6 +805,9 @@ model MultisigProposal {
   description  String                   @db.Text
   proposalType MultisigProposalTypeEnum @default(CONSUME) @map("proposal_type")
 
+  // Tokens associated with this proposal (array of TokenDto JSON objects)
+  tokens Json @db.Json
+
   // Transaction data from Miden (hex-encoded)
   summaryCommitment String @map("summary_commitment") @db.VarChar(255)
   summaryBytesHex   String @map("summary_bytes_hex") @db.Text

@@ -129,10 +129,18 @@ export function ProposalRow({
       ? consumableNotesData.notes.find(note => proposal.noteIds?.includes(note.note_id))
       : null;
 
-  // Extract asset info from the note
-  const firstAsset = proposalNote?.assets?.[0];
-  const displayAmount = firstAsset ? formatAmount(firstAsset.amount) : "0";
-  const faucetId = firstAsset?.faucet_id || "";
+  // Safely read token info and format the display amount using token decimals
+  const faucetId = proposal.tokens?.[0]?.address || "";
+  const token = proposal.tokens?.[0];
+  const displayAmount = token?.amount
+    ? (() => {
+        try {
+          return formatUnits(token.amount as any, token.decimals ?? 0);
+        } catch {
+          return "-";
+        }
+      })()
+    : "-";
 
   return (
     <div
@@ -159,27 +167,16 @@ export function ProposalRow({
       {/* Bills/Amount Count */}
       <div className="flex items-center justify-center">
         {proposal.proposalType === "CONSUME" ? (
-          isHistoryProposal ? (
-            // For history proposals, show placeholder since note may no longer exist
-            <span className="text-sm font-medium text-text-secondary">—</span>
-          ) : notesLoading ? (
-            <div className="flex flex-col items-end justify-end gap-1">
-              <div className="h-2 bg-neutral-300 rounded-full w-20 animate-pulse"></div>
-              <div className="h-2 bg-neutral-300 rounded-full w-10 animate-pulse"></div>
-            </div>
-          ) : proposalNote ? (
-            // Show asset info for CONSUME proposals
-            <div className="flex items-center justify-center">
-              <img
-                src={QASH_TOKEN_ADDRESS.startsWith(faucetId) ? "/token/qash.svg" : "/tokens/unknown-token.svg"}
-                alt="Token"
-                className="w-6 h-6 mr-2"
-              />
-              <span className="text-sm font-medium text-text-strong-950">
-                {displayAmount} {QASH_TOKEN_ADDRESS.startsWith(faucetId) ? "QASH" : formatAddress(faucetId)}
-              </span>
-            </div>
-          ) : null
+          <div className="flex items-center justify-center">
+            <img
+              src={QASH_TOKEN_ADDRESS.startsWith(faucetId) ? "/token/qash.svg" : "/tokens/unknown-token.svg"}
+              alt="Token"
+              className="w-6 h-6 mr-2"
+            />
+            <span className="text-sm font-medium text-text-strong-950">
+              {displayAmount} {QASH_TOKEN_ADDRESS.startsWith(faucetId) ? "QASH" : formatAddress(faucetId)}
+            </span>
+          </div>
         ) : billCount > 0 ? (
           <div className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-blue-50 border border-blue-200">
             <span className="text-sm font-semibold text-blue-600">

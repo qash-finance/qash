@@ -293,6 +293,7 @@ export class MultisigService {
       position: m.teamMember.position,
       publicKey: m.teamMember.user?.publicKey,
       joinedAt: m.createdAt,
+      profilePicture: m.teamMember.profilePicture,
     }));
   }
 
@@ -333,6 +334,31 @@ export class MultisigService {
     // Verify account exists
     const account = await this.getAccount(dto.accountId);
 
+    // Validate tokens provided and that each note maps to a provided token
+    if (!dto.tokens || dto.tokens.length === 0) {
+      throw new BadRequestException('tokens are required for consume proposals');
+    }
+
+    const tokenAddrs = new Set(dto.tokens.map((t) => t.address.toLowerCase()));
+
+    // Fetch consumable notes and validate noteIds exist and tokens match
+    const consumableNotes = await this.midenClient.getConsumableNotes(dto.accountId);
+    const noteMap = new Map((consumableNotes || []).map((n: any) => [n.note_id, n]));
+
+    for (const nid of dto.noteIds) {
+      const note = noteMap.get(nid);
+      if (!note) {
+        throw new BadRequestException(`Note ${nid} not found or not consumable`);
+      }
+      const assetFaucetIds = (note.assets || []).map((a: any) => (a.faucet_id || '').toLowerCase());
+      const matches = assetFaucetIds.some((f: string) => tokenAddrs.has(f));
+      if (!matches) {
+        throw new BadRequestException(
+          `Note ${nid} has assets with faucets ${assetFaucetIds.join(', ')} which are not included in tokens`,
+        );
+      }
+    }
+
     // Create proposal via Miden client
     const { summaryCommitment, summaryBytesHex, requestBytesHex } =
       await this.midenClient.createConsumeProposal(
@@ -350,6 +376,7 @@ export class MultisigService {
         summaryBytesHex,
         requestBytesHex,
         noteIds: dto.noteIds,
+        tokens: dto.tokens as unknown as any,
         status: 'PENDING',
       },
       include: {
@@ -373,6 +400,15 @@ export class MultisigService {
     // Verify account exists
     const account = await this.getAccount(dto.accountId);
 
+    // Validate tokens provided and that faucetId is included
+    if (!dto.tokens || dto.tokens.length === 0) {
+      throw new BadRequestException('tokens are required for send proposals');
+    }
+    const sendTokenAddrs = new Set(dto.tokens.map((t) => t.address.toLowerCase()));
+    if (!sendTokenAddrs.has((dto.faucetId || '').toLowerCase())) {
+      throw new BadRequestException('faucetId must be included in tokens');
+    }
+
     // Create proposal via Miden client
     const { summaryCommitment, summaryBytesHex, requestBytesHex } =
       await this.midenClient.createSendProposal(
@@ -392,6 +428,7 @@ export class MultisigService {
         summaryBytesHex,
         requestBytesHex,
         noteIds: [],
+        tokens: dto.tokens as unknown as any,
         status: 'PENDING',
       },
       include: {
@@ -431,6 +468,17 @@ export class MultisigService {
       );
     }
 
+    // Validate tokens provided and cover all faucets in payments
+    if (!dto.tokens || dto.tokens.length === 0) {
+      throw new BadRequestException('tokens are required for batch send proposals');
+    }
+    const batchTokenAddrs = new Set(dto.tokens.map((t) => t.address.toLowerCase()));
+    for (const p of dto.payments) {
+      if (!batchTokenAddrs.has((p.faucetId || '').toLowerCase())) {
+        throw new BadRequestException(`Payment faucet ${p.faucetId} is not included in tokens`);
+      }
+    }
+
     // Create proposal via Miden client with batch payments
     const { summaryCommitment, summaryBytesHex, requestBytesHex } =
       await this.midenClient.createBatchSendProposal(
@@ -448,6 +496,7 @@ export class MultisigService {
         summaryBytesHex: summaryBytesHex,
         requestBytesHex: requestBytesHex,
         noteIds: [],
+        tokens: dto.tokens as unknown as any,
         status: 'PENDING',
       },
       include: {
@@ -532,6 +581,19 @@ export class MultisigService {
       );
     }
 
+    // Ensure tokens provided and cover invoice payment tokens
+    if (!dto.tokens || dto.tokens.length === 0) {
+      throw new BadRequestException('tokens are required for proposals from bills');
+    }
+    const billTokenAddrs = new Set(dto.tokens.map((t) => t.address.toLowerCase()));
+    for (const b of bills) {
+      const pt = (b.invoice as any)?.paymentToken;
+      const addr = pt?.address || pt?.faucetId || pt?.token_address;
+      if (addr && !billTokenAddrs.has((addr || '').toLowerCase())) {
+        throw new BadRequestException(`Bill ${b.uuid} payment token ${addr} is not included in tokens`);
+      }
+    }
+
     // Use provided payments to create the proposal
     const proposal = await this.prisma.$transaction(async (tx) => {
       // Create proposal via Miden client with provided batch payments
@@ -551,6 +613,7 @@ export class MultisigService {
           summaryBytesHex,
           requestBytesHex,
           noteIds: [],
+          tokens: dto.tokens as unknown as any,
           status: 'PENDING',
           metadata: {
             billUUIDs: dto.billUUIDs,
@@ -1318,6 +1381,7 @@ export class MultisigService {
       rejectionCount: proposal.rejections?.length || 0,
       threshold,
       noteIds: proposal.noteIds || [],
+      tokens: proposal.tokens || [],
       recipientId: proposal.recipientId,
       faucetId: proposal.faucetId,
       amount: proposal.amount,

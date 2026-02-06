@@ -212,19 +212,38 @@ const BillReviewContainer = () => {
     try {
       openModal("PROCESSING_TRANSACTION");
 
-      // Build payments array from selected invoices
-      const payments = selectedInvoices.map(inv => ({
-        recipientId: inv.paymentWalletAddress,
-        faucetId: (inv.paymentToken as any)?.address,
-        amount: Math.floor(Number(inv.total) * Math.pow(10, (inv.paymentToken as any)?.decimals ?? 6)),
-      }));
+      // Collect tokens from selected invoices with accumulated amounts
+      const tokenAddressToAmount = new Map<string, string>();
+      selectedInvoices.forEach(inv => {
+        const faucetId = (inv.paymentToken as any)?.address;
+        const amount = Math.floor(Number(inv.total) * Math.pow(10, (inv.paymentToken as any)?.decimals ?? 6));
+
+        // Accumulate amounts by token address
+        if (faucetId) {
+          const currentAmount = tokenAddressToAmount.get(faucetId) || "0";
+          tokenAddressToAmount.set(faucetId, (BigInt(currentAmount) + BigInt(amount)).toString());
+        }
+      });
+
+      // Build tokens array from accumulated totals
+      const tokens = Array.from(tokenAddressToAmount.entries()).map(([address, amount]) => {
+        const paymentToken = selectedInvoices.find(inv => (inv.paymentToken as any)?.address === address)
+          ?.paymentToken as any;
+        return {
+          address,
+          symbol: paymentToken?.symbol || address,
+          decimals: paymentToken?.decimals ?? 6,
+          name: paymentToken?.name || paymentToken?.symbol || address,
+          amount,
+        };
+      });
 
       await createProposalMutation.mutateAsync({
         accountId,
         billUUIDs: selectedInvoices.map(inv => inv.bill.uuid),
         description: description,
-        payments,
-      } as CreateProposalFromBillsDto);
+        tokens,
+      });
 
       closeModal("PROCESSING_TRANSACTION");
       toast.success(`Proposal created for ${selectedInvoices.length} invoice(s). Waiting for signatures.`);

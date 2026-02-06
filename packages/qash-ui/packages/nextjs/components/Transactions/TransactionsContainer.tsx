@@ -19,6 +19,8 @@ import { useModal } from "@/contexts/ModalManagerProvider";
 import { bytesToHex, fromHexSig, hexToBytes } from "@/utils";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { useClient, useWallet } from "@getpara/react-sdk";
+import { useMidenProvider } from "@/contexts/MidenProvider";
+import { getFaucetMetadata } from "@/services/utils/miden/faucet";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "../Common/PageHeader";
 
@@ -43,6 +45,7 @@ export function TransactionsContainer() {
   const paraClient = useClient();
 
   const { openModal, closeModal } = useModal();
+  const { client: midenClient } = useMidenProvider();
   const { data: myCompany } = useGetMyCompany();
   const { data: multisigAccounts = [], isLoading: accountsLoading } = useListAccountsByCompany(myCompany?.id, {
     enabled: !!myCompany?.id,
@@ -278,10 +281,48 @@ export function TransactionsContainer() {
       setIsCreatingProposal(true);
       openModal("PROCESSING_TRANSACTION");
 
+      // Build tokens array from selected notes' faucet IDs with amounts
+      const selectedNotes = consumableNotesData.notes.filter(n => selectedNoteIds.includes(n.note_id));
+      const faucetToAmount = new Map<string, string>();
+      selectedNotes.forEach(n => {
+        (n.assets || []).forEach((a: any) => {
+          if (a.faucet_id) {
+            const currentAmount = faucetToAmount.get(a.faucet_id) || "0";
+            const newAmount = (BigInt(currentAmount) + BigInt(a.amount || "0")).toString();
+            faucetToAmount.set(a.faucet_id, newAmount);
+          }
+        });
+      });
+
+      const faucetIds = Array.from(faucetToAmount.keys());
+      const tokenPromises = faucetIds.map(async faucetId => {
+        try {
+          const meta = await getFaucetMetadata(midenClient, faucetId);
+          return {
+            address: faucetId,
+            symbol: meta.symbol,
+            decimals: meta.decimals,
+            name: meta.symbol,
+            amount: faucetToAmount.get(faucetId) || "0",
+          };
+        } catch (err) {
+          // Fallback to minimal token dto
+          return {
+            address: faucetId,
+            symbol: faucetId,
+            decimals: 0,
+            name: faucetId,
+            amount: faucetToAmount.get(faucetId) || "0",
+          };
+        }
+      });
+      const tokens = await Promise.all(tokenPromises);
+
       await createConsumeProposalMutation.mutateAsync({
         accountId: activeTab,
         noteIds: selectedNoteIds,
         description: `Consume ${selectedNoteIds.length} note${selectedNoteIds.length !== 1 ? "s" : ""}`,
+        tokens,
       });
 
       closeModal("PROCESSING_TRANSACTION");
@@ -309,10 +350,44 @@ export function TransactionsContainer() {
       setIsCreatingProposal(true);
       openModal("PROCESSING_TRANSACTION");
 
+      // Build tokens array for this note with amounts
+      const note = consumableNotesData.notes.find(n => n.note_id === noteId);
+      const faucetToAmount = new Map<string, string>();
+      (note?.assets || []).forEach((a: any) => {
+        if (a.faucet_id) {
+          const currentAmount = faucetToAmount.get(a.faucet_id) || "0";
+          const newAmount = (BigInt(currentAmount) + BigInt(a.amount || "0")).toString();
+          faucetToAmount.set(a.faucet_id, newAmount);
+        }
+      });
+      const faucetIds = Array.from(faucetToAmount.keys());
+      const tokenPromises = faucetIds.map(async faucetId => {
+        try {
+          const meta = await getFaucetMetadata(midenClient, faucetId);
+          return {
+            address: faucetId,
+            symbol: meta.symbol,
+            decimals: meta.decimals,
+            name: meta.symbol,
+            amount: faucetToAmount.get(faucetId) || "0",
+          };
+        } catch (err) {
+          return {
+            address: faucetId,
+            symbol: faucetId,
+            decimals: 0,
+            name: faucetId,
+            amount: faucetToAmount.get(faucetId) || "0",
+          };
+        }
+      });
+      const tokens = await Promise.all(tokenPromises);
+
       await createConsumeProposalMutation.mutateAsync({
         accountId: activeTab,
         noteIds: [noteId],
         description: "Consume note",
+        tokens,
       });
 
       closeModal("PROCESSING_TRANSACTION");

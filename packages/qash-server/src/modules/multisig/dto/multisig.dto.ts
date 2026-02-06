@@ -1,5 +1,7 @@
-import { IsString, IsInt, IsArray, IsOptional, IsNotEmpty, MaxLength, Min, ArrayMinSize, IsEnum, IsUUID } from 'class-validator';
+import { IsString, IsInt, IsArray, IsOptional, IsNotEmpty, MaxLength, Min, ArrayMinSize, IsEnum, IsUUID, ValidateNested } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { TokenDto } from 'src/modules/shared/shared.dto';
 import type * as SharedTypes from '@qash/types/dto/multisig';
 
 export class CreateMultisigAccountDto implements SharedTypes.CreateMultisigAccountDto {
@@ -83,6 +85,16 @@ export class CreateConsumeProposalDto implements SharedTypes.CreateConsumePropos
   @ArrayMinSize(1)
   @IsString({ each: true })
   noteIds: string[];
+
+  @ApiProperty({
+    description: 'Array of tokens involved in the proposal (full TokenDto expected)',
+    type: [TokenDto],
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => TokenDto)
+  tokens: TokenDto[];
 }
 
 export class CreateSendProposalDto implements SharedTypes.CreateSendProposalDto {
@@ -121,6 +133,16 @@ export class CreateSendProposalDto implements SharedTypes.CreateSendProposalDto 
   @IsInt()
   @Min(1)
   amount: number;
+
+  @ApiProperty({
+    description: 'Array of tokens involved in the proposal (full TokenDto expected)',
+    type: [TokenDto],
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => TokenDto)
+  tokens: TokenDto[];
 }
 
 export class MintTokensDto implements SharedTypes.MintTokensDto {
@@ -243,6 +265,16 @@ export class CreateBatchSendProposalDto implements SharedTypes.CreateBatchSendPr
   @ArrayMinSize(1)
   @IsNotEmpty({ each: true })
   payments: BatchPaymentItemDto[];
+
+  @ApiProperty({
+    description: 'Array of tokens involved in the batch proposal (full TokenDto expected)',
+    type: [TokenDto],
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => TokenDto)
+  tokens: TokenDto[];
 }
 
 export class SubmitSignatureDto implements SharedTypes.SubmitSignatureDto {
@@ -319,6 +351,16 @@ export class CreateProposalFromBillsDto implements SharedTypes.CreateProposalFro
   @ArrayMinSize(1)
   @IsNotEmpty({ each: true })
   payments: BatchPaymentItemDto[];
+
+  @ApiProperty({
+    description: 'Array of tokens involved in the proposal (full TokenDto expected)',
+    type: [TokenDto],
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => TokenDto)
+  tokens: TokenDto[];
 }
 
 export class MultisigAccountResponseDto implements SharedTypes.MultisigAccountResponseDto {
@@ -405,6 +447,12 @@ export class MultisigProposalResponseDto implements SharedTypes.MultisigProposal
 
   @ApiProperty({ type: [String], required: false })
   noteIds?: string[];
+
+  @ApiProperty({
+    description: 'Array of tokens associated with this proposal',
+    type: [TokenDto],
+  })
+  tokens: TokenDto[];
 
   @ApiProperty({ required: false })
   recipientId?: string;
