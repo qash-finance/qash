@@ -15,21 +15,6 @@ COPY .env ./packages/nextjs/.env
 # Install dependencies
 RUN pnpm install --frozen-lockfile
 
-# Dependencies stage for docs app
-FROM base AS docs-deps
-WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
-# Copy workspace configuration
-COPY .npmrc* pnpm-workspace.yaml* ./
-COPY package.json pnpm-lock.yaml* ./
-COPY packages/docs/package.json ./packages/docs/package.json
-COPY packages/docs/.env.example ./packages/docs/.env.example
-RUN pnpm install --frozen-lockfile
-# Copy docs source and build within workspace
-COPY packages/docs/ ./packages/docs
-RUN pnpm --filter @qash/docs build
-WORKDIR /app/packages/docs
-
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app ./
@@ -43,12 +28,8 @@ COPY --from=builder /app/packages/nextjs/public ./packages/nextjs/public
 COPY --from=builder /app/packages/nextjs/.next/standalone/packages/nextjs ./packages/nextjs
 COPY --from=builder /app/packages/nextjs/.next/static ./packages/nextjs/.next/static
 
-# Copy docs app
-COPY --from=docs-deps /app/packages/docs/build ./docs/build
-
 # Create a simple start script
 RUN printf '#!/bin/sh\n\
-cd /app/docs && npx serve -s build -l 3001 --single &\n\
 cd /app/packages/nextjs && node server.js\n' > /app/start.sh
 RUN chmod +x /app/start.sh
 

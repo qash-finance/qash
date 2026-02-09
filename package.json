@@ -19,7 +19,7 @@
     "dev": "pnpm run build:types && pnpm run --parallel dev:*",
     "dev:web": "pnpm --filter @qash/web dev",
     "dev:server": "pnpm --filter @qash/server start:dev",
-    "dev:docs": "pnpm --filter @qash/docs start",
+    "dev:docs": "pnpm --filter qash-doc start",
     "dev:types": "pnpm --filter @qash/types dev",
     "dev:multisig-server": "cd packages/stateless-multisig-server && cargo run",
     
@@ -27,7 +27,7 @@
     "build:types": "pnpm --filter @qash/types build",
     "build:web": "pnpm --filter @qash/web build",
     "build:server": "pnpm --filter @qash/server build",
-    "build:docs": "pnpm --filter @qash/docs build",
+    "build:docs": "pnpm --filter qash-doc build",
     
     "lint": "pnpm run -r lint",
     "lint:web": "pnpm --filter @qash/web lint",
