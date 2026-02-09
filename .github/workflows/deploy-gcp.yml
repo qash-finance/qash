@@ -1,0 +1,179 @@
+name: Deploy to GCP Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+      - stg
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - staging
+          - prod
+
+permissions:
+  contents: read
+  id-token: write # Required for Workload Identity Federation
+
+env:
+  GCP_REGION: asia-southeast1
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Determine environment from branch or manual input
+  # ---------------------------------------------------------------------------
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.env.outputs.environment }}
+      project_id: ${{ steps.env.outputs.project_id }}
+      registry: ${{ steps.env.outputs.registry }}
+    steps:
+      - name: Determine environment
+        id: env
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ENV="${{ github.event.inputs.environment }}"
+          elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            ENV="prod"
+          elif [ "${{ github.ref }}" = "refs/heads/stg" ]; then
+            ENV="staging"
+          else
+            echo "Unknown branch, defaulting to staging"
+            ENV="staging"
+          fi
+
+          echo "environment=${ENV}" >> "$GITHUB_OUTPUT"
+
+          if [ "$ENV" = "prod" ]; then
+            echo "project_id=${{ secrets.GCP_PROJECT_ID_PROD }}" >> "$GITHUB_OUTPUT"
+            echo "registry=${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID_PROD }}/qash-prod-containers" >> "$GITHUB_OUTPUT"
+          else
+            echo "project_id=${{ secrets.GCP_PROJECT_ID_STAGING }}" >> "$GITHUB_OUTPUT"
+            echo "registry=${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID_STAGING }}/qash-staging-containers" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Build and push container images
+  # ---------------------------------------------------------------------------
+  build:
+    needs: setup
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - name: qash-server
+            dockerfile: packages/qash-server/Dockerfile
+            context: packages/qash-server
+          - name: qash-web
+            dockerfile: packages/qash-ui/Dockerfile
+            context: packages/qash-ui
+          - name: qash-docs
+            dockerfile: packages/qash-doc/Dockerfile
+            context: packages/qash-doc
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_CICD_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
+          push: true
+          tags: |
+            ${{ needs.setup.outputs.registry }}/${{ matrix.service.name }}:${{ github.sha }}-${{ needs.setup.outputs.environment }}
+            ${{ needs.setup.outputs.registry }}/${{ matrix.service.name }}:latest-${{ needs.setup.outputs.environment }}
+          cache-from: type=gha,scope=${{ matrix.service.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service.name }}
+
+  # ---------------------------------------------------------------------------
+  # Deploy to Cloud Run
+  # ---------------------------------------------------------------------------
+  deploy:
+    needs: [setup, build]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - name: qash-server
+            cloud_run_suffix: server
+          - name: qash-web
+            cloud_run_suffix: web
+          - name: qash-docs
+            cloud_run_suffix: docs
+    steps:
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_CICD_SERVICE_ACCOUNT }}
+
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: qash-${{ needs.setup.outputs.environment }}-${{ matrix.service.cloud_run_suffix }}
+          region: ${{ env.GCP_REGION }}
+          image:
+            ${{ needs.setup.outputs.registry }}/${{ matrix.service.name }}:${{ github.sha }}-${{
+            needs.setup.outputs.environment }}
+
+      - name: Verify deployment
+        run: |
+          SERVICE_URL=$(gcloud run services describe \
+            qash-${{ needs.setup.outputs.environment }}-${{ matrix.service.cloud_run_suffix }} \
+            --region ${{ env.GCP_REGION }} \
+            --format 'value(status.url)')
+          echo "Service URL: ${SERVICE_URL}"
+
+          # Wait for service to be healthy
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${SERVICE_URL}" || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ Service is healthy (HTTP 200)"
+              exit 0
+            fi
+            echo "⏳ Waiting for service... (attempt ${i}/12, got HTTP ${STATUS})"
+            sleep 10
+          done
+          echo "⚠️ Service did not return HTTP 200 within 120s"
+          exit 1
+
+  # ---------------------------------------------------------------------------
+  # Notify
+  # ---------------------------------------------------------------------------
+  notify:
+    needs: [setup, deploy]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Slack notification
+        if: env.SLACK_WEBHOOK != ''
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          STATUS=${{ needs.deploy.result == 'success' && '✅ Success' || '❌ Failed' }}
+          curl -X POST "$SLACK_WEBHOOK" \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"text\": \"${STATUS}: Deployed *qash* to *${{ needs.setup.outputs.environment }}* (commit: \`${GITHUB_SHA:0:7}\`)\"
+            }"
