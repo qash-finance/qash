@@ -23,6 +23,8 @@ import { useModal } from "@/contexts/ModalManagerProvider";
 import { PrimaryButton } from "../Common/PrimaryButton";
 import { cancelB2BInvoice } from "@/services/api/invoice";
 import { PageHeader } from "../Common/PageHeader";
+import { trackEvent } from "@/services/analytics/posthog";
+import { PostHogEvent } from "@/types/posthog";
 
 type Tab = "all" | "sent" | "paid";
 
@@ -139,6 +141,7 @@ const ClientInvoiceContainer = () => {
       queryClient.invalidateQueries({ queryKey: ["b2b-invoices"] });
       queryClient.invalidateQueries({ queryKey: ["b2b-invoice-stats"] });
       toast.success("Invoice deleted successfully");
+      trackEvent(PostHogEvent.INVOICE_DELETED);
     },
     onError: (err: any) => {
       console.error("Delete invoice failed", err);
@@ -153,6 +156,7 @@ const ClientInvoiceContainer = () => {
       queryClient.invalidateQueries({ queryKey: ["b2b-invoices"] });
       queryClient.invalidateQueries({ queryKey: ["b2b-invoice-stats"] });
       toast.success("Invoice voided successfully");
+      trackEvent(PostHogEvent.INVOICE_VOIDED);
     },
     onError: (err: any) => {
       console.error("Void invoice failed", err);

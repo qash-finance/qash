@@ -13,6 +13,8 @@ import { useModal as useParaModal, useWallet } from "@getpara/react-sdk";
 import { useParaMiden } from "miden-para-react";
 import { useAccount as useParaAccount } from "@getpara/react-sdk";
 import { PrimaryButton } from "../Common/PrimaryButton";
+import { trackEvent } from "@/services/analytics/posthog";
+import { PostHogEvent } from "@/types/posthog";
 
 type Step = "email" | "otp";
 
@@ -66,6 +68,7 @@ export default function LoginContainer() {
       const userData = await loginWithPara(jwtResult.token, publicKey);
 
       toast.success("Successfully authenticated");
+      trackEvent(PostHogEvent.USER_LOGGED_IN, { method: "para" });
 
       await refreshUser();
 

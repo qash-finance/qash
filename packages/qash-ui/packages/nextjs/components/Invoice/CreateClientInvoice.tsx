@@ -29,6 +29,8 @@ import { AssetWithMetadata } from "@/types/faucet";
 import { useAuth } from "@/services/auth/context";
 import { AuthMeResponse } from "@/services/auth/api";
 import { InvoiceModalProps } from "@/types/modal";
+import { trackEvent } from "@/services/analytics/posthog";
+import { PostHogEvent } from "@/types/posthog";
 
 const LAST_STEP = 5;
 
@@ -514,6 +516,7 @@ const CreateClientInvoice = () => {
       // }
 
       setInvoiceSent(true);
+      trackEvent(PostHogEvent.INVOICE_CREATED);
       toast.success("Invoice sent successfully!");
     } catch (err: any) {
       console.log("🚀 ~ handleSendInvoice ~ err:", err);

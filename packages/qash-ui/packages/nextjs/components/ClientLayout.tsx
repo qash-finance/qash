@@ -19,6 +19,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { TransactionProviderC } from "@/contexts/TransactionProvider";
 import { useAuthGuard } from "@/hooks/server/useAuthGuard";
 import { Environment, ParaProvider } from "@getpara/react-sdk";
+import { PostHogProvider } from "@/contexts/PostHogProvider";
 import { MidenProvider } from "@/contexts/MidenProvider";
 import "@getpara/react-sdk/styles.css";
 
@@ -148,36 +149,38 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
             <SocketProvider>
               <ModalProvider>
                 <AuthProvider>
-                  <ProtectedContent>
-                    <AccountProvider>
-                      <TransactionProviderC>
-                        <TitleProvider>
-                          {/* <ConnectWalletButton /> */}
-                          <ModalManager />
-                          {isFullscreen ? (
-                            <div className="h-screen w-screen">{children}</div>
-                          ) : (
-                            <div className="flex flex-col h-screen overflow-hidden">
-                              <TestnetBanner />
-                              <div className="flex flex-row gap-2">
-                                <div className={`top-0 ${SIDEBAR_WIDTH_CLASSES}`}>
-                                  <Sidebar />
-                                </div>
-                                {/* {pathname.includes("dashboard") && <DashboardMenu />} */}
-                                <div className="flex-1 h-screen flex flex-col overflow-hidden gap-2">
-                                  <Title />
-                                  <div className="mx-[8px] mb-[24px] rounded-[12px] flex justify-center items-center flex-1 overflow-auto relative bg-background">
-                                    {children}
+                  <PostHogProvider>
+                    <ProtectedContent>
+                      <AccountProvider>
+                        <TransactionProviderC>
+                          <TitleProvider>
+                            {/* <ConnectWalletButton /> */}
+                            <ModalManager />
+                            {isFullscreen ? (
+                              <div className="h-screen w-screen">{children}</div>
+                            ) : (
+                              <div className="flex flex-col h-screen overflow-hidden">
+                                <TestnetBanner />
+                                <div className="flex flex-row gap-2">
+                                  <div className={`top-0 ${SIDEBAR_WIDTH_CLASSES}`}>
+                                    <Sidebar />
+                                  </div>
+                                  {/* {pathname.includes("dashboard") && <DashboardMenu />} */}
+                                  <div className="flex-1 h-screen flex flex-col overflow-hidden gap-2">
+                                    <Title />
+                                    <div className="mx-[8px] mb-[24px] rounded-[12px] flex justify-center items-center flex-1 overflow-auto relative bg-background">
+                                      {children}
+                                    </div>
                                   </div>
                                 </div>
                               </div>
-                            </div>
-                          )}
-                          {!isFullscreen && <FloatingActionButton imgSrc="/token/qash.svg" />}
-                        </TitleProvider>
-                      </TransactionProviderC>
-                    </AccountProvider>
-                  </ProtectedContent>
+                            )}
+                            {!isFullscreen && <FloatingActionButton imgSrc="/token/qash.svg" />}
+                          </TitleProvider>
+                        </TransactionProviderC>
+                      </AccountProvider>
+                    </ProtectedContent>
+                  </PostHogProvider>
                 </AuthProvider>
               </ModalProvider>
             </SocketProvider>

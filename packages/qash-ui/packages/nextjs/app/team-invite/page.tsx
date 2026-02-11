@@ -9,6 +9,8 @@ import { useModal, useWallet } from "@getpara/react-sdk";
 import toast from "react-hot-toast";
 import { useAccount as useParaAccount } from "@getpara/react-sdk";
 import { useParaMiden } from "miden-para-react";
+import { trackEvent } from "@/services/analytics/posthog";
+import { PostHogEvent } from "@/types/posthog";
 
 interface TeamMember {
   id: string;
@@ -118,6 +120,7 @@ export default function TeamInvitePage() {
       {
         onSuccess: () => {
           setIsAccepted(true);
+          trackEvent(PostHogEvent.TEAM_INVITE_ACCEPTED);
         },
         onError: (err: any) => {
           const errorMessage =

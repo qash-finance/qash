@@ -21,6 +21,8 @@ import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { useModal } from "@/contexts/ModalManagerProvider";
 import { PageHeader } from "../Common/PageHeader";
+import { trackEvent } from "@/services/analytics/posthog";
+import { PostHogEvent } from "@/types/posthog";
 
 type Tab = "all" | "pending" | "paid";
 
@@ -379,6 +381,7 @@ const BillContainer = () => {
               invoiceOwnerName: bill.invoice?.fromDetails?.name || "",
               onRemove: async () => {
                 await cancelInvoiceData(bill.invoice?.uuid || "");
+                trackEvent(PostHogEvent.BILL_CANCELLED, { billId: String(bill.id) });
                 toast.success("Invoice cancelled successfully");
                 // deleteBill.mutate(bill.uuid, {
                 //   onError: err => {
