@@ -10,7 +10,7 @@ import type { TeamMemberRoleEnum, TeamMemberStatusEnum } from '../enums/index.js
 // Request DTOs
 export interface CreateTeamMemberDto {
   firstName: string;
-  lastName: string;
+  lastName?: string;
   email: string;
   position?: string;
   profilePicture?: string;
@@ -34,7 +34,7 @@ export interface UpdateTeamMemberRoleDto {
 
 export interface InviteTeamMemberDto {
   firstName: string;
-  lastName: string;
+  lastName?: string;
   email: string;
   position?: string;
   role: TeamMemberRoleEnum;

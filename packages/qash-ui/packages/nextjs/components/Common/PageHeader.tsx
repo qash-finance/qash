@@ -1,7 +1,10 @@
 "use client";
+import { useAuth } from "@/services/auth/context";
+import { TeamMemberRoleEnum } from "@qash/types/enums";
 import React from "react";
 
 export const PageHeader = ({ icon, label, button }: { icon: string; label: string; button: React.ReactNode }) => {
+  const { user } = useAuth();
   return (
     <div className="flex flex-row items-center justify-between w-full">
       <div className="flex flex-row items-center justify-start gap-3">
@@ -9,7 +12,8 @@ export const PageHeader = ({ icon, label, button }: { icon: string; label: strin
         <span className="text-2xl font-bold">{label}</span>
       </div>
 
-      {button}
+      {(user?.teamMembership?.role === TeamMemberRoleEnum.ADMIN ||
+        user?.teamMembership?.role === TeamMemberRoleEnum.OWNER) && <>{button}</>}
     </div>
   );
 };

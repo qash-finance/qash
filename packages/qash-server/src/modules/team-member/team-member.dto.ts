@@ -29,14 +29,14 @@ export class CreateTeamMemberDto implements SharedTypes.CreateTeamMemberDto {
   @Length(1, 100)
   firstName: string;
 
-  @ApiProperty({
-    description: 'Last name',
+  @ApiPropertyOptional({
+    description: 'Last name (may be empty)',
     example: 'Doe',
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  @Length(1, 100)
-  lastName: string;
+  @Length(0, 100)
+  lastName?: string;
 
   @ApiProperty({
     description: 'Email address',
@@ -100,13 +100,12 @@ export class UpdateTeamMemberDto implements SharedTypes.UpdateTeamMemberDto {
   firstName?: string;
 
   @ApiPropertyOptional({
-    description: 'Last name',
+    description: 'Last name (may be empty)',
     example: 'Doe',
   })
   @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  @Length(1, 100)
+  @Length(0, 100)
   lastName?: string;
 
   @ApiPropertyOptional({
@@ -181,14 +180,14 @@ export class InviteTeamMemberDto implements SharedTypes.InviteTeamMemberDto {
   @Length(1, 100)
   firstName: string;
 
-  @ApiProperty({
-    description: 'Last name',
+  @ApiPropertyOptional({
+    description: 'Last name (may be empty)',
     example: 'Smith',
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  @Length(1, 100)
-  lastName: string;
+  @Length(0, 100)
+  lastName?: string;
 
   @ApiProperty({
     description: 'Email address to send invitation',

@@ -35,6 +35,8 @@ export default function CompanySettings() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
 
+  const isAdmin = user?.teamMembership?.role === "ADMIN" || user?.teamMembership?.role === "OWNER";
+
   const {
     register,
     handleSubmit,
@@ -152,7 +154,7 @@ export default function CompanySettings() {
         title="Company"
         buttonText="Save Changes"
         onButtonClick={handleSubmit(onSubmit)}
-        buttonDisabled={!hasChanges || isUpdating}
+        buttonDisabled={!hasChanges || isUpdating || !isAdmin}
         buttonClassName="w-30"
       />
 
@@ -163,7 +165,13 @@ export default function CompanySettings() {
           {/* Avatar Upload */}
           <div className="w-full flex items-center justify-center">
             <div className="flex gap-4 items-center flex-col">
-              <label className="bg-[#ebf4ff] border border-primary-blue border-dashed rounded-full shrink-0 w-[86px] h-[86px] flex items-center justify-center relative overflow-hidden cursor-pointer hover:bg-blue-50 transition-colors">
+              <label
+                className="bg-[#ebf4ff] border border-primary-blue border-dashed rounded-full shrink-0 w-[86px] h-[86px] flex items-center justify-center relative overflow-hidden cursor-pointer hover:bg-blue-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                style={{
+                  pointerEvents: !isAdmin || uploadLogoMutation.isPending ? "none" : "auto",
+                  opacity: !isAdmin || uploadLogoMutation.isPending ? 0.5 : 1,
+                }}
+              >
                 {logoUrl ? (
                   <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
                 ) : (
@@ -173,15 +181,15 @@ export default function CompanySettings() {
                   type="file"
                   accept="image/jpeg,image/png"
                   onChange={handleLogoUpload}
-                  disabled={uploadLogoMutation.isPending}
+                  disabled={uploadLogoMutation.isPending || !isAdmin}
                   className="hidden"
                 />
               </label>
               <label
                 className="border border-primary-divider rounded-lg px-3 py-1.5 w-fit font-barlow font-medium text-[14px] text-text-primary leading-[20px] tracking-[-0.56px] hover:bg-base-container-sub-background transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
-                  pointerEvents: uploadLogoMutation.isPending ? "none" : "auto",
-                  opacity: uploadLogoMutation.isPending ? 0.5 : 1,
+                  pointerEvents: uploadLogoMutation.isPending || !isAdmin ? "none" : "auto",
+                  opacity: uploadLogoMutation.isPending || !isAdmin ? 0.5 : 1,
                 }}
               >
                 {uploadLogoMutation.isPending ? "Uploading..." : "Upload photo"}
@@ -189,7 +197,7 @@ export default function CompanySettings() {
                   type="file"
                   accept="image/jpeg,image/png"
                   onChange={handleLogoUpload}
-                  disabled={uploadLogoMutation.isPending}
+                  disabled={uploadLogoMutation.isPending || !isAdmin}
                   className="hidden"
                 />
               </label>
@@ -200,12 +208,14 @@ export default function CompanySettings() {
           <InputOutlined
             label="Company name"
             placeholder="Enter your company name"
+            readOnly={!isAdmin}
             {...register("companyName", { required: true })}
           />
 
           {/* Company Type Dropdown */}
           <CompanyTypeDropdown
             selectedCompanyType={selectedCompanyType}
+            disabled={!isAdmin}
             onCompanyTypeSelect={value => {
               setSelectedCompanyType(value);
               setValue("companyType", value, { shouldDirty: true });
@@ -215,6 +225,7 @@ export default function CompanySettings() {
           {/* Country Dropdown */}
           <CountryDropdown
             selectedCountry={selectedCountry}
+            disabled={!isAdmin}
             onCountrySelect={value => {
               setSelectedCountry(value);
               setValue("country", value, { shouldDirty: true });
@@ -224,32 +235,43 @@ export default function CompanySettings() {
           {/* State and City Row */}
           <div className="flex gap-2 w-full">
             <div className="flex-1">
-              <InputOutlined label="State" placeholder="Select state" {...register("state")} />
+              <InputOutlined label="State" placeholder="Select state" readOnly={!isAdmin} {...register("state")} />
             </div>
             <div className="flex-1">
-              <InputOutlined label="City" placeholder="Select city" {...register("city")} />
+              <InputOutlined label="City" placeholder="Select city" readOnly={!isAdmin} {...register("city")} />
             </div>
           </div>
 
           {/* Address 1 */}
-          <InputOutlined label="Address 1" placeholder="Enter address 1" {...register("address1")} />
+          <InputOutlined
+            label="Address 1"
+            placeholder="Enter address 1"
+            readOnly={!isAdmin}
+            {...register("address1")}
+          />
 
           {/* Address 2 */}
-          <InputOutlined label="Address 2" placeholder="Enter address 2" {...register("address2")} />
+          <InputOutlined
+            label="Address 2"
+            placeholder="Enter address 2"
+            readOnly={!isAdmin}
+            {...register("address2")}
+          />
         </div>
 
         {/* Second Section */}
         <div className="flex flex-col gap-3 pt-6">
           {/* Tax ID */}
-          <InputOutlined label="Tax ID" placeholder="Enter tax ID" {...register("taxId")} />
+          <InputOutlined label="Tax ID" placeholder="Enter tax ID" readOnly={!isAdmin} {...register("taxId")} />
 
           {/* Postal Code */}
-          <InputOutlined label="Postal code" placeholder="e.g. 70000" {...register("postalCode")} />
+          <InputOutlined label="Postal code" placeholder="e.g. 70000" readOnly={!isAdmin} {...register("postalCode")} />
 
           {/* Company Registration Number */}
           <InputOutlined
             label="Company registration number"
             placeholder="e.g. 8683949"
+            readOnly={!isAdmin}
             {...register("registrationNumber")}
           />
         </div>

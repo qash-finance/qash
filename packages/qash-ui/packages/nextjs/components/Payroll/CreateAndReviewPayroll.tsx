@@ -1,9 +1,9 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PrimaryButton } from "../Common/PrimaryButton";
 import { useForm } from "react-hook-form";
-import { MODAL_IDS } from "@/types/modal";
+import { MODAL_IDS, PermissionRequiredModalProps } from "@/types/modal";
 import { useModal } from "@/contexts/ModalManagerProvider";
 import { AssetWithMetadata } from "@/types/faucet";
 import { ContractTerm } from "./ContractTerm";
@@ -67,6 +67,7 @@ interface CreatePayrollProps {
   initialToken?: AssetWithMetadata | null;
   initialNetwork?: { icon: string; name: string; value: string } | null;
   initialPayDay?: number;
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 const CreatePayroll = ({
@@ -75,6 +76,7 @@ const CreatePayroll = ({
   initialToken,
   initialNetwork,
   initialPayDay = 1,
+  onDirtyChange,
 }: CreatePayrollProps) => {
   const [selectedToken, setSelectedToken] = useState<AssetWithMetadata | null>(initialToken || null);
   const [selectedNetwork, setSelectedNetwork] = useState<{ icon: string; name: string; value: string } | null>(
@@ -86,7 +88,7 @@ const CreatePayroll = ({
   const {
     register,
     handleSubmit,
-    formState: { errors, isValid },
+    formState: { errors, isValid, isDirty: isFormDirty },
     setValue,
     watch,
   } = useForm<CreatePayrollFormData>({
@@ -103,6 +105,14 @@ const CreatePayroll = ({
       description: "",
     },
   });
+
+  // Bubble dirty state up to parent when form fields or selections change
+  useEffect(() => {
+    const dirty = isFormDirty || !!selectedToken || !!selectedNetwork;
+    if (dirty) {
+      onDirtyChange?.(true);
+    }
+  }, [isFormDirty, selectedToken, selectedNetwork, onDirtyChange]);
 
   // Only build the DTO and pass to onCreate, do not call API here
   const handleBuildPayrollDto = (formData: CreatePayrollFormData) => {
@@ -550,6 +560,78 @@ const CreateAndReviewPayroll = () => {
   const [selectedNetwork, setSelectedNetwork] = useState<{ icon: string; name: string; value: string } | null>(null);
   const [selectedPayDay, setSelectedPayDay] = useState<number | undefined>(undefined);
   const { setTitle, setShowBackArrow, setOnBackClick } = useTitle();
+  const { openModal } = useModal();
+  const [isDirty, setIsDirty] = useState(false);
+  const isDirtyRef = useRef(false);
+
+  // Keep ref in sync so event handlers always see the latest value
+  useEffect(() => {
+    isDirtyRef.current = isDirty;
+  }, [isDirty]);
+
+  // Also mark dirty when moving to review (payrollDto is set)
+  useEffect(() => {
+    if (payrollDto) {
+      setIsDirty(true);
+    }
+  }, [payrollDto]);
+
+  const isAdmin = user?.teamMembership?.role === "ADMIN" || user?.teamMembership?.role === "OWNER";
+
+  // Show modal and navigate away only on confirm
+  const confirmLeave = useCallback(
+    (onLeave: () => void) => {
+      openModal("PAYROLL_NOT_SAVED", {
+        onConfirm: () => {
+          setIsDirty(false);
+          isDirtyRef.current = false;
+          onLeave();
+        },
+      });
+    },
+    [openModal],
+  );
+
+  useEffect(() => {
+    if (user && !isAdmin) {
+      openModal<PermissionRequiredModalProps>(MODAL_IDS.PERMISSION_REQUIRED, {
+        role: user?.teamMembership?.role,
+        onConfirm: () => {
+          router.push("/");
+        },
+      });
+    }
+  }, [user, isAdmin]);
+
+  // Browser tab close / refresh guard
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirtyRef.current) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
+
+  // Browser back / forward button guard
+  useEffect(() => {
+    if (!isDirty) return;
+
+    // Push a duplicate entry so pressing back stays on the same page
+    window.history.pushState(null, "", window.location.href);
+
+    const handlePopState = () => {
+      if (isDirtyRef.current) {
+        // Re-push so the user stays on the page while the modal is open
+        window.history.pushState(null, "", window.location.href);
+        confirmLeave(() => router.back());
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [isDirty, router]);
 
   useEffect(() => {
     const handleBack = () => {
@@ -595,6 +677,7 @@ const CreateAndReviewPayroll = () => {
   };
 
   const renderContent = () => {
+    if (user && !isAdmin) return null;
     switch (step) {
       case "create":
         return (
@@ -606,6 +689,7 @@ const CreateAndReviewPayroll = () => {
             initialToken={selectedToken}
             initialNetwork={selectedNetwork}
             initialPayDay={selectedPayDay}
+            onDirtyChange={setIsDirty}
           />
         );
       case "review":

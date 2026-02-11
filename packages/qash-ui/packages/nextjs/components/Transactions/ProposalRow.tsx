@@ -18,6 +18,7 @@ interface ProposalRowProps {
   isExecuteLoading?: boolean;
   isCancelLoading?: boolean;
   userPublicKey?: string;
+  isViewer?: boolean;
   onProposalClick?: (e: any) => void;
 }
 
@@ -84,6 +85,7 @@ export function ProposalRow({
   isExecuteLoading,
   isCancelLoading,
   userPublicKey,
+  isViewer,
   onProposalClick,
 }: ProposalRowProps) {
   const status = proposal.status as MultisigProposalStatusEnum;
@@ -219,7 +221,7 @@ export function ProposalRow({
                 onCancel?.(proposal.uuid);
               }}
               loading={isCancelLoading}
-              disabled={isCancelLoading || isSignLoading}
+              disabled={isCancelLoading || isSignLoading || isViewer}
             />
             <PrimaryButton
               text={hasUserSigned ? "Signed" : "Sign"}
@@ -229,7 +231,7 @@ export function ProposalRow({
                 onSign?.(proposal.id);
               }}
               loading={isSignLoading}
-              disabled={hasUserSigned || isSignLoading || isCancelLoading}
+              disabled={hasUserSigned || isSignLoading || isCancelLoading || isViewer}
             />
           </>
         )}
@@ -244,7 +246,7 @@ export function ProposalRow({
                 onCancel?.(proposal.uuid);
               }}
               loading={isCancelLoading}
-              disabled={isCancelLoading || isExecuteLoading}
+              disabled={isCancelLoading || isExecuteLoading || isViewer}
             />
             <PrimaryButton
               text="Execute"
@@ -254,7 +256,7 @@ export function ProposalRow({
                 onExecute?.(proposal.id);
               }}
               loading={isExecuteLoading}
-              disabled={isExecuteLoading || isCancelLoading}
+              disabled={isExecuteLoading || isCancelLoading || isViewer}
             />
           </>
         )}

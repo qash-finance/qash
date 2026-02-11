@@ -66,6 +66,8 @@ import InviteTeamMember from "@/components/Modal/TeamMember/InviteTeamMember";
 import RemoveTeamMember from "@/components/Modal/TeamMember/RemoveTeamMember";
 import EditTeamMember from "@/components/Modal/TeamMember/EditTeamMember";
 import ChooseAccountModal from "@/components/Modal/Account/ChooseAccountModal";
+import PermissionRequiredModal from "@/components/Modal/PermissionRequiredModal";
+import PayrollNotSavedModal from "@/components/Modal/Payroll/PayrollNotSavedModal";
 import { Group } from "./group-payment";
 import { CompanyGroupResponseDto, CompanyContactResponseDto } from "@qash/types/dto/employee";
 import { BatchTransaction } from "@/services/store/batchTransactions";
@@ -145,7 +147,9 @@ export const MODAL_IDS = {
   INVITE_TEAM_MEMBER: "INVITE_TEAM_MEMBER",
   REMOVE_TEAM_MEMBER: "REMOVE_TEAM_MEMBER",
   EDIT_TEAM_MEMBER: "EDIT_TEAM_MEMBER",
+  PERMISSION_REQUIRED: "PERMISSION_REQUIRED",
   CHOOSE_ACCOUNT: "CHOOSE_ACCOUNT",
+  PAYROLL_NOT_SAVED: "PAYROLL_NOT_SAVED",
 } as const;
 
 export type ModalId = keyof typeof MODAL_IDS;
@@ -528,6 +532,15 @@ export interface ChooseAccountModalProps extends BaseModalProps {
   onConfirm?: (account: MultisigAccountResponseDto) => void;
 }
 
+export interface PermissionRequiredModalProps extends BaseModalProps {
+  onConfirm?: () => void;
+  role?: string;
+}
+
+export interface PayrollNotSavedModalProps extends BaseModalProps {
+  onConfirm?: () => void;
+}
+
 export type ModalPropsMap = {
   [MODAL_IDS.SELECT_TOKEN]: SelectTokenModalProps;
   [MODAL_IDS.EDIT_TRANSACTION]: EditTransactionModalProps;
@@ -594,6 +607,8 @@ export type ModalPropsMap = {
   [MODAL_IDS.REMOVE_TEAM_MEMBER]: RemoveTeamMemberProps;
   [MODAL_IDS.EDIT_TEAM_MEMBER]: EditTeamMemberProps;
   [MODAL_IDS.CHOOSE_ACCOUNT]: ChooseAccountModalProps;
+  [MODAL_IDS.PERMISSION_REQUIRED]: PermissionRequiredModalProps;
+  [MODAL_IDS.PAYROLL_NOT_SAVED]: PayrollNotSavedModalProps;
 };
 
 export type ModalProps = ModalPropsMap[keyof ModalPropsMap];
@@ -665,4 +680,6 @@ export const modalRegistry = {
   [MODAL_IDS.REMOVE_TEAM_MEMBER]: RemoveTeamMember,
   [MODAL_IDS.EDIT_TEAM_MEMBER]: EditTeamMember,
   [MODAL_IDS.CHOOSE_ACCOUNT]: ChooseAccountModal,
+  [MODAL_IDS.PERMISSION_REQUIRED]: PermissionRequiredModal,
+  [MODAL_IDS.PAYROLL_NOT_SAVED]: PayrollNotSavedModal,
 } as const;

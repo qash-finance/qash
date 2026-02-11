@@ -13,7 +13,7 @@ import {
   useGetConsumableNotes,
   useCreateConsumeProposal,
 } from "@/services/api/multisig";
-import { MultisigProposalStatusEnum } from "@qash/types/enums";
+import { MultisigProposalStatusEnum, TeamMemberRoleEnum } from "@qash/types/enums";
 import toast from "react-hot-toast";
 import { useModal } from "@/contexts/ModalManagerProvider";
 import { bytesToHex, fromHexSig, hexToBytes } from "@/utils";
@@ -23,6 +23,7 @@ import { useMidenProvider } from "@/contexts/MidenProvider";
 import { getFaucetMetadata } from "@/services/utils/miden/faucet";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "../Common/PageHeader";
+import { useAuth } from "@/services/auth/context";
 
 // Previously a fixed enum - we now allow any multisig account id
 type SubTabType = "pending" | "history" | "receive";
@@ -43,6 +44,9 @@ export function TransactionsContainer() {
   const [isCreatingProposal, setIsCreatingProposal] = useState(false);
   const { data: wallet } = useWallet();
   const paraClient = useClient();
+  const { user } = useAuth();
+
+  const isViewer = user?.teamMembership?.role === TeamMemberRoleEnum.VIEWER;
 
   const { openModal, closeModal } = useModal();
   const { client: midenClient } = useMidenProvider();
@@ -442,6 +446,7 @@ export function TransactionsContainer() {
                       onClaimNote={handleClaimNote}
                       isLoading={isCreatingProposal}
                       isInProposal={isNoteInProposal}
+                      isViewer={isViewer}
                     />
                   );
                 })}
@@ -475,6 +480,7 @@ export function TransactionsContainer() {
                   isExecuteLoading={actionLoadingId === proposal.uuid && actionType === "execute"}
                   isCancelLoading={actionLoadingId === proposal.uuid && actionType === "cancel"}
                   userPublicKey={wallet?.publicKey}
+                  isViewer={isViewer}
                   onProposalClick={() => router.push(`/transactions/detail?proposalId=${proposal.id}`)}
                 />
               ))
@@ -508,6 +514,7 @@ export function TransactionsContainer() {
                   isExecuteLoading={actionLoadingId === proposal.uuid && actionType === "execute"}
                   isCancelLoading={actionLoadingId === proposal.uuid && actionType === "cancel"}
                   userPublicKey={wallet?.publicKey}
+                  isViewer={isViewer}
                   onProposalClick={() => router.push(`/transactions/detail?proposalId=${proposal.id}`)}
                 />
               ))

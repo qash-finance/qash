@@ -11,6 +11,7 @@ import { DatePickerDropdown } from "@/components/Common/Dropdown/DatePickerDropd
 import { DueDateDropdown } from "@/components/Common/Dropdown/DueDateDropdown";
 import InvoicePreview from "../Common/Invoice/InvoicePreview";
 import { useModal } from "@/contexts/ModalManagerProvider";
+import { MODAL_IDS, PermissionRequiredModalProps } from "@/types/modal";
 import { createB2BInvoice, sendB2BInvoice, createB2BSchedule } from "@/services/api/invoice";
 import { useGetMyCompany } from "@/services/api/company";
 import { useListAccountsByCompany } from "@/services/api/multisig";
@@ -119,6 +120,19 @@ const CreateClientInvoice = () => {
   const [error, setError] = useState<string | null>(null);
   const [createdInvoice, setCreatedInvoice] = useState<any>(null);
   const [ccEmailInput, setCcEmailInput] = useState("");
+
+  const isAdmin = user?.teamMembership?.role === "ADMIN" || user?.teamMembership?.role === "OWNER";
+
+  useEffect(() => {
+    if (user && !isAdmin) {
+      openModal<PermissionRequiredModalProps>(MODAL_IDS.PERMISSION_REQUIRED, {
+        role: user?.teamMembership?.role,
+        onConfirm: () => {
+          router.push("/");
+        },
+      });
+    }
+  }, [user, isAdmin]);
 
   const {
     register,
@@ -1303,6 +1317,8 @@ const CreateClientInvoice = () => {
       </button>
     </div>
   );
+
+  if (user && !isAdmin) return null;
 
   return (
     <>

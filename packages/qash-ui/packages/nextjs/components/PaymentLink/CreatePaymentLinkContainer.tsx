@@ -1,7 +1,7 @@
 import { useModal } from "@/contexts/ModalManagerProvider";
 import { AssetWithMetadata } from "@/types/faucet";
-import { MODAL_IDS } from "@/types/modal";
-import React, { useState } from "react";
+import { MODAL_IDS, PermissionRequiredModalProps } from "@/types/modal";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { PrimaryButton } from "../Common/PrimaryButton";
 import { BaseContainer } from "../Common/BaseContainer";
@@ -107,6 +107,7 @@ const CreatePaymentLinkContainer = () => {
   const { data: multisigAccounts, isLoading: accountsLoading } = useListAccountsByCompany(myCompany?.id, {
     enabled: !!myCompany?.id,
   });
+  const isAdmin = user?.teamMembership?.role === "ADMIN" || user?.teamMembership?.role === "OWNER";
 
   const {
     register,
@@ -124,6 +125,17 @@ const CreatePaymentLinkContainer = () => {
       walletAddress: "",
     },
   });
+
+  useEffect(() => {
+    if (user && !isAdmin) {
+      openModal<PermissionRequiredModalProps>(MODAL_IDS.PERMISSION_REQUIRED, {
+        role: user?.teamMembership?.role,
+        onConfirm: () => {
+          router.push("/");
+        },
+      });
+    }
+  }, [user, isAdmin]);
 
   const handleCreatePaymentLink = async (data: CreatePaymentLinkFormData) => {
     if (!data.walletAddress) {
