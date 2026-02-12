@@ -11,8 +11,8 @@ import { Server, Socket } from 'socket.io';
 import { Injectable, Logger } from '@nestjs/common';
 import { NotificationResponseDto } from './notification.dto';
 
-interface WalletSocket extends Socket {
-  walletAddress?: string;
+interface UserSocket extends Socket {
+  userId?: number;
 }
 
 @Injectable()
@@ -30,11 +30,11 @@ export class NotificationGateway
   server: Server;
 
   private readonly logger = new Logger(NotificationGateway.name);
-  private connectedWallets = new Map<string, string[]>(); // walletAddress -> array of socketIds
+  private connectedUsers = new Map<number, string[]>(); // userId -> array of socketIds
 
   constructor() {}
 
-  async handleConnection(client: WalletSocket) {
+  async handleConnection(client: UserSocket) {
     this.logger.log(`Client ${client.id} connected to notifications`);
 
     // Send connection confirmation
@@ -44,166 +44,188 @@ export class NotificationGateway
     });
   }
 
-  handleDisconnect(client: WalletSocket) {
-    if (client.walletAddress) {
-      const walletSockets =
-        this.connectedWallets.get(client.walletAddress) || [];
-      const updatedSockets = walletSockets.filter(
+  handleDisconnect(client: UserSocket) {
+    if (client.userId) {
+      const userSockets = this.connectedUsers.get(client.userId) || [];
+      const updatedSockets = userSockets.filter(
         (socketId) => socketId !== client.id,
       );
 
       if (updatedSockets.length === 0) {
-        this.connectedWallets.delete(client.walletAddress);
+        this.connectedUsers.delete(client.userId);
       } else {
-        this.connectedWallets.set(client.walletAddress, updatedSockets);
+        this.connectedUsers.set(client.userId, updatedSockets);
       }
 
       this.logger.log(
-        `Wallet ${client.walletAddress} disconnected via socket ${client.id}`,
+        `User ${client.userId} disconnected via socket ${client.id}`,
       );
     } else {
       this.logger.log(`Client ${client.id} disconnected`);
     }
   }
 
-  @SubscribeMessage('join_wallet')
-  handleJoinWallet(
-    @ConnectedSocket() client: WalletSocket,
-    @MessageBody() data: { walletAddress: string },
+  @SubscribeMessage('join_user')
+  handleJoinUser(
+    @ConnectedSocket() client: UserSocket,
+    @MessageBody() data: { userId: number },
   ) {
-    const { walletAddress } = data;
+    const { userId } = data;
 
-    if (!walletAddress) {
-      client.emit('error', { message: 'Wallet address is required' });
+    if (!userId) {
+      client.emit('error', { message: 'User ID is required' });
       return;
     }
 
-    // Leave previous wallet room if any
-    if (client.walletAddress) {
-      client.leave(`wallet_${client.walletAddress}`);
-      this.removeFromWalletTracking(client);
+    // Leave previous user room if any
+    if (client.userId) {
+      client.leave(`user_${client.userId}`);
+      this.removeFromUserTracking(client);
     }
 
-    // Join new wallet room
-    client.walletAddress = walletAddress;
-    client.join(`wallet_${walletAddress}`);
+    // Join new user room
+    client.userId = userId;
+    client.join(`user_${userId}`);
 
-    // Track connected wallet
-    const walletSockets = this.connectedWallets.get(walletAddress) || [];
-    walletSockets.push(client.id);
-    this.connectedWallets.set(walletAddress, walletSockets);
+    // Track connected user
+    const userSockets = this.connectedUsers.get(userId) || [];
+    userSockets.push(client.id);
+    this.connectedUsers.set(userId, userSockets);
 
-    this.logger.log(`Client ${client.id} joined wallet room: ${walletAddress}`);
+    this.logger.log(`Client ${client.id} joined user room: ${userId}`);
 
-    client.emit('joined_wallet', {
-      message: 'Successfully joined wallet notification room',
-      walletAddress: walletAddress,
+    client.emit('joined_user', {
+      message: 'Successfully joined user notification room',
+      userId: userId,
     });
   }
 
-  @SubscribeMessage('leave_wallet')
-  handleLeaveWallet(@ConnectedSocket() client: WalletSocket) {
-    if (client.walletAddress) {
-      client.leave(`wallet_${client.walletAddress}`);
-      this.removeFromWalletTracking(client);
+  @SubscribeMessage('leave_user')
+  handleLeaveUser(@ConnectedSocket() client: UserSocket) {
+    if (client.userId) {
+      client.leave(`user_${client.userId}`);
+      this.removeFromUserTracking(client);
 
       this.logger.log(
-        `Client ${client.id} left wallet room: ${client.walletAddress}`,
+        `Client ${client.id} left user room: ${client.userId}`,
       );
 
-      client.emit('left_wallet', {
-        message: 'Left wallet notification room',
-        walletAddress: client.walletAddress,
+      client.emit('left_user', {
+        message: 'Left user notification room',
+        userId: client.userId,
       });
 
-      client.walletAddress = undefined;
+      client.userId = undefined;
     }
   }
 
   @SubscribeMessage('ping')
-  handlePing(@ConnectedSocket() client: WalletSocket) {
+  handlePing(@ConnectedSocket() client: UserSocket) {
     client.emit('pong', {
       timestamp: new Date().toISOString(),
       socketId: client.id,
-      walletAddress: client.walletAddress,
+      userId: client.userId,
     });
   }
 
-  // Method to emit notification to specific wallet address
-  public emitNotificationToWallet(
-    walletAddress: string,
+  /**
+   * Emit new notification to specific user
+   */
+  public emitNotificationToUser(
+    userId: number,
     notification: NotificationResponseDto,
   ) {
-    this.server.to(`wallet_${walletAddress}`).emit('new_notification', {
+    this.server.to(`user_${userId}`).emit('new_notification', {
       type: 'notification',
       data: notification,
       timestamp: new Date().toISOString(),
     });
 
     this.logger.log(
-      `Emitted notification ${notification.id} to wallet ${walletAddress}`,
+      `Emitted notification ${notification.id} to user ${userId}`,
     );
   }
 
-  // Method to emit notification count update to wallet
-  public emitUnreadCountToWallet(walletAddress: string, count: number) {
-    this.server.to(`wallet_${walletAddress}`).emit('unread_count_update', {
+  /**
+   * Emit unread count update to user
+   */
+  public emitUnreadCountToUser(userId: number, count: number) {
+    this.server.to(`user_${userId}`).emit('unread_count_update', {
       type: 'unread_count',
       count,
       timestamp: new Date().toISOString(),
     });
 
-    this.logger.log(`Emitted unread count ${count} to wallet ${walletAddress}`);
+    this.logger.log(`Emitted unread count ${count} to user ${userId}`);
   }
 
-  // Method to emit when notification is marked as read to wallet
-  public emitNotificationReadToWallet(
-    walletAddress: string,
-    notificationId: number,
-  ) {
-    this.server.to(`wallet_${walletAddress}`).emit('notification_read', {
+  /**
+   * Emit when notification is marked as read
+   */
+  public emitNotificationReadToUser(userId: number, notificationId: number) {
+    this.server.to(`user_${userId}`).emit('notification_read', {
       type: 'notification_read',
       notificationId,
       timestamp: new Date().toISOString(),
     });
   }
 
-  // Method to emit when all notifications are marked as read to wallet
-  public emitAllNotificationsReadToWallet(walletAddress: string) {
-    this.server.to(`wallet_${walletAddress}`).emit('all_notifications_read', {
+  /**
+   * Emit when all notifications are marked as read
+   */
+  public emitAllNotificationsReadToUser(userId: number) {
+    this.server.to(`user_${userId}`).emit('all_notifications_read', {
       type: 'all_notifications_read',
       timestamp: new Date().toISOString(),
     });
   }
 
-  // Get connected wallets count for debugging
-  public getConnectedWalletsCount(): number {
-    return this.connectedWallets.size;
+  /**
+   * Emit when notification is deleted
+   */
+  public emitNotificationDeletedToUser(userId: number, notificationId: number) {
+    this.server.to(`user_${userId}`).emit('notification_deleted', {
+      type: 'notification_deleted',
+      notificationId,
+      timestamp: new Date().toISOString(),
+    });
   }
 
-  // Check if wallet is connected
-  public isWalletConnected(walletAddress: string): boolean {
-    return this.connectedWallets.has(walletAddress);
+  /**
+   * Get connected users count (for debugging/monitoring)
+   */
+  public getConnectedUsersCount(): number {
+    return this.connectedUsers.size;
   }
 
-  // Get all connected wallets (for debugging)
-  public getConnectedWallets(): string[] {
-    return Array.from(this.connectedWallets.keys());
+  /**
+   * Check if user is connected
+   */
+  public isUserConnected(userId: number): boolean {
+    return this.connectedUsers.has(userId);
   }
 
-  // Helper method to remove client from wallet tracking
-  private removeFromWalletTracking(client: WalletSocket) {
-    if (client.walletAddress) {
-      const walletSockets =
-        this.connectedWallets.get(client.walletAddress) || [];
-      const updatedSockets = walletSockets.filter(
+  /**
+   * Get all connected user IDs (for debugging)
+   */
+  public getConnectedUsers(): number[] {
+    return Array.from(this.connectedUsers.keys());
+  }
+
+  /**
+   * Helper method to remove client from user tracking
+   */
+  private removeFromUserTracking(client: UserSocket) {
+    if (client.userId) {
+      const userSockets = this.connectedUsers.get(client.userId) || [];
+      const updatedSockets = userSockets.filter(
         (socketId) => socketId !== client.id,
       );
 
       if (updatedSockets.length === 0) {
-        this.connectedWallets.delete(client.walletAddress);
+        this.connectedUsers.delete(client.userId);
       } else {
-        this.connectedWallets.set(client.walletAddress, updatedSockets);
+        this.connectedUsers.set(client.userId, updatedSockets);
       }
     }
   }

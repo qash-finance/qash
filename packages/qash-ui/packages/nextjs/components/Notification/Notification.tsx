@@ -35,7 +35,6 @@ const tabs = (unreadCount: number) => [
 ];
 
 const Notification = ({ isOpen, onClose }: ModalProp<NotificationModalProps>) => {
-  const { walletAddress, isConnected } = useWalletConnect();
   const [isAnimating, setIsAnimating] = useState(false);
   const [activeTab, setActiveTab] = useState<"unread" | "all">("unread");
   const [unreadCount, setUnreadCount] = useState<number>(0);
@@ -44,10 +43,7 @@ const Notification = ({ isOpen, onClose }: ModalProp<NotificationModalProps>) =>
   const socket = socketContext?.socket;
   const queryClient = useQueryClient();
 
-  const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useGetNotificationsInfinite(
-    walletAddress,
-    20,
-  );
+  const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useGetNotificationsInfinite(20);
   const markAsReadMutation = useMarkNotificationAsRead();
   const markAllAsReadMutation = useMarkAllNotificationsAsRead();
 
@@ -197,9 +193,9 @@ const Notification = ({ isOpen, onClose }: ModalProp<NotificationModalProps>) =>
   const convertNotification = (notification: NotificationResponseDto): NotificationCardType => {
     return {
       id: notification.id,
-      type: notification.type as NotificationType,
+      type: notification.type as any as NotificationType, // Backend enum needs to be expanded
       title: notification.title,
-      subtitle: notification.message,
+      subtitle: notification.message || null,
       time: formatRelativeTime(new Date(notification.createdAt)),
       amount: notification.metadata?.amount,
       tokenAddress: notification.metadata?.tokenId,
@@ -278,11 +274,7 @@ const Notification = ({ isOpen, onClose }: ModalProp<NotificationModalProps>) =>
 
             {/* Notification List */}
             <div className="flex flex-col gap-1 w-full overflow-y-auto h-full my-2">
-              {!isConnected ? (
-                <div className="flex items-center justify-center py-8">
-                  <span className="text-text-secondary text-sm">Coming soon</span>
-                </div>
-              ) : isLoading || error ? (
+              {isLoading || error ? (
                 <div className="flex items-center justify-center py-8">
                   <span className="text-text-secondary text-sm">Loading notifications...</span>
                 </div>

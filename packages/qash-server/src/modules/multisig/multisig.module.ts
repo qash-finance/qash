@@ -8,9 +8,17 @@ import { AuthModule } from '../auth/auth.module';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { CompanyModule } from '../company/company.module';
 import { BillModule } from '../bill/bill.module';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
-  imports: [ConfigModule, AuthModule, ActivityLogModule, CompanyModule, BillModule],
+  imports: [
+    ConfigModule,
+    AuthModule,
+    ActivityLogModule,
+    CompanyModule,
+    BillModule,
+    NotificationModule,
+  ],
   controllers: [MultisigController],
   providers: [MultisigService, MidenClientService, PrismaService],
   exports: [MultisigService, MidenClientService],

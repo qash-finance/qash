@@ -163,3 +163,9 @@ export enum ErrorTeamMember {
   NotPendingInvitation = 'This invitation is not in pending status',
   NotSuspended = 'Team member is not suspended',
 }
+
+export enum ErrorNotification {
+  NotFound = 'Notification not found',
+  AccessDenied = 'Access denied to notification',
+  InvalidStatus = 'Invalid notification status',
+}

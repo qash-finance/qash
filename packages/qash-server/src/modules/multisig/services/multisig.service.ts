@@ -22,9 +22,10 @@ import {
   ExecuteTransactionResponseDto,
 } from '../dto/multisig.dto';
 import { UserWithCompany } from '../../auth/decorators/current-user.decorator';
-import { ActivityActionEnum, ActivityEntityTypeEnum, BillStatusEnum } from '../../../database/generated/client';
+import { ActivityActionEnum, ActivityEntityTypeEnum, BillStatusEnum, NotificationsTypeEnum } from '../../../database/generated/client';
 import { ActivityLogService } from 'src/modules/activity-log/activity-log.service';
 import { BillService } from 'src/modules/bill/bill.service';
+import { NotificationService } from 'src/modules/notification/notification.service';
 
 @Injectable()
 export class MultisigService {
@@ -35,6 +36,7 @@ export class MultisigService {
     private readonly midenClient: MidenClientService,
     private readonly activityLogService: ActivityLogService,
     private readonly billService: BillService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   /**
@@ -177,6 +179,30 @@ export class MultisigService {
         logo: dto.logo,
       },
     });
+
+    // Create notifications for all team members involved
+    try {
+      for (const teamMember of orderedTeamMembers) {
+        if (teamMember.user) {
+          await this.notificationService.createNotification({
+            title: 'Multisig Account Created',
+            message: `Multisig account "${dto.name}" has been created with ${memberIds.size} members and a threshold of ${dto.threshold}.`,
+            type: NotificationsTypeEnum.MULTISIG_ACCOUNT_CREATED,
+            userId: teamMember.user.id,
+            metadata: {
+              accountId,
+              name: dto.name,
+              threshold: dto.threshold,
+              memberCount: memberIds.size,
+            },
+          });
+        }
+      }
+      this.logger.log(`Notifications created for ${orderedTeamMembers.length} team members`);
+    } catch (error) {
+      this.logger.error('Failed to create notifications for multisig account creation', error);
+      // Don't throw - notification failure should not block account creation
+    }
 
     return account;
   }
