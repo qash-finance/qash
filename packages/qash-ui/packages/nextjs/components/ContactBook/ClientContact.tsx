@@ -16,7 +16,8 @@ import { MoreActionsTooltip } from "../Common/ToolTip/MoreActionsTooltip";
 
 export const ClientContact = () => {
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const isAdmin = user?.teamMembership?.role === "ADMIN" || user?.teamMembership?.role === "OWNER";
   const { openModal } = useModal();
   const deleteClientMutation = useDeleteClient();
   const { data: clientsResponse, isLoading: isLoadingClients } = useGetClients(
@@ -228,7 +229,7 @@ export const ClientContact = () => {
       Country: client.country || "-",
       City: client.city || "-",
       Type: client.companyType || "-",
-      " ": (
+      " ": isAdmin ? (
         <div className="flex justify-center items-center">
           <div
             data-tooltip-id={checkedRows.length > 0 ? "multiple-actions-tooltip" : `more-actions-${index}`}
@@ -247,7 +248,7 @@ export const ClientContact = () => {
             <img src="/misc/three-dot-icon.svg" alt="more actions" className="w-6 h-6" />
           </div>
         </div>
-      ),
+      ) : null,
     };
   });
 

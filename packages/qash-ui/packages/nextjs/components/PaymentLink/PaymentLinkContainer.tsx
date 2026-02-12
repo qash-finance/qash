@@ -20,6 +20,7 @@ import { PaymentLinkActionsTooltip } from "./PaymentLinkActionsTooltip";
 import { SecondaryButton } from "../Common/SecondaryButton";
 import { Badge, BadgeStatus } from "../Common/Badge";
 import { PageHeader } from "../Common/PageHeader";
+import { useAuth } from "@/services/auth/context";
 
 const tabs = [
   { id: "all", label: "All links", title: "All payment links", description: "Share these links for payments." },
@@ -50,6 +51,8 @@ const Card = ({ title, amount }: { title: string; amount: string }) => {
 
 const PaymentLinkContainer = () => {
   const router = useRouter();
+  const { user } = useAuth();
+  const isAdmin = user?.teamMembership?.role === "ADMIN" || user?.teamMembership?.role === "OWNER";
   const [activeTab, setActiveTab] = useState(tabs[0]);
   const [selectedRows, setSelectedRows] = useState<number[]>([]);
   const [activeTooltipId, setActiveTooltipId] = useState<string | null>(null);
@@ -225,7 +228,7 @@ const PaymentLinkContainer = () => {
           />
         </div>
       ),
-      " ": (
+      " ": isAdmin ? (
         <div className="flex justify-center items-center">
           <div
             data-tooltip-id={`payment-link-actions-${displayedLinks.indexOf(link)}`}
@@ -242,7 +245,7 @@ const PaymentLinkContainer = () => {
             <img src="/misc/three-dot-icon.svg" alt="More" className="w-6 h-6" />
           </div>
         </div>
-      ),
+      ) : null,
     }));
   }, [displayedLinks, selectedRows, deletePaymentLinksMutation.isPending]);
 

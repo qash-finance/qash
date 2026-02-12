@@ -46,7 +46,8 @@ export const CategoryBadge = ({ shape, color, name }: { shape: CategoryShapeEnum
 
 export const EmployeeContact = () => {
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const isAdmin = user?.teamMembership?.role === "ADMIN" || user?.teamMembership?.role === "OWNER";
   const { openModal } = useModal();
   const [tabs, setTabs] = useState<{ id: string; label: React.ReactNode }[]>([]);
   const [activeTab, setActiveTab] = useState<string>("all");
@@ -352,7 +353,7 @@ export const EmployeeContact = () => {
             </div>
           </div>
         ),
-        " ": (
+        " ": isAdmin ? (
           <div className="flex justify-center items-center">
             <div
               data-tooltip-id={checkedRows.length > 0 ? "multiple-actions-tooltip" : `more-actions-${index}`}
@@ -371,7 +372,7 @@ export const EmployeeContact = () => {
               <img src="/misc/three-dot-icon.svg" alt="more actions" className="w-6 h-6" />
             </div>
           </div>
-        ),
+        ) : null,
       };
     }) || [];
 
@@ -395,12 +396,14 @@ export const EmployeeContact = () => {
                 setCheckedRows([]); // Clear checked rows when switching tabs
               }}
             />
-            <div
-              className="flex flex-row items-center justify-center gap-2 cursor-pointer bg-background rounded-lg p-1.5"
-              onClick={() => openModal(MODAL_IDS.CREATE_GROUP)}
-            >
-              <img src="/misc/plus-icon.svg" alt="plus-icon" className="w-full" style={{ filter: "invert(1)" }} />
-            </div>
+            {isAdmin && (
+              <div
+                className="flex flex-row items-center justify-center gap-2 cursor-pointer bg-background rounded-lg p-1.5"
+                onClick={() => openModal(MODAL_IDS.CREATE_GROUP)}
+              >
+                <img src="/misc/plus-icon.svg" alt="plus-icon" className="w-full" style={{ filter: "invert(1)" }} />
+              </div>
+            )}
           </div>
           <span className="text-text-primary">{addressBooks?.length || 0} contacts</span>
         </div>

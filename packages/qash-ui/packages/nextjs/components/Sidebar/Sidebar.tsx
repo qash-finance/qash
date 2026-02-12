@@ -187,6 +187,11 @@ export const Sidebar: React.FC<NavProps> = ({ onActionItemClick }) => {
     // Add more submenu checks here as needed
     // const isAnySubmenuOpen = showMoveCryptoSidebar || showAnotherSubmenu;
 
+    // Update badge count for Transactions item based on number of pending proposals
+    const pendingCount = allProposals.filter(
+      p => p.status === MultisigProposalStatusEnum.READY || p.status === MultisigProposalStatusEnum.PENDING,
+    ).length;
+
     setActions(prev =>
       prev.map(item => {
         // Check if item is active based on URL
@@ -211,13 +216,17 @@ export const Sidebar: React.FC<NavProps> = ({ onActionItemClick }) => {
         // If no submenu is open, use URL-based active state
         const isActive = isAnySubmenuOpen ? isSubmenuActive : isUrlActive;
 
+        // Update badge count for Transactions item
+        const badgeCount = item.link === SidebarLink.Transactions ? pendingCount : item.badgeCount;
+
         return {
           ...item,
           isActive,
+          badgeCount,
         };
       }),
     );
-  }, [pathname, showMoveCryptoSidebar]);
+  }, [pathname, showMoveCryptoSidebar, allProposals]);
 
   useEffect(() => {
     if (multisigAccounts && multisigAccounts.length !== 0) {
@@ -229,24 +238,6 @@ export const Sidebar: React.FC<NavProps> = ({ onActionItemClick }) => {
       })();
     }
   }, [multisigAccounts]);
-
-  useEffect(() => {
-    // Update badge count for Transactions item based on number of pending proposals
-    const pendingCount = allProposals.filter(
-      p => p.status === MultisigProposalStatusEnum.READY || p.status === MultisigProposalStatusEnum.PENDING,
-    ).length;
-    setActions(prev =>
-      prev.map(item => {
-        if (item.link === SidebarLink.Transactions) {
-          return {
-            ...item,
-            badgeCount: pendingCount,
-          };
-        }
-        return item;
-      }),
-    );
-  }, [allProposals]);
 
   // **************** Handlers ****************
   const handleActionItemClick = (itemIndex: number) => {

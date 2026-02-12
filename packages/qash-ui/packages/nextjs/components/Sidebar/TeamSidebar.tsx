@@ -9,6 +9,7 @@ import { useGetMyCompany } from "@/services/api/company";
 import { useGetAccountBalances, useListAccountsByCompany } from "@/services/api/multisig";
 import MultisigAccountCard from "./MultisigAccountCard";
 import { useModal } from "@/contexts/ModalManagerProvider";
+import { useAuth } from "@/services/auth/context";
 
 interface TeamSidebarProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ interface TeamSidebarProps {
 }
 
 export default function TeamSidebar({ isOpen, onClose }: TeamSidebarProps) {
+  const { user } = useAuth();
   const pathname = usePathname();
   const { openModal } = useModal();
   const { data: myCompany } = useGetMyCompany();
@@ -23,6 +25,7 @@ export default function TeamSidebar({ isOpen, onClose }: TeamSidebarProps) {
   const { data: multisigAccounts, isLoading: accountsLoading } = useListAccountsByCompany(myCompany?.id, {
     enabled: !!myCompany?.id,
   });
+  const isAdmin = user?.teamMembership?.role === "ADMIN" || user?.teamMembership?.role === "OWNER";
 
   // Close sidebar when route changes
   useEffect(() => {
@@ -32,10 +35,20 @@ export default function TeamSidebar({ isOpen, onClose }: TeamSidebarProps) {
   }, [pathname]);
 
   const handleCreateNewAccount = () => {
+    if (!isAdmin) {
+      openModal("PERMISSION_REQUIRED", { role: user?.teamMembership?.role });
+      return;
+    }
+
     openModal("CREATE_ACCOUNT");
   };
 
   const handleAddMember = () => {
+    if (!isAdmin) {
+      openModal("PERMISSION_REQUIRED", { role: user?.teamMembership?.role });
+      return;
+    }
+
     openModal("INVITE_TEAM_MEMBER");
   };
 

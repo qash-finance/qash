@@ -23,6 +23,7 @@ import { useModal } from "@/contexts/ModalManagerProvider";
 import { PrimaryButton } from "../Common/PrimaryButton";
 import { cancelB2BInvoice } from "@/services/api/invoice";
 import { PageHeader } from "../Common/PageHeader";
+import { useAuth } from "@/services/auth/context";
 
 type Tab = "all" | "sent" | "paid";
 
@@ -81,6 +82,8 @@ const ClientInvoiceContainer = () => {
   const { data: groups } = useGetAllEmployeeGroups();
   const queryClient = useQueryClient();
   const { openModal } = useModal();
+  const { user } = useAuth();
+  const isAdmin = user?.teamMembership?.role === "ADMIN" || user?.teamMembership?.role === "OWNER";
 
   // Fetch B2B invoice statistics
   const { data: invoiceStats } = useQuery({
@@ -88,17 +91,18 @@ const ClientInvoiceContainer = () => {
     queryFn: getB2BInvoiceStats,
   });
 
-  const billActionRenderer = (rowData: Record<string, any>, index: number) => (
-    <div className="flex items-center justify-center w-full" onClick={e => e.stopPropagation()}>
-      <img
-        src="/misc/three-dot-icon.svg"
-        alt="three dot icon"
-        className="w-6 h-6 cursor-pointer"
-        data-tooltip-id="bill-action-tooltip"
-        data-tooltip-content={rowData.__id?.toString()}
-      />
-    </div>
-  );
+  const billActionRenderer = (rowData: Record<string, any>, index: number) =>
+    isAdmin ? (
+      <div className="flex items-center justify-center w-full" onClick={e => e.stopPropagation()}>
+        <img
+          src="/misc/three-dot-icon.svg"
+          alt="three dot icon"
+          className="w-6 h-6 cursor-pointer"
+          data-tooltip-id="bill-action-tooltip"
+          data-tooltip-content={rowData.__id?.toString()}
+        />
+      </div>
+    ) : null;
 
   const handleCheckRow = (idx: number) => {
     setCheckedRows(prev => (prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx]));
