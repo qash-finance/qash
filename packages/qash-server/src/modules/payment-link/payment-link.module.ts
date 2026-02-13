@@ -9,9 +9,10 @@ import { PrismaModule } from '../../database/prisma.module';
 import { AuthModule } from '../auth/auth.module';
 import { CompanyModule } from '../company/company.module';
 import { TeamMemberModule } from '../team-member/team-member.module';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, CompanyModule, TeamMemberModule],
+  imports: [PrismaModule, AuthModule, CompanyModule, TeamMemberModule, NotificationModule],
   providers: [
     PaymentLinkService,
     PaymentLinkRepository,

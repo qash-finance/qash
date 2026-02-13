@@ -17,10 +17,12 @@ import {
   PaymentLinkRecordRepository,
 } from './payment-link.repository';
 import { randomBytes } from 'crypto';
-import { PaymentLinkStatusEnum } from 'src/database/generated/enums';
+import { PaymentLinkStatusEnum, NotificationsTypeEnum, TeamMemberRoleEnum } from 'src/database/generated/enums';
 import { PaymentLink } from 'src/database/generated/client';
 import { PaymentLinkUpdateInput } from 'src/database/generated/models';
 import { CompanyService } from '../company/company.service';
+import { NotificationService } from '../notification/notification.service';
+import { PrismaService } from '../../database/prisma.service';
 
 @Injectable()
 export class PaymentLinkService {
@@ -30,6 +32,8 @@ export class PaymentLinkService {
     private readonly paymentLinkRepository: PaymentLinkRepository,
     private readonly paymentLinkRecordRepository: PaymentLinkRecordRepository,
     private readonly companyService: CompanyService,
+    private readonly notificationService: NotificationService,
+    private readonly prisma: PrismaService,
   ) {}
 
   // *************************************************
@@ -155,6 +159,39 @@ export class PaymentLinkService {
         updatedAt: now,
       });
 
+      // Notify company team members (OWNER and ADMIN)
+      try {
+        const teamMembers = await this.prisma.teamMember.findMany({
+          where: {
+            companyId,
+            role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+            user: { isNot: null },
+          },
+          include: { user: true },
+        });
+
+        for (const member of teamMembers) {
+          if (member.user) {
+            await this.notificationService.createNotification({
+              title: 'Payment Link Created',
+              message: `A new payment link "${sanitizedTitle}" has been created with code: ${code}`,
+              type: NotificationsTypeEnum.PAYMENT_LINK_CREATED,
+              userId: member.user.id,
+              metadata: {
+                paymentLinkId: link.id,
+                code,
+                title: sanitizedTitle,
+                amount: dto.amount,
+              },
+            });
+          }
+        }
+        this.logger.log(`Notifications sent for payment link creation: ${code}`);
+      } catch (error) {
+        this.logger.error('Failed to create notifications for payment link creation', error);
+        // Don't throw - notification failure should not block payment link creation
+      }
+
       return link;
     } catch (error) {
       handleError(error, this.logger);
@@ -197,6 +234,40 @@ export class PaymentLinkService {
           updatedAt: now,
         },
       );
+
+      // Notify company team members (OWNER and ADMIN)
+      try {
+        const teamMembers = await this.prisma.teamMember.findMany({
+          where: {
+            companyId: link.companyId,
+            role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+            user: { isNot: null },
+          },
+          include: { user: true },
+        });
+
+        for (const member of teamMembers) {
+          if (member.user) {
+            await this.notificationService.createNotification({
+              title: 'Payment Received',
+              message: `Payment received for payment link "${link.title}" from ${paymentDto.payer}`,
+              type: NotificationsTypeEnum.PAYMENT_RECEIVED,
+              userId: member.user.id,
+              metadata: {
+                paymentLinkId: link.id,
+                code: link.code,
+                payer: paymentDto.payer,
+                txid: paymentDto.txid,
+                paymentRecordId: paymentRecord.id,
+              },
+            });
+          }
+        }
+        this.logger.log(`Notifications sent for payment received: ${link.code}`);
+      } catch (error) {
+        this.logger.error('Failed to create notifications for payment received', error);
+        // Don't throw - notification failure should not block payment recording
+      }
 
       return paymentRecord;
     } catch (error) {
@@ -315,6 +386,38 @@ export class PaymentLinkService {
         PaymentLinkStatusEnum.DEACTIVATED,
       );
 
+      // Notify company team members (OWNER and ADMIN)
+      try {
+        const teamMembers = await this.prisma.teamMember.findMany({
+          where: {
+            companyId,
+            role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+            user: { isNot: null },
+          },
+          include: { user: true },
+        });
+
+        for (const member of teamMembers) {
+          if (member.user) {
+            await this.notificationService.createNotification({
+              title: 'Payment Link Deactivated',
+              message: `Payment link "${link.title}" has been deactivated`,
+              type: NotificationsTypeEnum.PAYMENT_LINK_DEACTIVATED,
+              userId: member.user.id,
+              metadata: {
+                paymentLinkId: link.id,
+                code: sanitizedCode,
+                title: link.title,
+              },
+            });
+          }
+        }
+        this.logger.log(`Notifications sent for payment link deactivation: ${sanitizedCode}`);
+      } catch (error) {
+        this.logger.error('Failed to create notifications for payment link deactivation', error);
+        // Don't throw - notification failure should not block deactivation
+      }
+
       return updatedLink;
     } catch (error) {
       handleError(error, this.logger);
@@ -354,6 +457,38 @@ export class PaymentLinkService {
         sanitizedCode,
         PaymentLinkStatusEnum.ACTIVE,
       );
+
+      // Notify company team members (OWNER and ADMIN)
+      try {
+        const teamMembers = await this.prisma.teamMember.findMany({
+          where: {
+            companyId,
+            role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+            user: { isNot: null },
+          },
+          include: { user: true },
+        });
+
+        for (const member of teamMembers) {
+          if (member.user) {
+            await this.notificationService.createNotification({
+              title: 'Payment Link Activated',
+              message: `Payment link "${link.title}" has been activated`,
+              type: NotificationsTypeEnum.PAYMENT_LINK_ACTIVATED,
+              userId: member.user.id,
+              metadata: {
+                paymentLinkId: link.id,
+                code: sanitizedCode,
+                title: link.title,
+              },
+            });
+          }
+        }
+        this.logger.log(`Notifications sent for payment link activation: ${sanitizedCode}`);
+      } catch (error) {
+        this.logger.error('Failed to create notifications for payment link activation', error);
+        // Don't throw - notification failure should not block activation
+      }
 
       return updatedLink;
     } catch (error) {

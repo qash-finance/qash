@@ -8,6 +8,7 @@ import { EmployeeGroupService } from './services/employee-group.service';
 import { CompanyModule } from '../company/company.module';
 import { TeamMemberModule } from '../team-member/team-member.module';
 import { AuthModule } from '../auth/auth.module';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { AuthModule } from '../auth/auth.module';
     AuthModule, // Import AuthModule for JwtAuthService and guards
     CompanyModule,
     TeamMemberModule,
+    NotificationModule,
   ],
   providers: [
     EmployeeGroupService,

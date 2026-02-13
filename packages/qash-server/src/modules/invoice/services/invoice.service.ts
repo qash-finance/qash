@@ -28,6 +28,10 @@ import {
   InvoiceStatusEnum,
   InvoiceTypeEnum,
 } from 'src/database/generated/client';
+import {
+  NotificationsTypeEnum,
+  TeamMemberRoleEnum,
+} from 'src/database/generated/enums';
 import { PrismaService } from 'src/database/prisma.service';
 import { MailService } from '../../mail/mail.service';
 import { JsonValue } from '@prisma/client/runtime/client';
@@ -39,6 +43,7 @@ import { EmployeeRepository } from 'src/modules/employee/repositories/employee.r
 import { BillService } from 'src/modules/bill/bill.service';
 import { TeamMemberRepository } from 'src/modules/team-member/team-member.repository';
 import { TokenDto } from 'src/modules/shared/shared.dto';
+import { NotificationService } from 'src/modules/notification/notification.service';
 
 @Injectable()
 export class InvoiceService {
@@ -53,6 +58,7 @@ export class InvoiceService {
     private readonly invoiceRepository: InvoiceRepository,
     private readonly payrollRepository: PayrollRepository,
     private readonly teamMemberRepository: TeamMemberRepository,
+    private readonly notificationService: NotificationService,
   ) {}
 
   //#region GET METHODS
@@ -175,7 +181,69 @@ export class InvoiceService {
   async markInvoicesAsOverdue(date?: Date): Promise<number> {
     try {
       const overdueDate = date || new Date();
-      return await this.invoiceRepository.markOverdueInvoices(overdueDate);
+
+      // Fetch invoices that are about to be marked as overdue
+      const overdueInvoices =
+        await this.invoiceRepository.findDueInvoices(overdueDate);
+
+      // Mark invoices as overdue
+      const count =
+        await this.invoiceRepository.markOverdueInvoices(overdueDate);
+
+      // Send notifications for each overdue invoice
+      if (count > 0 && overdueInvoices && overdueInvoices.length > 0) {
+        const companyIds = new Set<number>();
+
+        const getCompanyId = (invoice: InvoiceModel): number | null =>
+          invoice.toCompanyId ?? invoice.fromCompanyId ?? null;
+
+        for (const invoice of overdueInvoices) {
+          const companyId = getCompanyId(invoice as InvoiceModel);
+          if (companyId) {
+            companyIds.add(companyId);
+          }
+        }
+
+        for (const companyId of companyIds) {
+          const invoicesForCompany = overdueInvoices.filter(
+            (inv) => getCompanyId(inv as InvoiceModel) === companyId,
+          );
+
+          try {
+            const teamMembers = await this.prisma.teamMember.findMany({
+              where: {
+                companyId,
+                role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+                user: { isNot: null },
+              },
+              include: { user: true },
+            });
+
+            for (const member of teamMembers) {
+              if (member.user) {
+                await this.notificationService.createNotification({
+                  title: 'Invoices Marked as Overdue',
+                  message: `${invoicesForCompany.length} invoice(s) have been marked as overdue.`,
+                  type: NotificationsTypeEnum.INVOICE_OVERDUE,
+                  userId: member.user.id,
+                  metadata: {
+                    count: invoicesForCompany.length,
+                    companyId,
+                    invoiceIds: invoicesForCompany.map((inv) => inv.uuid),
+                  },
+                });
+              }
+            }
+          } catch (error) {
+            this.logger.error(
+              `Failed to create overdue notifications for company ${companyId}`,
+              error,
+            );
+          }
+        }
+      }
+
+      return count;
     } catch (error) {
       this.logger.error('Error marking invoices as overdue:', error);
       handleError(error, this.logger);
@@ -281,6 +349,39 @@ export class InvoiceService {
 
         const invoice = await this.invoiceRepository.create(invoiceData, tx);
 
+        // Notify company team members about invoice creation
+        try {
+          const teamMembers = await this.prisma.teamMember.findMany({
+            where: {
+              companyId,
+              role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+              user: { isNot: null },
+            },
+            include: { user: true },
+          });
+
+          for (const member of teamMembers) {
+            if (member.user) {
+              await this.notificationService.createNotification({
+                title: 'New Invoice Created',
+                message: `Invoice ${invoice.invoiceNumber} has been created for employee #${invoice.employeeId}.`,
+                type: NotificationsTypeEnum.INVOICE_CREATED,
+                userId: member.user.id,
+                metadata: {
+                  invoiceId: invoice.uuid,
+                  invoiceNumber: invoice.invoiceNumber,
+                  amount: invoice.total,
+                },
+              });
+            }
+          }
+        } catch (error) {
+          this.logger.error(
+            'Failed to create invoice creation notifications',
+            error,
+          );
+        }
+
         return invoice;
       });
     } catch (error) {
@@ -306,7 +407,47 @@ export class InvoiceService {
   ): Promise<InvoiceModel> {
     try {
       return await this.prisma.$transaction(async (tx) => {
-        return this.generateInvoice(payrollId, companyId, tx, options);
+        const invoice = await this.generateInvoice(
+          payrollId,
+          companyId,
+          tx,
+          options,
+        );
+
+        // Notify company team members about invoice generation
+        try {
+          const teamMembers = await this.prisma.teamMember.findMany({
+            where: {
+              companyId,
+              role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+              user: { isNot: null },
+            },
+            include: { user: true },
+          });
+
+          for (const member of teamMembers) {
+            if (member.user) {
+              await this.notificationService.createNotification({
+                title: 'Invoice Generated',
+                message: `Invoice ${invoice.invoiceNumber} has been automatically generated.`,
+                type: NotificationsTypeEnum.INVOICE_CREATED,
+                userId: member.user.id,
+                metadata: {
+                  invoiceId: invoice.uuid,
+                  invoiceNumber: invoice.invoiceNumber,
+                  amount: invoice.total,
+                },
+              });
+            }
+          }
+        } catch (error) {
+          this.logger.error(
+            'Failed to create invoice generation notifications',
+            error,
+          );
+        }
+
+        return invoice;
       });
     } catch (error) {
       this.logger.error('Error generating invoice from payroll:', error);
@@ -496,6 +637,39 @@ export class InvoiceService {
           tx,
         );
 
+        // Notify company team members that employee has reviewed the invoice
+        try {
+          const teamMembers = await this.prisma.teamMember.findMany({
+            where: {
+              companyId: invoice.payroll.companyId,
+              role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+              user: { isNot: null },
+            },
+            include: { user: true },
+          });
+
+          for (const member of teamMembers) {
+            if (member.user) {
+              await this.notificationService.createNotification({
+                title: 'Invoice Reviewed',
+                message: `Invoice ${invoice.invoiceNumber} has been reviewed by ${invoice.employee.name}.`,
+                type: NotificationsTypeEnum.INVOICE_REVIEWED,
+                userId: member.user.id,
+                metadata: {
+                  invoiceId: invoice.uuid,
+                  invoiceNumber: invoice.invoiceNumber,
+                  employeeName: invoice.employee.name,
+                },
+              });
+            }
+          }
+        } catch (error) {
+          this.logger.error(
+            'Failed to create invoice reviewed notifications',
+            error,
+          );
+        }
+
         return updatedInvoice;
       });
     } catch (error) {
@@ -590,6 +764,40 @@ export class InvoiceService {
           );
         } catch (emailError) {
           this.logger.error('Failed to send confirmation email:', emailError);
+        }
+
+        // Notify company team members about invoice confirmation
+        try {
+          const teamMembers = await this.prisma.teamMember.findMany({
+            where: {
+              companyId: invoice.payroll.companyId,
+              role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+              user: { isNot: null },
+            },
+            include: { user: true },
+          });
+
+          for (const member of teamMembers) {
+            if (member.user) {
+              await this.notificationService.createNotification({
+                title: 'Invoice Confirmed',
+                message: `Invoice ${invoice.invoiceNumber} has been confirmed by ${invoice.employee.name}.`,
+                type: NotificationsTypeEnum.INVOICE_CONFIRMED,
+                userId: member.user.id,
+                metadata: {
+                  invoiceId: invoice.uuid,
+                  invoiceNumber: invoice.invoiceNumber,
+                  employeeName: invoice.employee.name,
+                  amount: invoice.total,
+                },
+              });
+            }
+          }
+        } catch (error) {
+          this.logger.error(
+            'Failed to create invoice confirmed notifications',
+            error,
+          );
         }
 
         return updatedInvoice;

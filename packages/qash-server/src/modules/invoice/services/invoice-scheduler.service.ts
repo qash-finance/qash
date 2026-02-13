@@ -3,8 +3,9 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { InvoiceScheduleService } from './invoice-schedule.service';
 import { InvoiceService } from './invoice.service';
 import { PrismaService } from '../../../database/prisma.service';
+import { NotificationService } from '../../notification/notification.service';
 import { InvoiceScheduleModel } from 'src/database/generated/models/InvoiceSchedule';
-import { PayrollStatusEnum } from 'src/database/generated/enums';
+import { NotificationsTypeEnum, PayrollStatusEnum, TeamMemberRoleEnum } from 'src/database/generated/enums';
 import { MailService } from 'src/modules/mail/mail.service';
 import { TokenDto } from 'src/modules/shared/shared.dto';
 
@@ -17,6 +18,7 @@ export class InvoiceSchedulerService {
     private readonly invoiceService: InvoiceService,
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   /**
@@ -165,6 +167,42 @@ export class InvoiceSchedulerService {
         },
       );
 
+      // Notify company team members that a scheduled invoice was generated
+      setTimeout(async () => {
+        try {
+          const teamMembers = await this.prisma.teamMember.findMany({
+            where: {
+              companyId: payroll.companyId,
+              role: {
+                in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN],
+              },
+              user: { isNot: null },
+            },
+            include: { user: true },
+          });
+
+          for (const member of teamMembers) {
+            if (member.user) {
+              await this.notificationService.createNotification({
+                title: 'Scheduled Invoice Generated',
+                message: `Scheduled invoice ${invoice.invoiceNumber} has been generated for ${payroll.employee.name}.`,
+                type: NotificationsTypeEnum.INVOICE_SCHEDULED,
+                userId: member.user.id,
+                metadata: {
+                  companyId: payroll.companyId,
+                  payrollId: payroll.id,
+                  invoiceId: invoice.uuid,
+                  invoiceNumber: invoice.invoiceNumber,
+                  employeeName: payroll.employee.name,
+                },
+              });
+            }
+          }
+        } catch (error) {
+          this.logger.error('Error sending scheduled invoice notifications:', error);
+        }
+      }, 0);
+
       // Calculate month string from pay date
       const month = payDate.toLocaleDateString('en-US', {
         month: 'long',
@@ -223,6 +261,42 @@ export class InvoiceSchedulerService {
             this.logger.log(
               `Payroll ${payroll.id} reached cycle limit (${updatedPayroll.payrollCycle}). Schedule ${schedule.id} deactivated.`,
             );
+
+            // Notify company team members that payroll is completed
+            setTimeout(async () => {
+              try {
+                const teamMembers = await this.prisma.teamMember.findMany({
+                  where: {
+                    companyId: payroll.companyId,
+                    role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+                    user: { isNot: null },
+                  },
+                  include: { user: true },
+                });
+
+                for (const member of teamMembers) {
+                  if (member.user) {
+                    await this.notificationService.createNotification({
+                      title: 'Payroll Completed',
+                      message: `Payroll for employee ${schedule.payroll.employee.name} has completed all ${updatedPayroll.payrollCycle} cycles.`,
+                      type: NotificationsTypeEnum.PAYROLL_COMPLETED,
+                      userId: member.user.id,
+                      metadata: {
+                        companyId: payroll.companyId,
+                        payrollId: payroll.id,
+                        totalCycles: updatedPayroll.payrollCycle,
+                        employeeName: schedule.payroll.employee.name,
+                      },
+                    });
+                  }
+                }
+              } catch (error) {
+                this.logger.error(
+                  'Error sending payroll completion notification:',
+                  error,
+                );
+              }
+            }, 0);
           }
         }
       }

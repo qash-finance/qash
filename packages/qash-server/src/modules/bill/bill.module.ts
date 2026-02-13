@@ -8,6 +8,7 @@ import { AuthModule } from '../auth/auth.module';
 import { CompanyModule } from '../company/company.module';
 import { MailModule } from '../mail/mail.module';
 import { TeamMemberModule } from '../team-member/team-member.module';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { TeamMemberModule } from '../team-member/team-member.module';
     CompanyModule,
     MailModule,
     TeamMemberModule,
+    NotificationModule,
   ],
   controllers: [BillController],
   providers: [BillService, BillRepository],
