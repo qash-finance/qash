@@ -10,6 +10,7 @@ import {
 import { TeamMemberRepository } from './team-member.repository';
 import { CompanyRepository } from '../company/company.repository';
 import { MailService } from '../mail/mail.service';
+import { NotificationService } from '../notification/notification.service';
 import { UserRepository } from '../auth/repositories/user.repository';
 import {
   CreateTeamMemberDto,
@@ -23,6 +24,7 @@ import {
   UpdateAvatarResponseDto,
 } from './team-member.dto';
 import {
+  NotificationsTypeEnum,
   TeamMemberRoleEnum,
   TeamMemberStatusEnum,
 } from '../../database/generated/client';
@@ -45,6 +47,7 @@ export class TeamMemberService {
     private readonly companyRepository: CompanyRepository,
     private readonly userRepository: UserRepository,
     private readonly configService: ConfigService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   /**
@@ -126,7 +129,7 @@ export class TeamMemberService {
     inviteDto: InviteTeamMemberDto,
   ) {
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const result = await this.prisma.$transaction(async (tx) => {
         // Check if user can manage team
         const canManage = await this.teamMemberRepository.hasPermission(
           companyId,
@@ -225,6 +228,8 @@ export class TeamMemberService {
           email: inviteDto.email,
         };
       });
+
+      return result;
     } catch (error) {
       this.logger.error('Failed to invite team member:', error);
       handleError(error, this.logger);
@@ -473,7 +478,7 @@ export class TeamMemberService {
     newRole: TeamMemberRoleEnum,
   ) {
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const updatedMember = await this.prisma.$transaction(async (tx) => {
         const teamMember = await this.teamMemberRepository.findById(
           teamMemberId,
           tx,
@@ -519,6 +524,17 @@ export class TeamMemberService {
 
         return this.teamMemberRepository.updateRole(teamMemberId, newRole, tx);
       });
+
+      setTimeout(async () => {
+        await this.notifyTeamMemberRoleChanged(
+          updatedMember.companyId,
+          updatedMember.userId,
+          updatedMember.id,
+          newRole,
+        );
+      }, 0);
+
+      return updatedMember;
     } catch (error) {
       this.logger.error(
         `Failed to update team member role ${teamMemberId}:`,
@@ -722,7 +738,7 @@ export class TeamMemberService {
    */
   async acceptInvitationByToken(token: string) {
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const activatedMember = await this.prisma.$transaction(async (tx) => {
         const teamMember =
           await this.teamMemberRepository.findByInvitationToken(token, tx);
 
@@ -745,6 +761,16 @@ export class TeamMemberService {
         // Activate the team member
         return this.teamMemberRepository.activate(teamMember.id, tx);
       });
+
+      setTimeout(async () => {
+        await this.notifyTeamMemberJoined(
+          activatedMember.companyId,
+          activatedMember.id,
+          activatedMember.userId,
+        );
+      }, 0);
+
+      return activatedMember;
     } catch (error) {
       this.logger.error('Failed to accept invitation by token:', error);
       handleError(error, this.logger);
@@ -837,7 +863,7 @@ export class TeamMemberService {
     acceptDto?: AcceptInvitationDto,
   ) {
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const activatedMember = await this.prisma.$transaction(async (tx) => {
         const teamMember = await this.teamMemberRepository.findById(
           teamMemberId,
           tx,
@@ -884,6 +910,16 @@ export class TeamMemberService {
           tx,
         );
       });
+
+      setTimeout(async () => {
+        await this.notifyTeamMemberJoined(
+          activatedMember.companyId,
+          activatedMember.id,
+          activatedMember.userId,
+        );
+      }, 0);
+
+      return activatedMember;
     } catch (error) {
       this.logger.error(`Failed to accept invitation ${teamMemberId}:`, error);
       handleError(error, this.logger);
@@ -966,6 +1002,91 @@ export class TeamMemberService {
         error,
       );
       handleError(error, this.logger);
+    }
+  }
+
+  private async notifyTeamMemberJoined(
+    companyId: number,
+    teamMemberId: number,
+    userId: number | null,
+  ): Promise<void> {
+    try {
+      const recipients = await this.prisma.teamMember.findMany({
+        where: {
+          companyId,
+          status: TeamMemberStatusEnum.ACTIVE,
+          user: { isNot: null },
+        },
+        include: { user: true },
+      });
+
+      for (const recipient of recipients) {
+        if (recipient.user) {
+          await this.notificationService.createNotification({
+            title: 'Team Member Joined',
+            message: 'A new team member has joined your company.',
+            type: NotificationsTypeEnum.TEAM_MEMBER_JOINED,
+            userId: recipient.user.id,
+            metadata: {
+              companyId,
+              teamMemberId,
+              joinedUserId: userId,
+            },
+          });
+        }
+      }
+    } catch (error) {
+      this.logger.error('Failed to send team joined notifications:', error);
+    }
+  }
+
+  private async notifyTeamMemberRoleChanged(
+    companyId: number,
+    affectedUserId: number | null,
+    teamMemberId: number,
+    newRole: TeamMemberRoleEnum,
+  ): Promise<void> {
+    try {
+      if (affectedUserId) {
+        await this.notificationService.createNotification({
+          title: 'Your Team Role Changed',
+          message: `Your role has been updated to ${newRole}.`,
+          type: NotificationsTypeEnum.TEAM_MEMBER_ROLE_CHANGED,
+          userId: affectedUserId,
+          metadata: {
+            companyId,
+            teamMemberId,
+            newRole,
+          },
+        });
+      }
+
+      const owners = await this.prisma.teamMember.findMany({
+        where: {
+          companyId,
+          role: TeamMemberRoleEnum.OWNER,
+          user: { isNot: null },
+        },
+        include: { user: true },
+      });
+
+      for (const owner of owners) {
+        if (owner.user) {
+          await this.notificationService.createNotification({
+            title: 'Team Member Role Changed',
+            message: `A team member role has been updated to ${newRole}.`,
+            type: NotificationsTypeEnum.TEAM_MEMBER_ROLE_CHANGED,
+            userId: owner.user.id,
+            metadata: {
+              companyId,
+              teamMemberId,
+              newRole,
+            },
+          });
+        }
+      }
+    } catch (error) {
+      this.logger.error('Failed to send role change notifications:', error);
     }
   }
 

@@ -24,6 +24,10 @@ import {
   InvoiceStatusEnum,
   InvoiceTypeEnum,
 } from 'src/database/generated/client';
+import {
+  NotificationsTypeEnum,
+  TeamMemberRoleEnum,
+} from 'src/database/generated/enums';
 import { PrismaService } from 'src/database/prisma.service';
 import { MailService } from '../../mail/mail.service';
 import { JsonValue } from '@prisma/client/runtime/client';
@@ -35,6 +39,7 @@ import { CompanyRepository } from 'src/modules/company/company.repository';
 import { UserRepository } from 'src/modules/auth/repositories/user.repository';
 import { TeamMemberRepository } from 'src/modules/team-member/team-member.repository';
 import { TokenDto } from 'src/modules/shared/shared.dto';
+import { NotificationService } from 'src/modules/notification/notification.service';
 
 @Injectable()
 export class B2BInvoiceService {
@@ -50,6 +55,7 @@ export class B2BInvoiceService {
     private readonly companyRepository: CompanyRepository,
     private readonly userRepository: UserRepository,
     private readonly teamMemberRepository: TeamMemberRepository,
+    private readonly notificationService: NotificationService,
   ) {}
 
   //#region GET METHODS
@@ -589,6 +595,40 @@ export class B2BInvoiceService {
           );
         }
 
+        // Notify sender company team members that invoice has been sent
+        try {
+          const teamMembers = await this.prisma.teamMember.findMany({
+            where: {
+              companyId,
+              role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+              user: { isNot: null },
+            },
+            include: { user: true },
+          });
+
+          for (const member of teamMembers) {
+            if (member.user) {
+              await this.notificationService.createNotification({
+                title: 'B2B Invoice Sent',
+                message: `Invoice ${invoice.invoiceNumber} has been sent to ${invoice.toCompanyName || 'recipient'}.`,
+                type: NotificationsTypeEnum.INVOICE_SENT,
+                userId: member.user.id,
+                metadata: {
+                  invoiceId: invoice.uuid,
+                  invoiceNumber: invoice.invoiceNumber,
+                  recipientCompany: invoice.toCompanyName,
+                  recipientEmail: invoice.emailTo,
+                },
+              });
+            }
+          }
+        } catch (error) {
+          this.logger.error(
+            'Failed to create B2B invoice sent notifications',
+            error,
+          );
+        }
+
         return updatedInvoice;
       });
     } catch (error) {
@@ -663,6 +703,40 @@ export class B2BInvoiceService {
           );
         }
 
+        // Notify sender company team members that invoice has been confirmed
+        try {
+          const teamMembers = await this.prisma.teamMember.findMany({
+            where: {
+              companyId: invoice.fromCompanyId,
+              role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+              user: { isNot: null },
+            },
+            include: { user: true },
+          });
+
+          for (const member of teamMembers) {
+            if (member.user) {
+              await this.notificationService.createNotification({
+                title: 'B2B Invoice Confirmed',
+                message: `Invoice ${invoice.invoiceNumber} has been confirmed by ${invoice.toCompanyName || 'recipient'}.`,
+                type: NotificationsTypeEnum.INVOICE_CONFIRMED,
+                userId: member.user.id,
+                metadata: {
+                  invoiceId: invoice.uuid,
+                  invoiceNumber: invoice.invoiceNumber,
+                  recipientCompany: invoice.toCompanyName,
+                  amount: invoice.total,
+                },
+              });
+            }
+          }
+        } catch (error) {
+          this.logger.error(
+            'Failed to create B2B invoice confirmed notifications',
+            error,
+          );
+        }
+
         return updatedInvoice;
       });
     } catch (error) {
@@ -717,6 +791,40 @@ export class B2BInvoiceService {
             invoice.bill.id,
             companyId,
             'PAID' as any, // BillStatusEnum.PAID
+          );
+        }
+
+        // Notify sender company team members that invoice has been marked as paid
+        try {
+          const teamMembers = await this.prisma.teamMember.findMany({
+            where: {
+              companyId,
+              role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+              user: { isNot: null },
+            },
+            include: { user: true },
+          });
+
+          for (const member of teamMembers) {
+            if (member.user) {
+              await this.notificationService.createNotification({
+                title: 'B2B Invoice Paid',
+                message: `Invoice ${invoice.invoiceNumber} from ${invoice.toCompanyName || 'client'} has been marked as paid.`,
+                type: NotificationsTypeEnum.INVOICE_PAID,
+                userId: member.user.id,
+                metadata: {
+                  invoiceId: invoice.uuid,
+                  invoiceNumber: invoice.invoiceNumber,
+                  clientCompany: invoice.toCompanyName,
+                  amount: invoice.total,
+                },
+              });
+            }
+          }
+        } catch (error) {
+          this.logger.error(
+            'Failed to create B2B invoice paid notifications',
+            error,
           );
         }
 

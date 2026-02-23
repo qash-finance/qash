@@ -7,6 +7,7 @@ import { ActionButton } from "./ActionButton";
 import { Tooltip } from "react-tooltip";
 import { useAuth } from "@/services/auth/context";
 import { TeamMemberRoleEnum } from "@qash/types/enums";
+import { useGetNotificationsInfinite } from "@/services/api/notification";
 
 export const Title = () => {
   const { openModal } = useModal();
@@ -21,10 +22,10 @@ export const Title = () => {
   }, [pathname]);
 
   // Calculate unread count
-  // const { data } = useGetNotificationsInfinite(walletAddress, 20);
-  // const unreadCount = data?.pages
-  //   ? data.pages.flatMap(page => page.notifications).filter((item: any) => item.status === "UNREAD").length
-  //   : 0;
+  const { data } = useGetNotificationsInfinite();
+  const unreadCount = data?.pages
+    ? data.pages.flatMap(page => page.notifications).filter((item: any) => item.status === "UNREAD").length
+    : 0;
 
   return (
     <div className="flex flex-row gap-2 mx-[24px] pt-1">
@@ -114,9 +115,7 @@ export const Title = () => {
         onClick={() => openModal(MODAL_IDS.NOTIFICATION)}
       >
         <img src="/notification/notification.gif" alt="bell" className="w-5 h-5" />
-        {/* {isConnected && unreadCount > 0 && (
-          <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-[#FF2323] rounded-full" />
-        )} */}
+        {unreadCount > 0 && <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-[#FF2323] rounded-full" />}
       </div>
     </div>
   );

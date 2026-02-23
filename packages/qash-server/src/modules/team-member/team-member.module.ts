@@ -3,6 +3,7 @@ import { PrismaModule } from '../../database/prisma.module';
 import { AuthModule } from '../auth/auth.module';
 import { MailModule } from '../mail/mail.module';
 import { CompanyModule } from '../company/company.module';
+import { NotificationModule } from '../notification/notification.module';
 import { TeamMemberRepository } from './team-member.repository';
 import { TeamMemberService } from './team-member.service';
 import { TeamMemberController } from './team-member.controller';
@@ -13,6 +14,7 @@ import { TeamMemberController } from './team-member.controller';
     forwardRef(() => AuthModule), // Use forwardRef to avoid circular dependency
     MailModule,
     forwardRef(() => CompanyModule),
+    NotificationModule,
   ],
   providers: [TeamMemberRepository, TeamMemberService],
   controllers: [TeamMemberController],

@@ -34,10 +34,10 @@ export class NotificationRepository extends BaseRepository<
   }
 
   /**
-   * Find notifications for a wallet with pagination
+   * Find notifications for a user with pagination
    */
-  async findByWalletWithPagination(
-    walletAddress: string,
+  async findByUserWithPagination(
+    userId: number,
     options: {
       skip: number;
       take: number;
@@ -45,7 +45,7 @@ export class NotificationRepository extends BaseRepository<
       status?: NotificationsStatusEnum;
     },
   ): Promise<Notifications[]> {
-    const where: Prisma.NotificationsWhereInput = { walletAddress };
+    const where: Prisma.NotificationsWhereInput = { userId };
 
     if (options.type) where.type = options.type;
     if (options.status) where.status = options.status;
@@ -58,16 +58,16 @@ export class NotificationRepository extends BaseRepository<
   }
 
   /**
-   * Count notifications for a wallet with filters
+   * Count notifications for a user with filters
    */
-  async countByWallet(
-    walletAddress: string,
+  async countByUser(
+    userId: number,
     filters?: {
       type?: NotificationsTypeEnum;
       status?: NotificationsStatusEnum;
     },
   ): Promise<number> {
-    const where: Prisma.NotificationsWhereInput = { walletAddress };
+    const where: Prisma.NotificationsWhereInput = { userId };
 
     if (filters?.type) where.type = filters.type;
     if (filters?.status) where.status = filters.status;
@@ -76,13 +76,13 @@ export class NotificationRepository extends BaseRepository<
   }
 
   /**
-   * Find notification by ID and wallet address
+   * Find notification by ID and user ID (for ownership check)
    */
-  async findByIdAndWallet(
+  async findByIdAndUser(
     id: number,
-    walletAddress: string,
+    userId: number,
   ): Promise<Notifications | null> {
-    return this.findOne({ id, walletAddress });
+    return this.findOne({ id, userId });
   }
 
   /**
@@ -90,12 +90,12 @@ export class NotificationRepository extends BaseRepository<
    */
   async updateStatus(
     id: number,
-    walletAddress: string,
+    userId: number,
     status: NotificationsStatusEnum,
     additionalData?: Partial<Notifications>,
   ): Promise<Notifications> {
     return this.update(
-      { id, walletAddress },
+      { id, userId },
       {
         status,
         ...additionalData,
@@ -104,14 +104,14 @@ export class NotificationRepository extends BaseRepository<
   }
 
   /**
-   * Mark all notifications as read for a wallet
+   * Mark all notifications as read for a user
    */
-  async markAllAsReadForWallet(
-    walletAddress: string,
+  async markAllAsReadForUser(
+    userId: number,
   ): Promise<{ count: number }> {
     return this.updateMany(
       {
-        walletAddress,
+        userId,
         status: NotificationsStatusEnum.UNREAD,
       },
       {
@@ -122,20 +122,20 @@ export class NotificationRepository extends BaseRepository<
   }
 
   /**
-   * Count unread notifications for a wallet
+   * Count unread notifications for a user
    */
-  async countUnreadByWallet(walletAddress: string): Promise<number> {
+  async countUnreadByUser(userId: number): Promise<number> {
     return this.count({
-      walletAddress,
+      userId,
       status: NotificationsStatusEnum.UNREAD,
     });
   }
 
   /**
-   * Find recent notifications for a wallet (last 30 days)
+   * Find recent notifications for a user (last 30 days)
    */
-  async findRecentByWallet(
-    walletAddress: string,
+  async findRecentByUser(
+    userId: number,
     limit: number = 10,
   ): Promise<Notifications[]> {
     const thirtyDaysAgo = new Date();
@@ -143,7 +143,7 @@ export class NotificationRepository extends BaseRepository<
 
     return this.findMany(
       {
-        walletAddress,
+        userId,
         createdAt: {
           gte: thirtyDaysAgo,
         },
@@ -156,15 +156,15 @@ export class NotificationRepository extends BaseRepository<
   }
 
   /**
-   * Find notifications by type for a wallet
+   * Find notifications by type for a user
    */
-  async findByWalletAndType(
-    walletAddress: string,
+  async findByUserAndType(
+    userId: number,
     type: NotificationsTypeEnum,
     limit?: number,
   ): Promise<Notifications[]> {
     return this.findMany(
-      { walletAddress, type },
+      { userId, type },
       {
         take: limit,
         orderBy: { createdAt: 'desc' },
@@ -187,10 +187,10 @@ export class NotificationRepository extends BaseRepository<
   }
 
   /**
-   * Get notification statistics for a wallet
+   * Get notification statistics for a user
    */
-  async getWalletStats(
-    walletAddress: string,
+  async getUserStats(
+    userId: number,
     tx?: PrismaTransactionClient,
   ): Promise<{
     total: number;
@@ -199,11 +199,11 @@ export class NotificationRepository extends BaseRepository<
   }> {
     const model = this.getModel(tx);
     const [total, unread, byTypeResults] = await Promise.all([
-      this.count({ walletAddress }, tx),
-      this.count({ walletAddress, status: NotificationsStatusEnum.UNREAD }, tx),
+      this.count({ userId }, tx),
+      this.count({ userId, status: NotificationsStatusEnum.UNREAD }, tx),
       model.groupBy({
         by: ['type'],
-        where: { walletAddress },
+        where: { userId },
         _count: { type: true },
       }),
     ]);

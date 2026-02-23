@@ -19,9 +19,10 @@ import {
   ExecuteTransactionResponseDto,
 } from '../dto/multisig.dto';
 import { UserWithCompany } from '../../auth/decorators/current-user.decorator';
-import { ActivityActionEnum, ActivityEntityTypeEnum, BillStatusEnum } from '../../../database/generated/client';
+import { ActivityActionEnum, ActivityEntityTypeEnum, BillStatusEnum, NotificationsTypeEnum } from '../../../database/generated/client';
 import { ActivityLogService } from 'src/modules/activity-log/activity-log.service';
 import { BillService } from 'src/modules/bill/bill.service';
+import { NotificationService } from 'src/modules/notification/notification.service';
 
 @Injectable()
 export class MultisigService {
@@ -31,6 +32,7 @@ export class MultisigService {
     private readonly prisma: PrismaService,
     private readonly activityLogService: ActivityLogService,
     private readonly billService: BillService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   /**
@@ -153,6 +155,30 @@ export class MultisigService {
         logo: dto.logo,
       },
     });
+
+    // Create notifications for all team members involved
+    try {
+      for (const teamMember of teamMembers) {
+        if (teamMember.user) {
+          await this.notificationService.createNotification({
+            title: 'Multisig Account Created',
+            message: `Multisig account "${dto.name}" has been created with ${memberIds.size} members and a threshold of ${dto.threshold}.`,
+            type: NotificationsTypeEnum.MULTISIG_ACCOUNT_CREATED,
+            userId: teamMember.user.id,
+            metadata: {
+              accountId,
+              name: dto.name,
+              threshold: dto.threshold,
+              memberCount: memberIds.size,
+            },
+          });
+        }
+      }
+      this.logger.log(`Notifications created for ${teamMembers.length} team members`);
+    } catch (error) {
+      this.logger.error('Failed to create notifications for multisig account creation', error);
+      // Don't throw - notification failure should not block account creation
+    }
 
     return account;
   }
@@ -284,6 +310,48 @@ export class MultisigService {
 
     this.logger.log(`Consume proposal created: ${proposal.uuid}`);
 
+    // Notify all team members of the multisig account
+    try {
+      const accountWithMembers = await this.prisma.multisigAccount.findUnique({
+        where: { accountId: dto.accountId },
+        include: {
+          teamMembers: {
+            include: {
+              teamMember: {
+                include: {
+                  user: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (accountWithMembers) {
+        for (const member of accountWithMembers.teamMembers) {
+          if (member.teamMember.user) {
+            await this.notificationService.createNotification({
+              title: 'New Proposal Created',
+              message: `A new consume proposal "${dto.description}" has been created for multisig account "${accountWithMembers.name}". ${dto.noteIds.length} notes will be consumed.`,
+              type: NotificationsTypeEnum.MULTISIG_PROPOSAL_CREATED,
+              userId: member.teamMember.user.id,
+              metadata: {
+                proposalId: proposal.id,
+                proposalUuid:proposal.uuid,
+                accountId: dto.accountId,
+                proposalType: 'CONSUME',
+                noteIds: dto.noteIds,
+              },
+            });
+          }
+        }
+        this.logger.log(`Notifications sent for proposal ${proposal.uuid}`);
+      }
+    } catch (error) {
+      this.logger.error('Failed to create notifications for consume proposal', error);
+      // Don't throw - notification failure should not block proposal creation
+    }
+
     return this.mapProposalToDto(proposal, account.threshold);
   }
 
@@ -333,6 +401,50 @@ export class MultisigService {
     });
 
     this.logger.log(`Send proposal created: ${proposal.uuid}`);
+
+    // Notify all team members of the multisig account
+    try {
+      const accountWithMembers = await this.prisma.multisigAccount.findUnique({
+        where: { accountId: dto.accountId },
+        include: {
+          teamMembers: {
+            include: {
+              teamMember: {
+                include: {
+                  user: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (accountWithMembers) {
+        for (const member of accountWithMembers.teamMembers) {
+          if (member.teamMember.user) {
+            await this.notificationService.createNotification({
+              title: 'New Proposal Created',
+              message: `A new send proposal "${dto.description}" has been created for multisig account "${accountWithMembers.name}". Funds will be sent to ${dto.recipientId}.`,
+              type: NotificationsTypeEnum.MULTISIG_PROPOSAL_CREATED,
+              userId: member.teamMember.user.id,
+              metadata: {
+                proposalId: proposal.id,
+                proposalUuid: proposal.uuid,
+                accountId: dto.accountId,
+                proposalType: 'SEND',
+                recipientId: dto.recipientId,
+                amount: dto.amount,
+                faucetId: dto.faucetId,
+              },
+            });
+          }
+        }
+        this.logger.log(`Notifications sent for proposal ${proposal.uuid}`);
+      }
+    } catch (error) {
+      this.logger.error('Failed to create notifications for send proposal', error);
+      // Don't throw - notification failure should not block proposal creation
+    }
 
     return this.mapProposalToDto(proposal, account.threshold);
   }
@@ -406,6 +518,48 @@ export class MultisigService {
     this.logger.log(
       `Batch send proposal created with ${dto.payments.length} payments: ${proposal.uuid}`,
     );
+
+    // Notify all team members of the multisig account
+    try {
+      const accountWithMembers = await this.prisma.multisigAccount.findUnique({
+        where: { accountId: dto.accountId },
+        include: {
+          teamMembers: {
+            include: {
+              teamMember: {
+                include: {
+                  user: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (accountWithMembers) {
+        for (const member of accountWithMembers.teamMembers) {
+          if (member.teamMember.user) {
+            await this.notificationService.createNotification({
+              title: 'New Batch Proposal Created',
+              message: `A new batch send proposal "${dto.description}" has been created for multisig account "${accountWithMembers.name}". ${dto.payments.length} payments will be sent.`,
+              type: NotificationsTypeEnum.MULTISIG_PROPOSAL_CREATED,
+              userId: member.teamMember.user.id,
+              metadata: {
+                proposalId: proposal.id,
+                proposalUuid: proposal.uuid,
+                accountId: dto.accountId,
+                proposalType: 'SEND',
+                paymentCount: dto.payments.length,
+              },
+            });
+          }
+        }
+        this.logger.log(`Notifications sent for batch proposal ${proposal.uuid}`);
+      }
+    } catch (error) {
+      this.logger.error('Failed to create notifications for batch send proposal', error);
+      // Don't throw - notification failure should not block proposal creation
+    }
 
     return this.mapProposalToDto(proposal, account.threshold);
   }
@@ -591,6 +745,48 @@ export class MultisigService {
 
     this.logger.log(`Proposal created from bills: ${proposal.uuid}`);
 
+    // Notify all team members of the multisig account
+    try {
+      const accountWithMembers = await this.prisma.multisigAccount.findUnique({
+        where: { accountId: dto.accountId },
+        include: {
+          teamMembers: {
+            include: {
+              teamMember: {
+                include: {
+                  user: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (accountWithMembers) {
+        for (const member of accountWithMembers.teamMembers) {
+          if (member.teamMember.user) {
+            await this.notificationService.createNotification({
+              title: 'New Payment Proposal Created',
+              message: `A new payment proposal "${proposal.description}" has been created for multisig account "${accountWithMembers.name}". ${bills.length} bills are included.`,
+              type: NotificationsTypeEnum.MULTISIG_PROPOSAL_CREATED,
+              userId: member.teamMember.user.id,
+              metadata: {
+                proposalId: proposal.id,
+                proposalUuid: proposal.uuid,
+                accountId: dto.accountId,
+                billCount: bills.length,
+                billUUIDs: dto.billUUIDs,
+              },
+            });
+          }
+        }
+        this.logger.log(`Notifications sent for proposal ${proposal.uuid}`);
+      }
+    } catch (error) {
+      this.logger.error('Failed to create notifications for bills proposal', error);
+      // Don't throw - notification failure should not block proposal creation
+    }
+
     return this.mapProposalToDto(proposal, account.threshold);
   }
 
@@ -723,6 +919,47 @@ export class MultisigService {
     this.logger.log(
       `Proposal ${proposalUuid} cancelled: ${proposal.bills.length} bills unlinked, ${proposal.signatures.length} signatures deleted, noteIds cleared`,
     );
+
+    // Notify all team members of the multisig account
+    try {
+      const accountWithMembers = await this.prisma.multisigAccount.findUnique({
+        where: { accountId: proposal.accountId },
+        include: {
+          teamMembers: {
+            include: {
+              teamMember: {
+                include: {
+                  user: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (accountWithMembers) {
+        for (const member of accountWithMembers.teamMembers) {
+          if (member.teamMember.user) {
+            await this.notificationService.createNotification({
+              title: 'Proposal Cancelled',
+              message: `Proposal "${proposal.description}" for multisig account "${accountWithMembers.name}" has been cancelled by ${teamMember.firstName} ${teamMember.lastName}.`,
+              type: NotificationsTypeEnum.MULTISIG_PROPOSAL_REJECTED,
+              userId: member.teamMember.user.id,
+              metadata: {
+                proposalId: proposal.id,
+                proposalUuid: proposal.uuid,
+                accountId: proposal.accountId,
+                cancelledBy: { id: teamMember.id, name: `${teamMember.firstName} ${teamMember.lastName}` },
+              },
+            });
+          }
+        }
+        this.logger.log(`Notifications sent for cancelled proposal ${proposalUuid}`);
+      }
+    } catch (error) {
+      this.logger.error('Failed to create notifications for cancelled proposal', error);
+      // Don't throw - notification failure should not block cancellation
+    }
 
     return this.mapProposalToDto(updatedProposal, updatedProposal.account.threshold);
   }
@@ -923,6 +1160,48 @@ export class MultisigService {
       });
       updatedStatus = 'READY';
       this.logger.log(`Proposal ${proposalId} is ready for execution`);
+
+      // Notify all team members that proposal is ready
+      try {
+        const accountWithMembers = await this.prisma.multisigAccount.findUnique({
+          where: { accountId: proposal.accountId },
+          include: {
+            teamMembers: {
+              include: {
+                teamMember: {
+                  include: {
+                    user: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        if (accountWithMembers) {
+          for (const member of accountWithMembers.teamMembers) {
+            if (member.teamMember.user) {
+              await this.notificationService.createNotification({
+                title: 'Proposal Ready for Execution',
+                message: `Proposal "${proposal.description}" for multisig account "${accountWithMembers.name}" has reached the signature threshold (${signatureCount}/${proposal.account.threshold}) and is ready to execute.`,
+                type: NotificationsTypeEnum.MULTISIG_PROPOSAL_READY,
+                userId: member.teamMember.user.id,
+                metadata: {
+                  proposalId,
+                  proposalUuid: proposal.uuid,
+                  accountId: proposal.accountId,
+                  signatureCount,
+                  threshold: proposal.account.threshold,
+                },
+              });
+            }
+          }
+          this.logger.log(`Notifications sent for ready proposal ${proposalId}`);
+        }
+      } catch (error) {
+        this.logger.error('Failed to create notifications for ready proposal', error);
+        // Don't throw - notification failure should not block proposal status update
+      }
     }
 
     // Return updated proposal
@@ -1078,6 +1357,48 @@ export class MultisigService {
           billCount: proposal.bills.length,
         },
       });
+
+      // Notify all team members that proposal was rejected
+      try {
+        const accountWithMembers = await this.prisma.multisigAccount.findUnique({
+          where: { accountId: proposal.accountId },
+          include: {
+            teamMembers: {
+              include: {
+                teamMember: {
+                  include: {
+                    user: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        if (accountWithMembers) {
+          for (const member of accountWithMembers.teamMembers) {
+            if (member.teamMember.user) {
+              await this.notificationService.createNotification({
+                title: 'Proposal Rejected',
+                message: `Proposal "${proposal.description}" for multisig account "${accountWithMembers.name}" has been rejected. Rejection threshold reached: ${rejectionCount}/${rejectionThreshold}.`,
+                type: NotificationsTypeEnum.MULTISIG_PROPOSAL_REJECTED,
+                userId: member.teamMember.user.id,
+                metadata: {
+                  proposalId,
+                  proposalUuid: proposal.uuid,
+                  accountId: proposal.accountId,
+                  rejectionCount,
+                  rejectionThreshold,
+                },
+              });
+            }
+          }
+          this.logger.log(`Notifications sent for rejected proposal ${proposalId}`);
+        }
+      } catch (error) {
+        this.logger.error('Failed to create notifications for rejected proposal', error);
+        // Don't throw - notification failure should not block rejection
+      }
     }
 
     // Return updated proposal
@@ -1153,6 +1474,48 @@ export class MultisigService {
     this.logger.log(
       `Proposal ${proposalId} marked as executed via PSM. ${validBills.length} bills paid.`,
     );
+
+    // Notify all team members of successful execution
+    try {
+      const accountWithMembers = await this.prisma.multisigAccount.findUnique({
+        where: { accountId: proposal.accountId },
+        include: {
+          teamMembers: {
+            include: {
+              teamMember: {
+                include: {
+                  user: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (accountWithMembers) {
+        for (const member of accountWithMembers.teamMembers) {
+          if (member.teamMember.user) {
+            await this.notificationService.createNotification({
+              title: 'Proposal Executed Successfully',
+              message: `Proposal "${proposal.description}" for multisig account "${accountWithMembers.name}" has been executed successfully. Transaction ID: ${transactionId}`,
+              type: NotificationsTypeEnum.MULTISIG_PROPOSAL_EXECUTED,
+              userId: member.teamMember.user.id,
+              metadata: {
+                proposalId,
+                proposalUuid: proposal.uuid,
+                accountId: proposal.accountId,
+                transactionId,
+                billsPaid: validBills.length,
+              },
+            });
+          }
+        }
+        this.logger.log(`Notifications sent for executed proposal ${proposalId}`);
+      }
+    } catch (error) {
+      this.logger.error('Failed to create notifications for executed proposal', error);
+      // Don't throw - notification failure should not block execution result
+    }
 
     return { success: true, transactionId };
   }

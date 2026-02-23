@@ -9,6 +9,7 @@ import { BillRepository, BillWithInvoice } from './bill.repository';
 import { InvoiceRepository } from '../invoice/repositories/invoice.repository';
 import { PdfService } from '../invoice/services/pdf.service';
 import { MailService } from '../mail/mail.service';
+import { NotificationService } from '../notification/notification.service';
 import {
   BillQueryDto,
   BillStatsDto,
@@ -21,6 +22,8 @@ import {
   BillStatusEnum,
   InvoiceStatusEnum,
   InvoiceTypeEnum,
+  NotificationsTypeEnum,
+  TeamMemberRoleEnum,
 } from 'src/database/generated/client';
 import { handleError } from 'src/common/utils/errors';
 import { PrismaService } from 'src/database/prisma.service';
@@ -37,6 +40,7 @@ export class BillService {
     private readonly invoiceRepository: InvoiceRepository,
     private readonly pdfService: PdfService,
     private readonly mailService: MailService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   //#region GET METHODS
@@ -308,6 +312,39 @@ export class BillService {
 
     const bill = await this.billRepository.create(billData, tx);
 
+    // Notify company team members asynchronously (don't block transaction)
+    setTimeout(async () => {
+      try {
+        const teamMembers = await this.prisma.teamMember.findMany({
+          where: {
+            companyId,
+            role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+            user: { isNot: null },
+          },
+          include: { user: true },
+        });
+
+        for (const member of teamMembers) {
+          if (member.user) {
+            await this.notificationService.createNotification({
+              title: 'Bill Created',
+              message: `A new bill has been created for invoice ${invoice.invoiceNumber}.`,
+              type: NotificationsTypeEnum.BILL_CREATED,
+              userId: member.user.id,
+              metadata: {
+                companyId,
+                billId: bill.uuid,
+                invoiceId: invoice.uuid,
+                invoiceNumber: invoice.invoiceNumber,
+              },
+            });
+          }
+        }
+      } catch (error) {
+        this.logger.error('Error sending bill creation notification:', error);
+      }
+    }, 0);
+
     return bill;
   }
 
@@ -362,6 +399,40 @@ export class BillService {
     };
 
     const bill = await this.billRepository.create(billData, tx);
+
+    // Notify company team members asynchronously (don't block transaction)
+    setTimeout(async () => {
+      try {
+        const teamMembers = await this.prisma.teamMember.findMany({
+          where: {
+            companyId,
+            role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+            user: { isNot: null },
+          },
+          include: { user: true },
+        });
+
+        for (const member of teamMembers) {
+          if (member.user) {
+            await this.notificationService.createNotification({
+              title: 'Bill Created',
+              message: `A new B2B bill has been created for invoice ${invoice.invoiceNumber}.`,
+              type: NotificationsTypeEnum.BILL_CREATED,
+              userId: member.user.id,
+              metadata: {
+                companyId,
+                billId: bill.uuid,
+                invoiceId: invoice.uuid,
+                invoiceNumber: invoice.invoiceNumber,
+                fromCompanyName: invoice.fromCompany?.companyName,
+              },
+            });
+          }
+        }
+      } catch (error) {
+        this.logger.error('Error sending B2B bill creation notification:', error);
+      }
+    }, 0);
 
     return bill;
   }
@@ -467,6 +538,39 @@ export class BillService {
     }, {
       timeout: 60000, // 60 seconds timeout for transaction
     });
+
+    // Notify company team members about bill payment
+    try {
+      const teamMembers = await this.prisma.teamMember.findMany({
+        where: {
+          companyId,
+          role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+          user: { isNot: null },
+        },
+        include: { user: true },
+      });
+
+      for (const member of teamMembers) {
+        if (member.user) {
+          await this.notificationService.createNotification({
+            title: 'Bills Paid',
+            message: `${billsWithInvoices.length} bill(s) have been marked as paid.`,
+            type: NotificationsTypeEnum.BILL_PAID,
+            userId: member.user.id,
+            metadata: {
+              count: billsWithInvoices.length,
+              companyId,
+              billIds: billsWithInvoices.map((bill) => bill.uuid),
+              totalAmount: result.totalAmount,
+              transactionHash: dto.transactionHash,
+            },
+          });
+        }
+      }
+    } catch (error) {
+      this.logger.error('Error sending bill payment notifications:', error);
+      // Don't throw - notification failure should not block bill payment
+    }
 
     // After successful transaction, send payslip emails for employee invoices
     // This is done outside the transaction to avoid blocking it
@@ -661,6 +765,100 @@ export class BillService {
       this.logger.log(
         `Updated ${billUUIDs.length} bills to PROPOSED status for proposal ${proposalId}`,
       );
+
+      // Notify asynchronously (don't block the transaction)
+      setTimeout(async () => {
+        try {
+          // Fetch bills to get companyId and invoice details
+          const bills = await this.prisma.bill.findMany({
+            where: {
+              uuid: { in: billUUIDs },
+            },
+            include: {
+              invoice: true,
+              company: true,
+            },
+          });
+
+          if (bills.length === 0) return;
+
+          // Fetch the multisig proposal and account to get signers
+          const proposal = await this.prisma.multisigProposal.findUnique({
+            where: { id: proposalId },
+            include: {
+              account: {
+                include: {
+                  teamMembers: {
+                    include: {
+                      teamMember: {
+                        include: {
+                          user: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          });
+
+          if (!proposal || !proposal.account) return;
+
+          const companyId = bills[0].companyId;
+          const totalAmount = bills
+            .reduce((sum, bill) => sum + parseFloat(bill.invoice.total || '0'), 0)
+            .toFixed(2);
+
+          // Notify company team members
+          const teamMembers = await this.prisma.teamMember.findMany({
+            where: {
+              companyId,
+              role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+              user: { isNot: null },
+            },
+            include: { user: true },
+          });
+
+          for (const member of teamMembers) {
+            if (member.user) {
+              await this.notificationService.createNotification({
+                title: 'Bills Pending Approval',
+                message: `${billUUIDs.length} bill(s) totaling ${totalAmount} are pending multisig approval.`,
+                type: NotificationsTypeEnum.BILL_PROPOSED,
+                userId: member.user.id,
+                metadata: {
+                  companyId,
+                  billIds: billUUIDs,
+                  proposalId,
+                  totalAmount,
+                  count: billUUIDs.length,
+                },
+              });
+            }
+          }
+
+          // Notify multisig signers
+          for (const memberLink of proposal.account.teamMembers) {
+            if (memberLink.teamMember?.user) {
+              await this.notificationService.createNotification({
+                title: 'Multisig Approval Needed',
+                message: `${billUUIDs.length} bill(s) totaling ${totalAmount} require your signature for approval.`,
+                type: NotificationsTypeEnum.BILL_PROPOSED,
+                userId: memberLink.teamMember.user.id,
+                metadata: {
+                  companyId,
+                  billIds: billUUIDs,
+                  proposalId,
+                  totalAmount,
+                  count: billUUIDs.length,
+                },
+              });
+            }
+          }
+        } catch (error) {
+          this.logger.error('Error sending bill proposal notifications:', error);
+        }
+      }, 0);
     } catch (error) {
       this.logger.error('Error updating bills to PROPOSED status:', error);
       handleError(error, this.logger);

@@ -22,7 +22,8 @@ model User {
   commitment String?      @map("commitment") @db.Text
 
   teamMembership TeamMember? // 1:1 relationship, each user is a company team member
-  invitedMembers TeamMember[] @relation("TeamMemberInviter")
+  invitedMembers TeamMember[]    @relation("TeamMemberInviter")
+  notifications  Notifications[]
 
   @@index([email])
   @@index([role])
@@ -558,23 +559,25 @@ model PaymentLinkRecord {
 }
 
 model Notifications {
-  id            Int                     @id() @default(autoincrement())
-  createdAt     DateTime                @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt     DateTime                @default(now()) @map("updated_at") @db.Timestamp(6)
-  title         String
-  message       String?
-  type          NotificationsTypeEnum
-  status        NotificationsStatusEnum @default(UNREAD)
-  metadata      Json?
-  actionUrl     String?                 @map("action_url") @db.VarChar
-  walletAddress String                  @map("wallet_address") @db.VarChar
-  readAt        DateTime?               @map("read_at") @db.Timestamp(6)
+  id        Int                     @id() @default(autoincrement())
+  createdAt DateTime                @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime                @default(now()) @map("updated_at") @db.Timestamp(6)
+  title     String
+  message   String?
+  type      NotificationsTypeEnum
+  status    NotificationsStatusEnum @default(UNREAD)
+  metadata  Json?
+  actionUrl String?                 @map("action_url") @db.VarChar
+  readAt    DateTime?               @map("read_at") @db.Timestamp(6)
+
+  userId Int  @map("user_id")
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@index([type])
-  @@index([walletAddress])
-  @@index([walletAddress, createdAt])
-  @@index([walletAddress, status])
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([userId, status])
   @@map("notifications")
 }
 
@@ -698,6 +701,53 @@ enum NotificationsStatusEnum {
 }
 
 enum NotificationsTypeEnum {
+  // Account & Wallet Operations
+  MULTISIG_ACCOUNT_CREATED
+  MULTISIG_PROPOSAL_CREATED
+  MULTISIG_PROPOSAL_READY
+  MULTISIG_PROPOSAL_EXECUTED
+  MULTISIG_PROPOSAL_REJECTED
+  MULTISIG_PROPOSAL_FAILED
+
+  // Payment Operations
+  PAYMENT_RECEIVED
+  PAYMENT_SENT
+  PAYMENT_LINK_CREATED
+  PAYMENT_LINK_ACTIVATED
+  PAYMENT_LINK_DEACTIVATED
+
+  // Invoice & Bill Operations
+  INVOICE_CREATED
+  INVOICE_SENT
+  INVOICE_REVIEWED
+  INVOICE_CONFIRMED
+  INVOICE_PAID
+  INVOICE_OVERDUE
+  INVOICE_SCHEDULED
+  BILL_CREATED
+  BILL_PENDING
+  BILL_PROPOSED
+  BILL_PAID
+
+  // Payroll Operations
+  PAYROLL_CREATED
+  PAYROLL_ACTIVE
+  PAYROLL_PAUSED
+  PAYROLL_COMPLETED
+
+  // Employee & Team Operations
+  EMPLOYEE_ADDED
+  EMPLOYEE_UPDATED
+  EMPLOYEE_REMOVED
+  TEAM_MEMBER_INVITED
+  TEAM_MEMBER_JOINED
+  TEAM_MEMBER_ROLE_CHANGED
+
+  // Company Operations
+  COMPANY_VERIFIED
+  COMPANY_VERIFICATION_REJECTED
+
+  // System
   NOP
 }
 

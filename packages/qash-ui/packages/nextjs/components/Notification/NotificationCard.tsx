@@ -6,7 +6,7 @@ import React from "react";
 export interface NotificationCardProps {
   type: NotificationType;
   title: string;
-  subtitle?: string;
+  subtitle?: string | null;
   time: string;
   amount?: string;
   tokenAddress?: string;
