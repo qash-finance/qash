@@ -21,6 +21,8 @@ import { AuthMeResponse } from "@/services/auth/api";
 import { blo } from "blo";
 import { turnBechToHex } from "@/services/utils/turnBechToHex";
 import { Company } from "@qash/types/dto/company";
+import { trackEvent } from "@/services/analytics/posthog";
+import { PostHogEvent } from "@/types/posthog";
 
 interface CreatePayrollFormData {
   employee: string;
@@ -475,6 +477,9 @@ const ReviewPayroll = ({ onBackAndEdit, payrollDto, employee, owner, company }: 
       });
 
       toast.success("Payroll created successfully");
+      trackEvent(PostHogEvent.PAYROLL_CREATED, {
+        totalAmount: payrollDto.amount,
+      });
 
       setTimeout(() => {
         router.push("/payroll");

@@ -22,6 +22,7 @@ import { Environment, ParaProvider } from "@getpara/react-sdk";
 import { MidenProvider, useMidenProvider } from "@/contexts/MidenProvider";
 import { PSMProvider, usePSMProvider } from "@/contexts/PSMProvider";
 import FullScreenLoading from "./Loading/FullScreenLoading";
+import { PostHogProvider } from "@/contexts/PostHogProvider";
 import "@getpara/react-sdk/styles.css";
 
 // Responsive sidebar widths: smaller on medium screens, larger on bigger screens
@@ -168,6 +169,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
               <SocketProvider>
                 <ModalProvider>
                   <AuthProvider>
+                    <PostHogProvider>
                     <ProtectedContent>
                       <AccountProvider>
                         <TransactionProviderC>
@@ -198,6 +200,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
                         </TransactionProviderC>
                       </AccountProvider>
                     </ProtectedContent>
+                    </PostHogProvider>
                   </AuthProvider>
                 </ModalProvider>
               </SocketProvider>

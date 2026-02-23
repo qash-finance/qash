@@ -20,6 +20,8 @@ import { useMidenProvider } from "@/contexts/MidenProvider";
 import { useAuth } from "@/services/auth/context";
 import { useGetMyCompany } from "@/services/api/company";
 import { useListAccountsByCompany } from "@/services/api/multisig";
+import { trackEvent } from "@/services/analytics/posthog";
+import { PostHogEvent } from "@/types/posthog";
 
 interface CreatePaymentLinkFormData {
   title: string;
@@ -167,6 +169,10 @@ const CreatePaymentLinkContainer = () => {
       };
 
       const result = await mutateAsync(paymentLinkData);
+      trackEvent(PostHogEvent.PAYMENT_LINK_CREATED, {
+        amount: data.amount,
+        token: selectedToken.metadata.symbol,
+      });
       toast.success("Payment link created successfully!");
       reset();
       setSelectedToken(null);

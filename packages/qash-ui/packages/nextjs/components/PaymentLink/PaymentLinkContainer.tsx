@@ -21,6 +21,8 @@ import { SecondaryButton } from "../Common/SecondaryButton";
 import { Badge, BadgeStatus } from "../Common/Badge";
 import { PageHeader } from "../Common/PageHeader";
 import { useAuth } from "@/services/auth/context";
+import { trackEvent } from "@/services/analytics/posthog";
+import { PostHogEvent } from "@/types/posthog";
 
 const tabs = [
   { id: "all", label: "All links", title: "All payment links", description: "Share these links for payments." },
@@ -133,6 +135,7 @@ const PaymentLinkContainer = () => {
       mutation.mutate(link.code, {
         onSuccess: () => {
           toast.success(`Payment link ${isActive ? "activated" : "deactivated"} successfully`);
+          trackEvent(PostHogEvent.PAYMENT_LINK_TOGGLED, { active: isActive });
           setActiveTooltipId(null);
         },
         onError: (error: any) => {
@@ -151,6 +154,7 @@ const PaymentLinkContainer = () => {
 
     try {
       const response = await deletePaymentLinksMutation.mutateAsync([link.code]);
+      trackEvent(PostHogEvent.PAYMENT_LINK_DELETED);
       toast.success(response.message || "Payment link deleted successfully");
     } catch (error: any) {
       toast.error(error?.message || "Failed to delete payment link");

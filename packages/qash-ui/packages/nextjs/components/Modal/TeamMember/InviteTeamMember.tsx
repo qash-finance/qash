@@ -18,6 +18,8 @@ import { TeamMemberRoleEnum, TeamMemberStatusEnum } from "@qash/types/enums";
 import { InviteTeamMemberDto } from "@qash/types/dto/team-member";
 import { MemberRoleTooltip } from "../../Common/ToolTip/MemberRoleTooltip";
 import toast from "react-hot-toast";
+import { trackEvent } from "@/services/analytics/posthog";
+import { PostHogEvent } from "@/types/posthog";
 
 interface InviteFormData {
   emailInput: string;
@@ -138,6 +140,7 @@ export function InviteTeamMember({ isOpen, onClose, zIndex }: ModalProp<Validati
         });
 
         toast.success(`Invitation sent to ${candidate.email}`);
+        trackEvent(PostHogEvent.TEAM_MEMBER_INVITED, { email: candidate.email, role: candidate.role });
       } else {
         // Bulk invite - filter out emails that are already team members or pending
         const duplicates = data.invitedEmails.filter(e => teamMembers.some(tm => tm.user?.email === e.email));
@@ -172,6 +175,7 @@ export function InviteTeamMember({ isOpen, onClose, zIndex }: ModalProp<Validati
         });
 
         toast.success(`Invitations sent to ${toInvite.length} members`);
+        trackEvent(PostHogEvent.TEAM_MEMBERS_BULK_INVITED, { count: toInvite.length });
       }
       reset();
       refetchTeamMembers();

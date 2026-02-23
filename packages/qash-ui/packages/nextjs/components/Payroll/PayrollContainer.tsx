@@ -13,6 +13,8 @@ import { useModal } from "@/contexts/ModalManagerProvider";
 import { PageHeader } from "../Common/PageHeader";
 import { PrimaryButton } from "../Common/PrimaryButton";
 import { useAuth } from "@/services/auth/context";
+import { trackEvent } from "@/services/analytics/posthog";
+import { PostHogEvent } from "@/types/posthog";
 
 const PayrollContainer = () => {
   const router = useRouter();
@@ -56,6 +58,7 @@ const PayrollContainer = () => {
       payrollOwnerName: data?.payrolls.find(payroll => payroll.id === id)?.employee.name || "",
       onRemove: async () => {
         await deletePayroll.mutateAsync(id);
+        trackEvent(PostHogEvent.PAYROLL_DELETED, { payrollId: String(id) });
         refetch();
       },
     });

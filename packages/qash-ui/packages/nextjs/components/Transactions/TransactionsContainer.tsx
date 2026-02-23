@@ -22,6 +22,8 @@ import { getFaucetMetadata } from "@/services/utils/miden/faucet";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "../Common/PageHeader";
 import { useAuth } from "@/services/auth/context";
+import { trackEvent } from "@/services/analytics/posthog";
+import { PostHogEvent } from "@/types/posthog";
 
 // Previously a fixed enum - we now allow any multisig account id
 type SubTabType = "pending" | "history" | "receive";
@@ -142,6 +144,7 @@ export function TransactionsContainer() {
 
       closeModal("PROCESSING_TRANSACTION");
       toast.success("Signature submitted successfully");
+      trackEvent(PostHogEvent.PROPOSAL_SIGNED, { proposalId: String(proposalId) });
       refetchProposals();
     } catch (error) {
       closeModal("PROCESSING_TRANSACTION");
@@ -170,6 +173,7 @@ export function TransactionsContainer() {
 
       closeModal("PROCESSING_TRANSACTION");
       toast.success("Transaction executed successfully");
+      trackEvent(PostHogEvent.PROPOSAL_EXECUTED, { proposalId: String(proposalId) });
       refetchProposals();
     } catch (error) {
       closeModal("PROCESSING_TRANSACTION");
@@ -190,6 +194,7 @@ export function TransactionsContainer() {
       await cancelProposalMutation.mutateAsync({ proposalUuid });
 
       toast.success("Proposal cancelled");
+      trackEvent(PostHogEvent.PROPOSAL_CANCELLED, { proposalId: proposalUuid });
       refetchProposals();
     } catch (error) {
       console.error("Failed to cancel proposal:", error);

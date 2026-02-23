@@ -17,6 +17,8 @@ import toast from "react-hot-toast";
 import { useAuth } from "@/services/auth/context";
 import { User } from "@/types/user";
 import { CompanyTypeEnum } from "@qash/types/enums";
+import { trackEvent } from "@/services/analytics/posthog";
+import { PostHogEvent } from "@/types/posthog";
 
 type Step = "company" | "team" | "complete";
 
@@ -145,6 +147,7 @@ export default function OnboardingContainer() {
           logo: logoUrl || undefined,
         });
         toast.success("Company registered successfully");
+        trackEvent(PostHogEvent.COMPANY_CREATED, { companyName: data.companyName });
         // Refresh the user data to get updated company info
         await refreshUser?.();
         setStep("complete");

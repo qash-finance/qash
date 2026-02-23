@@ -10,9 +10,7 @@ export const PUBLIC_ROUTES = [
 // **************** LOCAL STORAGE *******************
 export const TOUR_SKIPPED_KEY = "tour_skipped";
 export const BALANCE_VISIBILITY_KEY = "balance_visibility";
-export const ANALYTICS_SESSION_ID_KEY = "analytics_session_id";
-export const ANALYTICS_SESSION_START_KEY = "analytics_session_start";
-export const ANALYTICS_USER_ADDRESS_KEY = "analytics_user_address";
+
 export const WALLET_ADDRESSES_KEY = "miden-wallet-addresses";
 export const LAST_CONNECTED_KEY = "miden-last-connected-address";
 export const MIDEN_WALLET_AUTH_KEY = "miden_wallet_auth";

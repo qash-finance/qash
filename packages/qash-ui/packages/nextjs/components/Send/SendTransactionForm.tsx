@@ -39,6 +39,8 @@ import { useMidenSdkStore } from "@/contexts/MidenSdkProvider";
 import { PrimaryButton } from "../Common/PrimaryButton";
 import { formatNumberWithCommas } from "@/services/utils/formatNumber";
 import { ToggleSwitch } from "../Common/ToggleSwitch";
+import { trackEvent } from "@/services/analytics/posthog";
+import { PostHogEvent } from "@/types/posthog";
 export enum AmountInputTab {
   SEND = "send",
   STREAM = "stream",
@@ -410,6 +412,12 @@ export const SendTransactionForm: React.FC<SendTransactionFormProps> = ({
       // submit transaction to miden
       const txId = await submitTransactionWithOwnOutputNotes(senderAccountId, [note]);
       console.log("isPrivateTransaction", isPrivateTransaction);
+      trackEvent(PostHogEvent.TRANSACTION_SENT, {
+        amount: amount.toString(),
+        token: selectedToken.metadata.symbol,
+        transactionId: txId,
+      });
+
       // submit transaction to server
       const response = await sendSingleTransaction({
         assets: [{ faucetId: selectedToken.faucetId, amount: amount.toString(), metadata: selectedToken.metadata }],
@@ -613,6 +621,11 @@ export const SendTransactionForm: React.FC<SendTransactionFormProps> = ({
         recallableTime: recallableTime,
         noteType: CustomNoteType.P2IDR,
         message: getValues("message"),
+      });
+
+      trackEvent(PostHogEvent.TRANSACTION_ADDED_TO_BATCH, {
+        amount: amount.toString(),
+        token: selectedToken.metadata.symbol,
       });
 
       toast.success("Transaction added to batch successfully");

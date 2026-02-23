@@ -7,6 +7,8 @@ import { getBalance } from "@/services/utils/getBalance";
 import { NODE_ENDPOINT } from "@/services/utils/constant";
 import { UseMutateAsyncFunction } from "@tanstack/react-query";
 import toast from "react-hot-toast";
+import { trackEvent } from "@/services/analytics/posthog";
+import { PostHogEvent } from "@/types/posthog";
 
 interface BalanceData {
   balances: Array<{
@@ -112,6 +114,7 @@ export function MidenProvider({ children }: { children: ReactNode }) {
   // Fetch balances when address, client, or connection status changes
   useEffect(() => {
     if (isConnected && address && client) {
+      trackEvent(PostHogEvent.WALLET_CONNECTED, { address });
       fetchBalances();
     }
   }, [isConnected, address, client, fetchBalances]);
