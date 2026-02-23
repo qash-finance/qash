@@ -21,20 +21,9 @@ import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { useModal } from "@/contexts/ModalManagerProvider";
 import { PageHeader } from "../Common/PageHeader";
+import { useAuth } from "@/services/auth/context";
 
 type Tab = "all" | "pending" | "paid";
-
-const billActionRenderer = (rowData: Record<string, any>, index: number) => (
-  <div className="flex items-center justify-center w-full" onClick={e => e.stopPropagation()}>
-    <img
-      src="/misc/three-dot-icon.svg"
-      alt="three dot icon"
-      className="w-6 h-6 cursor-pointer"
-      data-tooltip-id="bill-action-tooltip"
-      data-tooltip-content={rowData.__billId?.toString()}
-    />
-  </div>
-);
 
 const Card = ({ title, text }: { title: string; text: React.ReactNode }) => {
   return (
@@ -95,6 +84,21 @@ const BillContainer = () => {
   const { data: groups } = useGetAllEmployeeGroups();
   const { data: billStats } = useGetBillStats();
   const { openModal } = useModal();
+  const { user } = useAuth();
+  const isAdmin = user?.teamMembership?.role === "ADMIN" || user?.teamMembership?.role === "OWNER";
+
+  const billActionRenderer = (rowData: Record<string, any>, index: number) =>
+    isAdmin ? (
+      <div className="flex items-center justify-center w-full" onClick={e => e.stopPropagation()}>
+        <img
+          src="/misc/three-dot-icon.svg"
+          alt="three dot icon"
+          className="w-6 h-6 cursor-pointer"
+          data-tooltip-id="bill-action-tooltip"
+          data-tooltip-content={rowData.__billId?.toString()}
+        />
+      </div>
+    ) : null;
 
   const handleCheckRow = (idx: number) => {
     const bill = bills[idx];

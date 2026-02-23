@@ -33,7 +33,7 @@ async function transactionRecordToUITransaction({
   tr: any;
   inputNote: any | undefined;
 }): Promise<UITransaction> {
-  const { AccountId, NetworkId, AccountInterface, Address } = await import("@demox-labs/miden-sdk");
+  const { AccountId, NetworkId, AccountInterface, Address } = await import("@miden-sdk/miden-sdk");
 
   const assets: {
     assetId: string;
@@ -49,7 +49,7 @@ async function transactionRecordToUITransaction({
       const fungibleAssets: any[] = note.assets().fungibleAssets();
       fungibleAssets.forEach((asset: any) => {
         assets.push({
-          assetId: asset.faucetId().toBech32(NetworkId.Testnet, AccountInterface.BasicWallet),
+          assetId: asset.faucetId().toBech32(NetworkId.testnet(), AccountInterface.BasicWallet),
           amount: asset.amount(),
         });
       });
@@ -60,7 +60,7 @@ async function transactionRecordToUITransaction({
     });
 
     const statusObject = tr.transactionStatus();
-    const sender = tr.accountId().toBech32(NetworkId.Testnet, AccountInterface.BasicWallet);
+    const sender = tr.accountId().toBech32(NetworkId.testnet(), AccountInterface.BasicWallet);
 
     const result: UITransaction = {
       id: tr.id().toHex(),
@@ -83,14 +83,14 @@ async function transactionRecordToUITransaction({
       const fungibleAssets = note.details().assets().fungibleAssets();
       fungibleAssets.forEach((asset: any) => {
         assets.push({
-          assetId: asset.faucetId().toBech32(NetworkId.Testnet, AccountInterface.BasicWallet),
+          assetId: asset.faucetId().toBech32(NetworkId.testnet(), AccountInterface.BasicWallet),
           amount: asset.amount(),
         });
       });
     });
 
     const statusObject = tr.transactionStatus();
-    const consumer = tr.accountId().toBech32(NetworkId.Testnet, AccountInterface.BasicWallet);
+    const consumer = tr.accountId().toBech32(NetworkId.testnet(), AccountInterface.BasicWallet);
 
     let transactionType: "Incoming" | "Outgoing" | "Faucet" = "Incoming";
     let sender: string = "";
@@ -101,7 +101,7 @@ async function transactionRecordToUITransaction({
     } else {
       transactionType = "Incoming";
       sender = AccountId.fromHex(inputNote[0].metadata().sender().toString()).toBech32(
-        NetworkId.Testnet,
+        NetworkId.testnet(),
         AccountInterface.BasicWallet,
       );
     }

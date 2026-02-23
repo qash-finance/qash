@@ -8,7 +8,7 @@ import { useAuth } from "@/services/auth/context";
 import { useModal, useWallet } from "@getpara/react-sdk";
 import toast from "react-hot-toast";
 import { useAccount as useParaAccount } from "@getpara/react-sdk";
-import { useParaMiden } from "miden-para-react";
+import { useParaMiden } from "@miden-sdk/use-miden-para-react";
 
 interface TeamMember {
   id: string;

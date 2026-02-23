@@ -17,12 +17,9 @@ import {
   CreateProposalFromBillsDto,
   SubmitSignatureDto,
   SubmitRejectionDto,
-  MintTokensDto,
-  GetBatchAccountBalancesDto,
   MultisigAccountResponseDto,
   MultisigProposalResponseDto,
   ExecuteTransactionResponseDto,
-  GetBatchAccountBalancesResponseDto,
 } from './dto/multisig.dto';
 import { ParaJwtAuthGuard } from '../auth/guards/para-jwt-auth.guard';
 import { CompanyAuth } from '../auth/decorators/company-auth.decorator';
@@ -78,42 +75,6 @@ export class MultisigController {
     @Param('companyId', ParseIntPipe) companyId: number,
   ): Promise<MultisigAccountResponseDto[]> {
     return this.multisigService.listAccountsByCompany(companyId);
-  }
-
-  @Get('accounts/:accountId/notes')
-  @ApiOperation({ summary: 'Get consumable notes for an account' })
-  @ApiResponse({
-    status: 200,
-    description: 'List of consumable notes',
-  })
-  async getConsumableNotes(@Param('accountId') accountId: string): Promise<{ notes: any[] }> {
-    const notes = await this.multisigService.getConsumableNotes(accountId);
-    return { notes };
-  }
-
-  @Get('accounts/:accountId/balances')
-  @ApiOperation({ summary: 'Get account balances' })
-  @ApiResponse({
-    status: 200,
-    description: 'Account balances',
-  })
-  async getAccountBalances(@Param('accountId') accountId: string): Promise<{ balances: any[] }> {
-    const balances = await this.multisigService.getAccountBalances(accountId);
-    return { balances };
-  }
-
-  @Post('accounts/balances')
-  @ApiOperation({ summary: 'Get balances for multiple accounts' })
-  @ApiResponse({
-    status: 200,
-    description: 'Balances for multiple accounts',
-    type: GetBatchAccountBalancesResponseDto,
-  })
-  async getBatchAccountBalances(
-    @Body() dto: GetBatchAccountBalancesDto,
-  ): Promise<GetBatchAccountBalancesResponseDto> {
-    const accounts = await this.multisigService.getBatchAccountBalances(dto.accountIds);
-    return { accounts };
   }
 
   @Get('accounts/:accountId/members')
@@ -183,25 +144,6 @@ export class MultisigController {
     @CurrentUser('withCompany') user: UserWithCompany,
   ): Promise<MultisigProposalResponseDto> {
     return this.multisigService.createProposalFromBills(dto, user);
-  }
-
-  @Post('accounts/:accountId/mint')
-  @ApiOperation({ summary: 'Mint tokens to a multisig account' })
-  @ApiResponse({
-    status: 200,
-    description: 'Tokens minted successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        transactionId: { type: 'string' },
-      },
-    },
-  })
-  async mintTokens(
-    @Param('accountId') accountId: string,
-    @Body() dto: MintTokensDto,
-  ): Promise<{ transactionId: string }> {
-    return this.multisigService.mintTokens(accountId, dto);
   }
 
   // ============================================================================
@@ -277,17 +219,18 @@ export class MultisigController {
     return this.multisigService.submitRejection(proposalId, user, dto);
   }
 
-  @Post('proposals/:proposalId/execute')
-  @ApiOperation({ summary: 'Execute a proposal' })
+  @Post('proposals/:proposalId/mark-executed')
+  @ApiOperation({ summary: 'Mark a proposal as executed (after frontend PSM execution)' })
   @ApiResponse({
     status: 200,
-    description: 'Proposal execution result',
+    description: 'Proposal marked as executed',
     type: ExecuteTransactionResponseDto,
   })
-  async executeProposal(
+  async markProposalExecuted(
     @Param('proposalId', ParseIntPipe) proposalId: number,
+    @Body() body: { transactionId?: string },
   ): Promise<ExecuteTransactionResponseDto> {
-    return this.multisigService.executeProposal(proposalId);
+    return this.multisigService.markProposalExecuted(proposalId, body.transactionId);
   }
 
   @Post('proposals/:proposalUuid/cancel')

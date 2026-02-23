@@ -9,6 +9,7 @@ import { MemberActionTooltip } from "@/components/Common/ToolTip/MemberActionToo
 import toast from "react-hot-toast";
 import type { TeamMemberResponseDto } from "@qash/types/dto/team-member";
 import { TeamMemberRoleEnum, TeamMemberStatusEnum } from "@qash/types/enums";
+import { PermissionRequiredModalProps } from "@/types/modal";
 
 interface Member {
   id: string;
@@ -39,6 +40,7 @@ const roleDisplay = (role?: string): TeamMemberRoleEnum => {
 
 const MemberTab: React.FC<MemberTabProps> = ({ onMenuClick }) => {
   const { user } = useAuth();
+  const { openModal } = useModal();
   const companyId = user?.teamMembership?.companyId;
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState(query);
@@ -65,7 +67,6 @@ const MemberTab: React.FC<MemberTabProps> = ({ onMenuClick }) => {
     }));
   }, [teamMembers]);
 
-  const { openModal } = useModal();
   const removeTeamMember = useRemoveTeamMember();
 
   return (
@@ -100,9 +101,21 @@ const MemberTab: React.FC<MemberTabProps> = ({ onMenuClick }) => {
             profilePicture: m.profilePicture || undefined,
           };
 
-          const handleEdit = () => openModal("EDIT_TEAM_MEMBER", { id: Number(m.id) });
+          const handleEdit = () => {
+            if (user?.teamMembership?.role !== "ADMIN" && user?.teamMembership?.role !== "OWNER") {
+              openModal<PermissionRequiredModalProps>("PERMISSION_REQUIRED", { role: user?.teamMembership?.role });
+              return;
+            }
+
+            openModal("EDIT_TEAM_MEMBER", { id: Number(m.id) });
+          };
 
           const handleRemove = () => {
+            if (user?.teamMembership?.role !== "ADMIN" && user?.teamMembership?.role !== "OWNER") {
+              openModal<PermissionRequiredModalProps>("PERMISSION_REQUIRED", { role: user?.teamMembership?.role });
+              return;
+            }
+
             openModal("REMOVE_TEAM_MEMBER", {
               name: `${m.firstName} ${m.lastName}`.trim(),
               onRemove: async () => {

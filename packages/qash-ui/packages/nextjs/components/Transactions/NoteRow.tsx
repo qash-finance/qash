@@ -13,6 +13,7 @@ interface NoteRowProps {
   onClaimNote?: (noteId: string) => Promise<void>;
   isLoading?: boolean;
   isInProposal?: boolean;
+  isViewer?: boolean;
 }
 
 // Helper function to parse note_type (e.g., "Some(Public)" -> "Public")
@@ -46,6 +47,7 @@ export function NoteRow({
   onClaimNote,
   isLoading = false,
   isInProposal = false,
+  isViewer = false,
 }: NoteRowProps) {
   const firstAsset = note.assets?.[0];
   const displayAmount = firstAsset ? formatAmount(firstAsset.amount) : "0";
@@ -113,7 +115,7 @@ export function NoteRow({
           text={isInProposal ? "In Proposal" : "Claim"}
           onClick={handleClaimClick}
           loading={isLoading}
-          disabled={isInProposal || isLoading}
+          disabled={isInProposal || isLoading || isViewer}
           buttonClassName="px-3"
         />
       </div>

@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { BaseContainer } from "../Common/BaseContainer";
 import GeneralStatistics from "./Overview/GeneralStatistics";
 import TopInteractedAddresses from "./Overview/TopInteractedAddresses";
 import SpendingAverageChart from "./Overview/SpendingAverageChart";
 import { LineChart, Line, XAxis, Tooltip, ResponsiveContainer } from "recharts";
 import TransactionHistory from "./Overview/TransactionHistory";
-import { useGetBatchAccountBalances, useListAccountsByCompany } from "@/services/api/multisig";
+import { useLocalAccountBalances, useListAccountsByCompany } from "@/services/api/multisig";
 import { useGetMyCompany } from "@/services/api/company";
 
 const BalanceOverviewHeader = ({ totalBalance = 0 }: { totalBalance?: number }) => {
@@ -134,20 +134,10 @@ export const Overview = () => {
   const [timePeriod, setTimePeriod] = useState<"month" | "year">("month");
   const { data: myCompany } = useGetMyCompany();
   const { data: multisigAccounts } = useListAccountsByCompany(myCompany?.id, { enabled: !!myCompany?.id });
-  const getBalances = useGetBatchAccountBalances();
-  const [totalBalance, setTotalBalance] = useState<number>(0);
 
-  useEffect(() => {
-    if (multisigAccounts && multisigAccounts.length !== 0) {
-      (async () => {
-        const { accounts } = await getBalances.mutateAsync({
-          accountIds: multisigAccounts.map(acc => acc.accountId),
-        });
-        const total = accounts.reduce((acc, curr) => acc + Number(curr.stats.totalUSD), 0);
-        setTotalBalance(total);
-      })();
-    }
-  }, [multisigAccounts]);
+  const accountIds = multisigAccounts?.map(acc => acc.accountId);
+  const { data: balanceData } = useLocalAccountBalances(accountIds);
+  const totalBalance = balanceData?.totalBalance ?? 0;
 
   return (
     <div className="w-full">

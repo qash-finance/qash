@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { blo } from "blo";
 import { TokenItem } from "./TokenItem";
 import { turnBechToHex } from "@/services/utils/turnBechToHex";
@@ -8,7 +8,8 @@ import { TabContainer } from "../Common/TabContainer";
 import { Select } from "../Common/Select";
 import { FilterButton } from "../Common/FilterButton";
 import { supportedTokens } from "@/services/utils/supportedToken";
-import { useMidenProvider } from "@/contexts/MidenProvider";
+import { useGetMyCompany } from "@/services/api/company";
+import { useListAccountsByCompany, useMultisigAssets } from "@/services/api/multisig";
 
 const tokenSortOptions = [
   // { value: "bitcoin", label: "Bitcoin", icon: "/token/btc.svg" },
@@ -38,7 +39,12 @@ const tabs = [
 
 export function TokenList() {
   // **************** Custom Hooks *******************
-  const { balances, balancesLoading } = useMidenProvider();
+  const { data: myCompany } = useGetMyCompany();
+  const { data: multisigAccounts } = useListAccountsByCompany(myCompany?.id, { enabled: !!myCompany?.id });
+  const accountIds = useMemo(() => multisigAccounts?.map(a => a.accountId) || [], [multisigAccounts]);
+  const { data: balances, isLoading: balancesLoading } = useMultisigAssets(accountIds, {
+    enabled: accountIds.length > 0,
+  });
 
   // **************** Local State *******************
   const [activeTab, setActiveTab] = useState<"tokens" | "nfts">("tokens");

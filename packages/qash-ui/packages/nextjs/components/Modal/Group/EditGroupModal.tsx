@@ -63,7 +63,7 @@ export function EditGroupModal({ isOpen, onClose, zIndex, group }: ModalProp<Edi
 
   const handleSave = async () => {
     try {
-      const { Address } = await import("@demox-labs/miden-sdk");
+      const { Address } = await import("@miden-sdk/miden-sdk");
 
       if (!group) return;
 

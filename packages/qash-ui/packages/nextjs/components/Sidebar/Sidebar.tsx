@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { NavSections } from "./NavSection";
 import { Connect } from "./Connect";
 import { useRouter, usePathname } from "next/navigation";
@@ -16,11 +16,14 @@ import TeamSidebar from "./TeamSidebar";
 import { useGetMyCompany } from "@/services/api/company";
 import { useGetTeamStats } from "@/services/api/team-member";
 import {
-  useGetBatchAccountBalances,
-  useGetMultisigAccount,
   useListAccountsByCompany,
   useListProposalsByCompany,
+  useLocalAccountBalances,
 } from "@/services/api/multisig";
+import { MultisigProposalStatusEnum } from "@qash/types/enums";
+import type { MultisigProposalResponseDto } from "@qash/types/dto/multisig";
+
+const EMPTY_PROPOSALS: MultisigProposalResponseDto[] = [];
 
 export const MOVE_CRYPTO_SIDEBAR_OFFSET = 290;
 
@@ -168,16 +171,18 @@ export const Sidebar: React.FC<NavProps> = ({ onActionItemClick }) => {
   const handleOpenTeamSidebar = useCallback(() => setShowTeamSidebar(true), []);
   const handleCloseTeamSidebar = useCallback(() => setShowTeamSidebar(false), []);
   const { logoutAsync } = useMidenProvider();
-  const getBalances = useGetBatchAccountBalances();
-  const [totalBalance, setTotalBalance] = useState<number>(0);
+  const accountIds = useMemo(() => multisigAccounts?.map(a => a.accountId) || [], [multisigAccounts]);
+  const { data: localBalances } = useLocalAccountBalances(accountIds, { enabled: accountIds.length > 0 });
+  const totalBalance = localBalances?.totalBalance ?? 0;
 
   const {
-    data: allProposals = [],
+    data: allProposalsRaw,
     isLoading: proposalsLoading,
     refetch: refetchProposals,
   } = useListProposalsByCompany(myCompany?.id, {
     enabled: !!myCompany?.id,
   });
+  const allProposals = allProposalsRaw ?? EMPTY_PROPOSALS;
 
   // **************** Effect ****************
   useEffect(() => {
@@ -185,6 +190,11 @@ export const Sidebar: React.FC<NavProps> = ({ onActionItemClick }) => {
     const isAnySubmenuOpen = showMoveCryptoSidebar;
     // Add more submenu checks here as needed
     // const isAnySubmenuOpen = showMoveCryptoSidebar || showAnotherSubmenu;
+
+    // Update badge count for Transactions item based on number of pending proposals
+    const pendingCount = allProposals.filter(
+      p => p.status === MultisigProposalStatusEnum.READY || p.status === MultisigProposalStatusEnum.PENDING,
+    ).length;
 
     setActions(prev =>
       prev.map(item => {
@@ -210,39 +220,17 @@ export const Sidebar: React.FC<NavProps> = ({ onActionItemClick }) => {
         // If no submenu is open, use URL-based active state
         const isActive = isAnySubmenuOpen ? isSubmenuActive : isUrlActive;
 
+        // Update badge count for Transactions item
+        const badgeCount = item.link === SidebarLink.Transactions ? pendingCount : item.badgeCount;
+
         return {
           ...item,
           isActive,
+          badgeCount,
         };
       }),
     );
-  }, [pathname, showMoveCryptoSidebar]);
-
-  useEffect(() => {
-    if (multisigAccounts && multisigAccounts.length !== 0) {
-      (async () => {
-        const { accounts } = await getBalances.mutateAsync({
-          accountIds: multisigAccounts.map(acc => acc.accountId),
-        });
-        setTotalBalance(accounts.reduce((acc, curr) => acc + Number(curr.stats.totalUSD), 0));
-      })();
-    }
-  }, [multisigAccounts]);
-
-  useEffect(() => {
-    // Update badge count for Transactions item based on allProposals length
-    setActions(prev =>
-      prev.map(item => {
-        if (item.link === SidebarLink.Transactions) {
-          return {
-            ...item,
-            badgeCount: allProposals.length,
-          };
-        }
-        return item;
-      }),
-    );
-  }, [allProposals]);
+  }, [pathname, showMoveCryptoSidebar, allProposals]);
 
   // **************** Handlers ****************
   const handleActionItemClick = (itemIndex: number) => {

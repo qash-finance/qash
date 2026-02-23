@@ -4,5 +4,6 @@ export interface TokenDto {
   symbol: string;
   decimals: number;
   name: string;
+  amount?: string; // Amount in raw/wei format
   maxSupply?: number;
 }

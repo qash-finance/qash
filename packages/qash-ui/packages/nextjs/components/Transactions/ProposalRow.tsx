@@ -1,13 +1,15 @@
 "use client";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { formatUnits } from "viem";
 import { PrimaryButton } from "@/components/Common/PrimaryButton";
 import { SecondaryButton } from "@/components/Common/SecondaryButton";
 import { MultisigProposalResponseDto } from "@qash/types/dto/multisig";
 import { MultisigProposalStatusEnum } from "@qash/types/enums";
 import { useGetConsumableNotes } from "@/services/api/multisig";
-import { QASH_TOKEN_ADDRESS } from "@/services/utils/constant";
+import { QASH_TOKEN_ADDRESS, QASH_TOKEN_DECIMALS } from "@/services/utils/constant";
 import { formatAddress } from "@/services/utils/miden/address";
+import { useMidenProvider } from "@/contexts/MidenProvider";
+import { getFaucetMetadata } from "@/services/utils/miden/faucet";
 
 interface ProposalRowProps {
   proposal: MultisigProposalResponseDto;
@@ -18,6 +20,7 @@ interface ProposalRowProps {
   isExecuteLoading?: boolean;
   isCancelLoading?: boolean;
   userPublicKey?: string;
+  isViewer?: boolean;
   onProposalClick?: (e: any) => void;
 }
 
@@ -84,8 +87,10 @@ export function ProposalRow({
   isExecuteLoading,
   isCancelLoading,
   userPublicKey,
+  isViewer,
   onProposalClick,
 }: ProposalRowProps) {
+  const { client: midenClient } = useMidenProvider();
   const status = proposal.status as MultisigProposalStatusEnum;
   const config = statusConfig[status] || statusConfig[MultisigProposalStatusEnum.PENDING];
   const isPending = status === MultisigProposalStatusEnum.PENDING;
@@ -129,10 +134,32 @@ export function ProposalRow({
       ? consumableNotesData.notes.find(note => proposal.noteIds?.includes(note.note_id))
       : null;
 
-  // Extract asset info from the note
-  const firstAsset = proposalNote?.assets?.[0];
-  const displayAmount = firstAsset ? formatAmount(firstAsset.amount) : "0";
-  const faucetId = firstAsset?.faucet_id || "";
+  // Resolve token metadata from the Miden SDK faucet account (cached)
+  const faucetId = proposal.tokens?.[0]?.address || "";
+  const token = proposal.tokens?.[0];
+  const [faucetMeta, setFaucetMeta] = useState<{ symbol: string; decimals: number } | null>(null);
+
+  useEffect(() => {
+    if (!midenClient || !faucetId) return;
+    let cancelled = false;
+    getFaucetMetadata(midenClient, faucetId)
+      .then(meta => { if (!cancelled) setFaucetMeta(meta); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [midenClient, faucetId]);
+
+  const tokenSymbol = faucetMeta?.symbol || token?.symbol || "";
+  const tokenDecimals = faucetMeta?.decimals ?? token?.decimals ?? 0;
+  const tokenIsQash = tokenSymbol.toUpperCase() === "QASH";
+  const displayAmount = token?.amount
+    ? (() => {
+        try {
+          return formatUnits(BigInt(token.amount), tokenDecimals);
+        } catch {
+          return "-";
+        }
+      })()
+    : "-";
 
   return (
     <div
@@ -159,27 +186,16 @@ export function ProposalRow({
       {/* Bills/Amount Count */}
       <div className="flex items-center justify-center">
         {proposal.proposalType === "CONSUME" ? (
-          isHistoryProposal ? (
-            // For history proposals, show placeholder since note may no longer exist
-            <span className="text-sm font-medium text-text-secondary">—</span>
-          ) : notesLoading ? (
-            <div className="flex flex-col items-end justify-end gap-1">
-              <div className="h-2 bg-neutral-300 rounded-full w-20 animate-pulse"></div>
-              <div className="h-2 bg-neutral-300 rounded-full w-10 animate-pulse"></div>
-            </div>
-          ) : proposalNote ? (
-            // Show asset info for CONSUME proposals
-            <div className="flex items-center justify-center">
-              <img
-                src={QASH_TOKEN_ADDRESS.startsWith(faucetId) ? "/token/qash.svg" : "/tokens/unknown-token.svg"}
-                alt="Token"
-                className="w-6 h-6 mr-2"
-              />
-              <span className="text-sm font-medium text-text-strong-950">
-                {displayAmount} {QASH_TOKEN_ADDRESS.startsWith(faucetId) ? "QASH" : formatAddress(faucetId)}
-              </span>
-            </div>
-          ) : null
+          <div className="flex items-center justify-center">
+            <img
+              src={tokenIsQash ? "/token/qash.svg" : "/tokens/unknown-token.svg"}
+              alt="Token"
+              className="w-6 h-6 mr-2"
+            />
+            <span className="text-sm font-medium text-text-strong-950">
+              {displayAmount} {tokenIsQash ? "QASH" : (token?.symbol || formatAddress(faucetId))}
+            </span>
+          </div>
         ) : billCount > 0 ? (
           <div className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-blue-50 border border-blue-200">
             <span className="text-sm font-semibold text-blue-600">
@@ -222,7 +238,7 @@ export function ProposalRow({
                 onCancel?.(proposal.uuid);
               }}
               loading={isCancelLoading}
-              disabled={isCancelLoading || isSignLoading}
+              disabled={isCancelLoading || isSignLoading || isViewer}
             />
             <PrimaryButton
               text={hasUserSigned ? "Signed" : "Sign"}
@@ -232,34 +248,21 @@ export function ProposalRow({
                 onSign?.(proposal.id);
               }}
               loading={isSignLoading}
-              disabled={hasUserSigned || isSignLoading || isCancelLoading}
+              disabled={hasUserSigned || isSignLoading || isCancelLoading || isViewer}
             />
           </>
         )}
         {isReady && (
-          <>
-            <SecondaryButton
-              text="Cancel"
-              variant="dark"
-              buttonClassName="px-4"
-              onClick={(e: any) => {
-                e.stopPropagation();
-                onCancel?.(proposal.uuid);
-              }}
-              loading={isCancelLoading}
-              disabled={isCancelLoading || isExecuteLoading}
-            />
-            <PrimaryButton
-              text="Execute"
-              buttonClassName="px-4"
-              onClick={(e: any) => {
-                e.stopPropagation();
-                onExecute?.(proposal.id);
-              }}
-              loading={isExecuteLoading}
-              disabled={isExecuteLoading || isCancelLoading}
-            />
-          </>
+          <PrimaryButton
+            text="Execute"
+            buttonClassName="px-4"
+            onClick={(e: any) => {
+              e.stopPropagation();
+              onExecute?.(proposal.id);
+            }}
+            loading={isExecuteLoading}
+            disabled={isExecuteLoading || isViewer}
+          />
         )}
         {isHistory && (
           <span className={`text-sm font-medium ${config.textColor} whitespace-nowrap`}>{config.label}</span>

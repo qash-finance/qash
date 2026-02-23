@@ -11,12 +11,14 @@ export interface CreateUserData {
   email: string;
   isActive?: boolean;
   publicKey?: string;
+  commitment?: string;
 }
 
 export interface UpdateUserData {
   isActive?: boolean;
   lastLogin?: Date;
   publicKey?: string;
+  commitment?: string;
 }
 
 @Injectable()
@@ -71,6 +73,7 @@ export class UserRepository extends BaseRepository<
         email: data.email,
         isActive: data.isActive ?? true,
         publicKey: data.publicKey,
+        commitment: data.commitment,
       },
     });
   }

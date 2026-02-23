@@ -112,7 +112,7 @@ const config = {
               },
               {
                 label: "Docs",
-                href: "https://github.com/qash-finance/qash-ui/tree/main/packages/docs",
+                href: "https://github.com/qash-finance/qash/tree/main/packages/qash-doc",
               },
             ],
           },

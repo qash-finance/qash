@@ -17,9 +17,10 @@ interface AccountTabProps {
   accounts: Account[];
   onCreateNewAccount: () => void;
   onMenuClick: (accountId: string) => void;
+  isAdmin?: boolean;
 }
 
-const AccountTab: React.FC<AccountTabProps> = ({ onCreateNewAccount, onMenuClick, accounts }) => {
+const AccountTab: React.FC<AccountTabProps> = ({ onCreateNewAccount, onMenuClick, accounts, isAdmin }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const router = useRouter();
 
@@ -46,13 +47,15 @@ const AccountTab: React.FC<AccountTabProps> = ({ onCreateNewAccount, onMenuClick
           </div>
 
           {/* Button */}
-          <PrimaryButton
-            text="Create a account"
-            icon="/misc/plus-icon.svg"
-            iconPosition="left"
-            onClick={onCreateNewAccount}
-            containerClassName="w-48"
-          />
+          {isAdmin && (
+            <PrimaryButton
+              text="Create a account"
+              icon="/misc/plus-icon.svg"
+              iconPosition="left"
+              onClick={onCreateNewAccount}
+              containerClassName="w-48"
+            />
+          )}
         </div>
       </div>
     );
@@ -76,13 +79,15 @@ const AccountTab: React.FC<AccountTabProps> = ({ onCreateNewAccount, onMenuClick
         </section>
 
         {/* Create Button */}
-        <SecondaryButton
-          text="Create new account"
-          icon="/misc/plus-icon.svg"
-          iconPosition="left"
-          onClick={onCreateNewAccount}
-          buttonClassName="w-fit px-3"
-        />
+        {isAdmin && (
+          <SecondaryButton
+            text="Create new account"
+            icon="/misc/plus-icon.svg"
+            iconPosition="left"
+            onClick={onCreateNewAccount}
+            buttonClassName="w-fit px-3"
+          />
+        )}
       </div>
 
       {/* Account Cards Grid */}

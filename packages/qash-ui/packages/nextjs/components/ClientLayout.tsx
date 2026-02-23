@@ -19,7 +19,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { TransactionProviderC } from "@/contexts/TransactionProvider";
 import { useAuthGuard } from "@/hooks/server/useAuthGuard";
 import { Environment, ParaProvider } from "@getpara/react-sdk";
-import { MidenProvider } from "@/contexts/MidenProvider";
+import { MidenProvider, useMidenProvider } from "@/contexts/MidenProvider";
+import { PSMProvider, usePSMProvider } from "@/contexts/PSMProvider";
+import FullScreenLoading from "./Loading/FullScreenLoading";
 import "@getpara/react-sdk/styles.css";
 
 // Responsive sidebar widths: smaller on medium screens, larger on bigger screens
@@ -82,6 +84,22 @@ function ProtectedContent({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+// Gate that shows FullScreenLoading until core infrastructure is ready:
+// 1. Para SDK initialized (isLoading === false)
+// 2. If connected: WebClient created + PSM connected
+function AppReadyGate({ children }: { children: ReactNode }) {
+  const { isLoading, isConnected, client } = useMidenProvider();
+  const { psmStatus } = usePSMProvider();
+
+  // Para SDK still initializing
+  if (isLoading) return <FullScreenLoading />;
+
+  // User is connected but WebClient or PSM not ready yet
+  if (isConnected && (!client || psmStatus === "connecting")) return <FullScreenLoading />;
+
+  return <>{children}</>;
+}
+
 export default function ClientLayout({ children }: ClientLayoutProps) {
   useMobileDetection();
   const pathname = usePathname();
@@ -99,6 +117,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
     <QueryClientProvider client={queryClient}>
       <ParaProvider paraClientConfig={paraClientConfig} config={paraConfig} paraModalConfig={paraModalConfig}>
         <MidenProvider>
+         <PSMProvider>
           <Toaster
             position="top-right"
             toastOptions={{
@@ -144,44 +163,47 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
               </ToastBar>
             )}
           />
-          <TourProviderWrapper>
-            <SocketProvider>
-              <ModalProvider>
-                <AuthProvider>
-                  <ProtectedContent>
-                    <AccountProvider>
-                      <TransactionProviderC>
-                        <TitleProvider>
-                          {/* <ConnectWalletButton /> */}
-                          <ModalManager />
-                          {isFullscreen ? (
-                            <div className="h-screen w-screen">{children}</div>
-                          ) : (
-                            <div className="flex flex-col h-screen overflow-hidden">
-                              <TestnetBanner />
-                              <div className="flex flex-row gap-2">
-                                <div className={`top-0 ${SIDEBAR_WIDTH_CLASSES}`}>
-                                  <Sidebar />
-                                </div>
-                                {/* {pathname.includes("dashboard") && <DashboardMenu />} */}
-                                <div className="flex-1 h-screen flex flex-col overflow-hidden gap-2">
-                                  <Title />
-                                  <div className="mx-[8px] mb-[24px] rounded-[12px] flex justify-center items-center flex-1 overflow-auto relative bg-background">
-                                    {children}
+          <AppReadyGate>
+            <TourProviderWrapper>
+              <SocketProvider>
+                <ModalProvider>
+                  <AuthProvider>
+                    <ProtectedContent>
+                      <AccountProvider>
+                        <TransactionProviderC>
+                          <TitleProvider>
+                            {/* <ConnectWalletButton /> */}
+                            <ModalManager />
+                            {isFullscreen ? (
+                              <div className="h-screen w-screen">{children}</div>
+                            ) : (
+                              <div className="flex flex-col h-screen overflow-hidden">
+                                <TestnetBanner />
+                                <div className="flex flex-row gap-2">
+                                  <div className={`top-0 ${SIDEBAR_WIDTH_CLASSES}`}>
+                                    <Sidebar />
+                                  </div>
+                                  {/* {pathname.includes("dashboard") && <DashboardMenu />} */}
+                                  <div className="flex-1 h-screen flex flex-col overflow-hidden gap-2">
+                                    <Title />
+                                    <div className="mx-[8px] mb-[24px] rounded-[12px] flex justify-center items-center flex-1 overflow-auto relative bg-background">
+                                      {children}
+                                    </div>
                                   </div>
                                 </div>
                               </div>
-                            </div>
-                          )}
-                          {!isFullscreen && <FloatingActionButton imgSrc="/token/qash.svg" />}
-                        </TitleProvider>
-                      </TransactionProviderC>
-                    </AccountProvider>
-                  </ProtectedContent>
-                </AuthProvider>
-              </ModalProvider>
-            </SocketProvider>
-          </TourProviderWrapper>
+                            )}
+                            {!isFullscreen && <FloatingActionButton imgSrc="/token/qash.svg" />}
+                          </TitleProvider>
+                        </TransactionProviderC>
+                      </AccountProvider>
+                    </ProtectedContent>
+                  </AuthProvider>
+                </ModalProvider>
+              </SocketProvider>
+            </TourProviderWrapper>
+          </AppReadyGate>
+         </PSMProvider>
         </MidenProvider>
       </ParaProvider>
     </QueryClientProvider>

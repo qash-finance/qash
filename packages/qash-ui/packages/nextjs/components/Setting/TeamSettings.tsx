@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { useAuth } from "@/services/auth/context";
 import { PrimaryButton } from "../Common/PrimaryButton";
 import Card from "../Common/Card";
 import AccountTab, { Account } from "./TeamSetting/AccountTab";
@@ -11,6 +12,7 @@ import { useGetTeamStats } from "@/services/api/team-member";
 
 const TeamSettings = () => {
   const { openModal } = useModal();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"account" | "member">("account");
   // Fetch the current company and list its multisig accounts
   const { data: myCompany } = useGetMyCompany();
@@ -18,6 +20,8 @@ const TeamSettings = () => {
     enabled: !!myCompany?.id,
   });
   const { data: teamStats } = useGetTeamStats(myCompany?.id);
+
+  const isAdmin = user?.teamMembership?.role === "ADMIN" || user?.teamMembership?.role === "OWNER";
 
   const accounts: Account[] = (multisigAccounts || []).map(a => ({
     id: a.accountId,
@@ -39,7 +43,12 @@ const TeamSettings = () => {
     switch (activeTab) {
       case "account":
         return (
-          <AccountTab accounts={accounts} onCreateNewAccount={handleCreateNewAccount} onMenuClick={handleMenuClick} />
+          <AccountTab
+            accounts={accounts}
+            onCreateNewAccount={handleCreateNewAccount}
+            onMenuClick={handleMenuClick}
+            isAdmin={isAdmin}
+          />
         );
       case "member":
         return <MemberTab onMenuClick={handleMenuClick} />;
@@ -57,13 +66,15 @@ const TeamSettings = () => {
             <p className="text-xs font-medium text-text-secondary leading-none">{teamStats?.total} members</p>
           </div>
         </div>
-        <PrimaryButton
-          text="Add new members"
-          icon="/misc/plus-icon.svg"
-          iconPosition="left"
-          onClick={() => openModal("INVITE_TEAM_MEMBER")}
-          containerClassName="w-[160px]"
-        />
+        {isAdmin && (
+          <PrimaryButton
+            text="Add new members"
+            icon="/misc/plus-icon.svg"
+            iconPosition="left"
+            onClick={() => openModal("INVITE_TEAM_MEMBER")}
+            containerClassName="w-[160px]"
+          />
+        )}
       </div>
 
       {/* Stats Cards */}

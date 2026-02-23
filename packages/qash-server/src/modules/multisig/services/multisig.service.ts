@@ -6,7 +6,6 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
-import { MidenClientService } from './miden-client.service';
 import {
   CreateMultisigAccountDto,
   CreateConsumeProposalDto,
@@ -15,8 +14,6 @@ import {
   CreateProposalFromBillsDto,
   SubmitSignatureDto,
   SubmitRejectionDto,
-  MintTokensDto,
-  GetBatchAccountBalancesDto,
   MultisigAccountResponseDto,
   MultisigProposalResponseDto,
   ExecuteTransactionResponseDto,
@@ -32,7 +29,6 @@ export class MultisigService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly midenClient: MidenClientService,
     private readonly activityLogService: ActivityLogService,
     private readonly billService: BillService,
   ) {}
@@ -105,36 +101,16 @@ export class MultisigService {
       );
     }
 
-    // Preserve ordering (creator first, then any others in provided order)
-    const orderedTeamMembers = memberIdArray.map((id) => {
-      const tm = teamMembers.find((t) => t.id === id);
-      if (!tm) {
-        throw new BadRequestException(`Team member ${id} not found`);
-      }
-      return tm;
-    });
-
-    // Extract public keys and validate presence
-    const publicKeys = orderedTeamMembers.map((tm) => {
-      const pk = tm.user?.publicKey;
-      if (!pk) {
-        throw new BadRequestException(`Missing public key for team member ${tm.id}`);
-      }
-      return pk;
-    });
-
     // Validate threshold against number of approvers
-    if (dto.threshold > publicKeys.length) {
+    if (dto.threshold > memberIdArray.length) {
       throw new BadRequestException(
-        `Threshold (${dto.threshold}) cannot be greater than number of approvers (${publicKeys.length})`,
+        `Threshold (${dto.threshold}) cannot be greater than number of approvers (${memberIdArray.length})`,
       );
     }
 
-    // Create account via Miden client
-    const { accountId } = await this.midenClient.createMultisigAccount(
-      publicKeys,
-      dto.threshold,
-    );
+    // Use the frontend-provided accountId and publicKeys (created on-chain by OZ SDK)
+    const accountId = dto.accountId;
+    const publicKeys = dto.publicKeys;
 
     // Store in database with team members
     const account = await this.prisma.multisigAccount.create({
@@ -217,45 +193,6 @@ export class MultisigService {
   }
 
   /**
-   * Get consumable notes for an account
-   */
-  async getConsumableNotes(accountId: string): Promise<any[]> {
-    // Verify account exists
-    await this.getAccount(accountId);
-
-    // Get notes from Miden client
-    return this.midenClient.getConsumableNotes(accountId);
-  }
-
-  /**
-   * Get account balances
-   */
-  async getAccountBalances(accountId: string): Promise<any[]> {
-    // Verify account exists
-    await this.getAccount(accountId);
-
-    // Get balances from Miden client
-    return this.midenClient.getAccountBalances(accountId);
-  }
-
-  /**
-   * Get balances for multiple accounts
-   */
-  async getBatchAccountBalances(
-    accountIds: string[],
-  ): Promise<Array<{ accountId: string; balances: any[] }>> {
-    this.logger.log(`Getting balances for ${accountIds.length} accounts`);
-
-    // Verify all accounts exist
-    for (const accountId of accountIds) {
-      await this.getAccount(accountId);
-    }
-
-    // Get balances from Miden client
-    return this.midenClient.getBatchAccountBalances(accountIds);
-  }
-
-  /**
    * List all team members associated with a multisig account (by accountId)
    */
   async listAccountMembers(accountId: string): Promise<any[]> {
@@ -292,32 +229,10 @@ export class MultisigService {
       role: m.teamMember.role,
       position: m.teamMember.position,
       publicKey: m.teamMember.user?.publicKey,
+      commitment: (m.teamMember.user as any)?.commitment,
       joinedAt: m.createdAt,
+      profilePicture: m.teamMember.profilePicture,
     }));
-  }
-
-  /**
-   * Mint tokens to a multisig account from a faucet
-   */
-  async mintTokens(
-    accountId: string,
-    dto: MintTokensDto,
-  ): Promise<{ transactionId: string }> {
-    this.logger.log(
-      `Minting ${dto.amount} tokens to account ${accountId} from faucet ${dto.faucetId}`,
-    );
-
-    // Verify account exists
-    await this.getAccount(accountId);
-
-    // Call Miden client to mint tokens
-    const { transactionId } = await this.midenClient.mintTokens(
-      accountId,
-      dto.faucetId,
-      dto.amount,
-    );
-
-    return { transactionId };
   }
 
   /**
@@ -333,12 +248,20 @@ export class MultisigService {
     // Verify account exists
     const account = await this.getAccount(dto.accountId);
 
-    // Create proposal via Miden client
-    const { summaryCommitment, summaryBytesHex, requestBytesHex } =
-      await this.midenClient.createConsumeProposal(
-        dto.accountId,
-        dto.noteIds,
+    // Validate tokens provided
+    if (!dto.tokens || dto.tokens.length === 0) {
+      throw new BadRequestException('tokens are required for consume proposals');
+    }
+
+    if (!dto.summaryCommitment || !dto.summaryBytesHex) {
+      throw new BadRequestException(
+        'summaryCommitment and summaryBytesHex are required (proposal must be created via PSM on the frontend)',
       );
+    }
+
+    const summaryCommitment = dto.summaryCommitment;
+    const summaryBytesHex = dto.summaryBytesHex;
+    const requestBytesHex = dto.requestBytesHex || '';
 
     // Store proposal in database
     const proposal = await this.prisma.multisigProposal.create({
@@ -346,10 +269,12 @@ export class MultisigService {
         accountId: dto.accountId,
         description: dto.description,
         proposalType: 'CONSUME',
+        psmProposalId: dto.psmProposalId || null,
         summaryCommitment,
         summaryBytesHex,
         requestBytesHex,
         noteIds: dto.noteIds,
+        tokens: dto.tokens as unknown as any,
         status: 'PENDING',
       },
       include: {
@@ -373,14 +298,20 @@ export class MultisigService {
     // Verify account exists
     const account = await this.getAccount(dto.accountId);
 
-    // Create proposal via Miden client
-    const { summaryCommitment, summaryBytesHex, requestBytesHex } =
-      await this.midenClient.createSendProposal(
-        dto.accountId,
-        dto.recipientId,
-        dto.faucetId,
-        dto.amount,
+    // Validate tokens provided and that faucetId is included
+    if (!dto.tokens || dto.tokens.length === 0) {
+      throw new BadRequestException('tokens are required for send proposals');
+    }
+    const sendTokenAddrs = new Set(dto.tokens.map((t) => t.address.toLowerCase()));
+    if (!sendTokenAddrs.has((dto.faucetId || '').toLowerCase())) {
+      throw new BadRequestException('faucetId must be included in tokens');
+    }
+
+    if (!dto.summaryCommitment || !dto.summaryBytesHex) {
+      throw new BadRequestException(
+        'summaryCommitment and summaryBytesHex are required (proposal must be created via PSM on the frontend)',
       );
+    }
 
     // Store proposal in database
     const proposal = await this.prisma.multisigProposal.create({
@@ -388,10 +319,12 @@ export class MultisigService {
         accountId: dto.accountId,
         description: dto.description,
         proposalType: 'SEND',
-        summaryCommitment,
-        summaryBytesHex,
-        requestBytesHex,
+        psmProposalId: dto.psmProposalId || null,
+        summaryCommitment: dto.summaryCommitment,
+        summaryBytesHex: dto.summaryBytesHex,
+        requestBytesHex: dto.requestBytesHex || '',
         noteIds: [],
+        tokens: dto.tokens as unknown as any,
         status: 'PENDING',
       },
       include: {
@@ -431,12 +364,22 @@ export class MultisigService {
       );
     }
 
-    // Create proposal via Miden client with batch payments
-    const { summaryCommitment, summaryBytesHex, requestBytesHex } =
-      await this.midenClient.createBatchSendProposal(
-        dto.accountId,
-        dto.payments,
+    // Validate tokens provided and cover all faucets in payments
+    if (!dto.tokens || dto.tokens.length === 0) {
+      throw new BadRequestException('tokens are required for batch send proposals');
+    }
+    const batchTokenAddrs = new Set(dto.tokens.map((t) => t.address.toLowerCase()));
+    for (const p of dto.payments) {
+      if (!batchTokenAddrs.has((p.faucetId || '').toLowerCase())) {
+        throw new BadRequestException(`Payment faucet ${p.faucetId} is not included in tokens`);
+      }
+    }
+
+    if (!dto.summaryCommitment || !dto.summaryBytesHex) {
+      throw new BadRequestException(
+        'summaryCommitment and summaryBytesHex are required (proposal must be created via PSM on the frontend)',
       );
+    }
 
     // Store proposal in database with payments stored as JSON
     const proposal = await this.prisma.multisigProposal.create({
@@ -444,11 +387,16 @@ export class MultisigService {
         accountId: dto.accountId,
         description: dto.description,
         proposalType: 'SEND',
-        summaryCommitment: summaryCommitment,
-        summaryBytesHex: summaryBytesHex,
-        requestBytesHex: requestBytesHex,
+        psmProposalId: dto.psmProposalId || null,
+        summaryCommitment: dto.summaryCommitment,
+        summaryBytesHex: dto.summaryBytesHex,
+        requestBytesHex: dto.requestBytesHex || '',
         noteIds: [],
+        tokens: dto.tokens as unknown as any,
         status: 'PENDING',
+        metadata: {
+          payments: dto.payments as unknown as any[],
+        },
       },
       include: {
         signatures: true,
@@ -532,29 +480,52 @@ export class MultisigService {
       );
     }
 
+    // Ensure tokens provided and cover invoice payment tokens
+    if (!dto.tokens || dto.tokens.length === 0) {
+      throw new BadRequestException('tokens are required for proposals from bills');
+    }
+    const billTokenAddrs = new Set(dto.tokens.map((t) => t.address.toLowerCase()));
+    for (const b of bills) {
+      const pt = (b.invoice as any)?.paymentToken;
+      const addr = pt?.address || pt?.faucetId || pt?.token_address;
+      if (addr && !billTokenAddrs.has((addr || '').toLowerCase())) {
+        throw new BadRequestException(`Bill ${b.uuid} payment token ${addr} is not included in tokens`);
+      }
+    }
+
     // Use provided payments to create the proposal
     const proposal = await this.prisma.$transaction(async (tx) => {
-      // Create proposal via Miden client with provided batch payments
-      const { summaryCommitment, summaryBytesHex, requestBytesHex } =
-        await this.midenClient.createBatchSendProposal(
-          dto.accountId,
-          dto.payments,
+      let summaryCommitment: string;
+      let summaryBytesHex: string;
+      let requestBytesHex: string;
+
+      if (!dto.summaryCommitment || !dto.summaryBytesHex) {
+        throw new BadRequestException(
+          'summaryCommitment and summaryBytesHex are required (proposal must be created via PSM on the frontend)',
         );
-      
+      }
+
+      summaryCommitment = dto.summaryCommitment;
+      summaryBytesHex = dto.summaryBytesHex;
+      requestBytesHex = dto.requestBytesHex || '';
+
       // Create the proposal
       const newProposal = await tx.multisigProposal.create({
         data: {
           accountId: dto.accountId,
           description: dto.description,
           proposalType: 'SEND',
+          psmProposalId: dto.psmProposalId || null,
           summaryCommitment,
           summaryBytesHex,
           requestBytesHex,
           noteIds: [],
+          tokens: dto.tokens as unknown as any,
           status: 'PENDING',
           metadata: {
             billUUIDs: dto.billUUIDs,
             totalBills: bills.length,
+            payments: dto.payments || null,
           },
         },
         include: {
@@ -1115,25 +1086,20 @@ export class MultisigService {
   }
 
   /**
-   * Execute a proposal
-   * Handles linked bills: validates, filters invalid, updates status on success/failure
+   * Mark a proposal as executed (called after frontend executes via PSM).
+   * Updates proposal status + linked bills without calling the Rust server.
    */
-  async executeProposal(
+  async markProposalExecuted(
     proposalId: number,
+    transactionId?: string,
   ): Promise<ExecuteTransactionResponseDto> {
-    this.logger.log(`Executing proposal ${proposalId}`);
+    this.logger.log(`Marking proposal ${proposalId} as executed via PSM`);
 
-    // Get proposal with all data including linked bills
     const proposal = await this.prisma.multisigProposal.findUnique({
       where: { id: proposalId },
       include: {
         account: true,
-        signatures: true,
-        bills: {
-          include: {
-            invoice: true,
-          },
-        },
+        bills: { include: { invoice: true } },
       },
     });
 
@@ -1141,126 +1107,54 @@ export class MultisigService {
       throw new NotFoundException(`Proposal ${proposalId} not found`);
     }
 
-    // Check status
-    if (proposal.status !== 'READY' && proposal.status !== 'PENDING') {
-      throw new BadRequestException(
-        `Proposal is not ready for execution (status: ${proposal.status})`,
-      );
+    if (proposal.status === 'EXECUTED') {
+      return { success: true, transactionId: proposal.transactionId || undefined };
     }
 
-    // Check threshold
-    if (proposal.signatures.length < proposal.account.threshold) {
-      throw new BadRequestException(
-        `Not enough signatures (${proposal.signatures.length}/${proposal.account.threshold})`,
-      );
-    }
-
-    // Filter valid bills (those with valid invoices and payable status)
+    const now = new Date();
     const validBills = proposal.bills.filter(
       (b) =>
         b.invoice !== null &&
         (b.status === BillStatusEnum.PENDING || b.status === BillStatusEnum.OVERDUE),
     );
 
-    const invalidBillIds = proposal.bills
-      .filter((b) => !validBills.includes(b))
-      .map((b) => b.uuid);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.multisigProposal.update({
+        where: { id: proposalId },
+        data: {
+          status: 'EXECUTED',
+          transactionId: transactionId || null,
+        },
+      });
 
-    if (invalidBillIds.length > 0) {
-      this.logger.warn(
-        `Skipping ${invalidBillIds.length} invalid bills: ${invalidBillIds.join(', ')}`,
-      );
-    }
-
-    // Prepare signatures array (indexed by approver position)
-    const signaturesHex: (string | null)[] = proposal.account.publicKeys.map(
-      (_, index) => {
-        const sig = proposal.signatures.find(
-          (s) => s.approverIndex === index,
-        );
-        return sig ? sig.signatureHex : null;
-      },
-    );
-
-    // Execute via Miden client
-    const result = await this.midenClient.executeTransaction(
-      proposal.accountId,
-      proposal.requestBytesHex,
-      proposal.summaryBytesHex,
-      signaturesHex,
-      proposal.account.publicKeys,
-    );
-
-    const now = new Date();
-
-    // Update proposal and bills based on result
-    if (result.success) {
-      await this.prisma.$transaction(async (tx) => {
-        // Update proposal status
-        await tx.multisigProposal.update({
-          where: { id: proposalId },
+      if (validBills.length > 0) {
+        await tx.bill.updateMany({
+          where: { id: { in: validBills.map((b) => b.id) } },
           data: {
-            status: 'EXECUTED',
-            transactionId: result.transactionId,
+            status: BillStatusEnum.PAID,
+            paidAt: now,
+            transactionHash: transactionId || null,
           },
         });
 
-        // Update valid bills to PAID
-        if (validBills.length > 0) {
-          await tx.bill.updateMany({
-            where: {
-              id: { in: validBills.map((b) => b.id) },
-            },
-            data: {
-              status: BillStatusEnum.PAID,
-              paidAt: now,
-              transactionHash: result.transactionId,
-            },
-          });
+        const invoiceIds = validBills
+          .map((b) => b.invoice?.id)
+          .filter((id): id is number => id !== undefined);
 
-          // Update corresponding invoices to PAID
-          const invoiceIds = validBills
-            .map((b) => b.invoice?.id)
-            .filter((id): id is number => id !== undefined);
-
-          if (invoiceIds.length > 0) {
-            await tx.invoice.updateMany({
-              where: { id: { in: invoiceIds } },
-              data: {
-                status: 'PAID',
-                paidAt: now,
-              },
-            });
-          }
-        }
-      });
-
-      this.logger.log(
-        `Proposal ${proposalId} executed successfully: ${result.transactionId}. ${validBills.length} bills paid.`,
-      );
-    } else {
-      await this.prisma.$transaction(async (tx) => {
-        // Update proposal status to FAILED
-        await tx.multisigProposal.update({
-          where: { id: proposalId },
-          data: { status: 'FAILED' },
-        });
-
-        // Update linked bills to FAILED (but keep them linked for audit trail)
-        if (proposal.bills.length > 0) {
-          await tx.bill.updateMany({
-            where: { multisigProposalId: proposalId },
-            data: { status: BillStatusEnum.FAILED },
+        if (invoiceIds.length > 0) {
+          await tx.invoice.updateMany({
+            where: { id: { in: invoiceIds } },
+            data: { status: 'PAID', paidAt: now },
           });
         }
-      });
+      }
+    });
 
-      this.logger.error(
-        `Proposal ${proposalId} execution failed: ${result.error}. ${proposal.bills.length} bills marked as FAILED.`,
-      );
-    }
+    this.logger.log(
+      `Proposal ${proposalId} marked as executed via PSM. ${validBills.length} bills paid.`,
+    );
 
-    return result;
+    return { success: true, transactionId };
   }
 
   /**
@@ -1281,7 +1175,9 @@ export class MultisigService {
     const approvers = (proposal.account?.teamMembers || []).map((am: any, idx: number) => {
       const tm = am.teamMember;
       const pubKey = tm?.user?.publicKey;
-      const sig = signatureByKey[normalize(pubKey)];
+      const commitment = tm?.user?.commitment;
+      // Match by raw publicKey OR by ECDSA commitment (PSM signs with commitment as approverPublicKey)
+      const sig = signatureByKey[normalize(pubKey)] || signatureByKey[normalize(commitment)];
       return {
         id: tm?.id,
         uuid: tm?.uuid,
@@ -1309,6 +1205,7 @@ export class MultisigService {
       accountId: proposal.accountId,
       description: proposal.description,
       proposalType: proposal.proposalType,
+      psmProposalId: proposal.psmProposalId || undefined,
       summaryCommitment: proposal.summaryCommitment,
       summaryBytesHex: proposal.summaryBytesHex,
       requestBytesHex: proposal.requestBytesHex,
@@ -1318,9 +1215,11 @@ export class MultisigService {
       rejectionCount: proposal.rejections?.length || 0,
       threshold,
       noteIds: proposal.noteIds || [],
+      tokens: proposal.tokens || [],
       recipientId: proposal.recipientId,
       faucetId: proposal.faucetId,
       amount: proposal.amount,
+      payments: (proposal.metadata as any)?.payments || undefined,
       signatures: proposal.signatures?.map((sig: any) => ({
         id: sig.id,
         uuid: sig.uuid,

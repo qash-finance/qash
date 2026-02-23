@@ -1,13 +1,13 @@
 "use client";
 
 import { useClient, useAccount, type Wallet } from "@getpara/react-sdk";
-import { createParaMidenClient } from "miden-para";
+import { createParaMidenClient } from "@miden-sdk/miden-para";
 import { useEffect, useRef, useState, useMemo } from "react";
 
 export function useMiden(nodeUrl?: string) {
   const para = useClient();
   const { isConnected, embedded } = useAccount();
-  const clientRef = useRef<import("@demox-labs/miden-sdk").WebClient | null>(null);
+  const clientRef = useRef<import("@miden-sdk/miden-sdk").WebClient | null>(null);
   const [accountId, setAccountId] = useState<string>("");
 
   // Filter for EVM-compatible wallets - memoize to prevent infinite loops
@@ -22,7 +22,7 @@ export function useMiden(nodeUrl?: string) {
     });
     async function setupClient() {
       if (isConnected && evmWallets && para) {
-        const { AccountType, AccountId, Address, NetworkId } = await import("@demox-labs/miden-sdk");
+        const { AccountType, AccountId, Address, NetworkId } = await import("@miden-sdk/miden-sdk");
 
         const { client: midenParaClient, accountId: aId } = await createParaMidenClient(
           para,
@@ -38,7 +38,7 @@ export function useMiden(nodeUrl?: string) {
         );
 
         clientRef.current = midenParaClient;
-        setAccountId(Address.fromAccountId(AccountId.fromHex(aId), "BasicWallet").toBech32(NetworkId.Testnet));
+        setAccountId(Address.fromAccountId(AccountId.fromHex(aId), "BasicWallet").toBech32(NetworkId.testnet()));
       }
     }
     setupClient();

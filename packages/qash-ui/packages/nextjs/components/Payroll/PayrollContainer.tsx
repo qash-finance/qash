@@ -12,9 +12,12 @@ import { useRouter } from "next/navigation";
 import { useModal } from "@/contexts/ModalManagerProvider";
 import { PageHeader } from "../Common/PageHeader";
 import { PrimaryButton } from "../Common/PrimaryButton";
+import { useAuth } from "@/services/auth/context";
 
 const PayrollContainer = () => {
   const router = useRouter();
+  const { user } = useAuth();
+  const isAdmin = user?.teamMembership?.role === "ADMIN" || user?.teamMembership?.role === "OWNER";
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [search, setSearch] = useState("");
@@ -59,17 +62,18 @@ const PayrollContainer = () => {
   };
 
   // Action renderer for payroll table
-  const payrollActionRenderer = (rowData: Record<string, any>, index: number) => (
-    <div className="flex items-center justify-center w-full" onClick={e => e.stopPropagation()}>
-      <img
-        src="/misc/three-dot-icon.svg"
-        alt="three dot icon"
-        className="w-6 h-6 cursor-pointer"
-        data-tooltip-id="payroll-action-tooltip"
-        data-tooltip-content={rowData.__id?.toString()}
-      />
-    </div>
-  );
+  const payrollActionRenderer = (rowData: Record<string, any>, index: number) =>
+    isAdmin ? (
+      <div className="flex items-center justify-center w-full" onClick={e => e.stopPropagation()}>
+        <img
+          src="/misc/three-dot-icon.svg"
+          alt="three dot icon"
+          className="w-6 h-6 cursor-pointer"
+          data-tooltip-id="payroll-action-tooltip"
+          data-tooltip-content={rowData.__id?.toString()}
+        />
+      </div>
+    ) : null;
 
   // Transform API data to table format
   const payrollData = (data?.payrolls || []).map(payroll => {

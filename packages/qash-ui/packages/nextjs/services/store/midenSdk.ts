@@ -54,7 +54,7 @@ export const createMidenSdkStore = () =>
         });
 
         try {
-          const { WebClient } = await import("@demox-labs/miden-sdk");
+          const { WebClient } = await import("@miden-sdk/miden-sdk");
           const client = await WebClient.createClient(NODE_ENDPOINT);
           console.log("Miden SDK client initialized:", client);
 

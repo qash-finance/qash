@@ -60,13 +60,14 @@ export class ParaAuthApi {
   async setParaJwtCookie(
     paraJwtToken: string,
     publicKey?: string,
+    commitment?: string,
   ): Promise<SetParaJwtCookieResponse> {
     const response = await fetch(`${this.backendUrl}/auth/set-cookie`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ token: paraJwtToken, publicKey }),
+      body: JSON.stringify({ token: paraJwtToken, publicKey, commitment }),
       credentials: "include", // Important for cookies
     });
 

@@ -2,6 +2,7 @@ import {
   IsNotEmpty,
   IsString,
   IsNumber,
+  IsOptional,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import type * as SharedTypesToken from '@qash/types/dto/token';
@@ -39,6 +40,15 @@ export class TokenDto implements SharedTypesToken.TokenDto {
   @IsString()
   @IsNotEmpty()
   name: string;
+
+  @ApiProperty({
+    description: 'The amount of the token in raw/wei format',
+    example: '1000000000000000000',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  amount?: string;
 }
 
 export class NetworkDto implements SharedTypesNetwork.NetworkDto {

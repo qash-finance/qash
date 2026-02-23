@@ -7,20 +7,21 @@ import { useGetMyCompany } from "@/services/api/company";
 import {
   useListAccountsByCompany,
   useListProposalsByCompany,
-  useSubmitSignature,
+  useSignProposal,
   useExecuteProposal,
   useCancelProposal,
   useGetConsumableNotes,
   useCreateConsumeProposal,
 } from "@/services/api/multisig";
-import { MultisigProposalStatusEnum } from "@qash/types/enums";
+import { MultisigProposalStatusEnum, TeamMemberRoleEnum } from "@qash/types/enums";
 import toast from "react-hot-toast";
 import { useModal } from "@/contexts/ModalManagerProvider";
-import { bytesToHex, fromHexSig, hexToBytes } from "@/utils";
-import { keccak_256 } from "@noble/hashes/sha3.js";
-import { useClient, useWallet } from "@getpara/react-sdk";
+import { useMidenProvider } from "@/contexts/MidenProvider";
+import { useParaSigner } from "@/hooks/web3/useParaSigner";
+import { getFaucetMetadata } from "@/services/utils/miden/faucet";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "../Common/PageHeader";
+import { useAuth } from "@/services/auth/context";
 
 // Previously a fixed enum - we now allow any multisig account id
 type SubTabType = "pending" | "history" | "receive";
@@ -39,10 +40,13 @@ export function TransactionsContainer() {
   const [actionType, setActionType] = useState<"sign" | "execute" | "cancel" | null>(null);
   const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
   const [isCreatingProposal, setIsCreatingProposal] = useState(false);
-  const { data: wallet } = useWallet();
-  const paraClient = useClient();
+  const { commitment: signerCommitment } = useParaSigner();
+  const { user } = useAuth();
+
+  const isViewer = user?.teamMembership?.role === TeamMemberRoleEnum.VIEWER;
 
   const { openModal, closeModal } = useModal();
+  const { client: midenClient } = useMidenProvider();
   const { data: myCompany } = useGetMyCompany();
   const { data: multisigAccounts = [], isLoading: accountsLoading } = useListAccountsByCompany(myCompany?.id, {
     enabled: !!myCompany?.id,
@@ -72,7 +76,7 @@ export function TransactionsContainer() {
     enabled: !!activeTab,
   });
 
-  const submitSignatureMutation = useSubmitSignature();
+  const signProposalMutation = useSignProposal();
   const executeProposalMutation = useExecuteProposal();
   const cancelProposalMutation = useCancelProposal();
   const createConsumeProposalMutation = useCreateConsumeProposal();
@@ -112,7 +116,7 @@ export function TransactionsContainer() {
       );
   }, [allProposals, activeTab]);
 
-  // Handle signing a proposal
+  // Handle signing a proposal via PSM MultisigClient
   const handleSign = async (proposalId: number) => {
     const proposal = allProposals.find(p => p.id === proposalId);
     if (!proposal) {
@@ -120,76 +124,20 @@ export function TransactionsContainer() {
       return;
     }
 
-    if (!wallet?.publicKey || !paraClient) {
-      throw new Error("Wallet not connected");
+    const account = multisigAccounts.find(a => a.accountId === proposal.accountId);
+    if (!account) {
+      toast.error("Multisig account not found");
+      return;
     }
 
     try {
       setActionLoadingId(proposal.uuid);
       setActionType("sign");
-
-      // Open signing modal - the actual signing will be done by Para wallet
       openModal("PROCESSING_TRANSACTION");
 
-      // The message to sign is the keccak256 hash of the transaction summary commitment
-      // This matches what miden-para does and what the Miden VM expects for ECDSA K256 Keccak verification
-      const summaryCommitment = proposal.summaryCommitment;
-      if (!summaryCommitment) {
-        throw new Error("Proposal missing summary commitment for signing");
-      }
-
-      // Remove 0x prefix if present, then convert to bytes and hash with keccak256
-      const commitmentHex = summaryCommitment.replace(/^0x/, "");
-      const commitmentBytes = hexToBytes(commitmentHex);
-      const hashedMessage = keccak_256(commitmentBytes);
-
-      // Convert keccak hash to base64 for Para SDK
-      const messageBase64 = btoa(String.fromCharCode(...hashedMessage));
-
-      // Sign with Para popup
-      const signResult = await paraClient.signMessage({
-        walletId: wallet.id,
-        messageBase64,
-      });
-
-      // Check if signing was successful
-      if (!("signature" in signResult) || !signResult.signature) {
-        throw new Error("Signing failed or was rejected");
-      }
-
-      // Convert Para hex signature to Miden serialized format
-      // This adds the ECDSA auth scheme byte prefix (1) and padding
-      const serializedSig = fromHexSig(signResult.signature as string);
-
-      // Convert to hex string for backend
-      const signatureHex = bytesToHex(serializedSig);
-
-      // Compute approver index by finding the user's public key in the account's publicKeys
-      const account = multisigAccounts.find(a => a.accountId === proposal.accountId);
-      if (!account) {
-        closeModal("PROCESSING_TRANSACTION");
-        toast.error("Multisig account not found");
-        return;
-      }
-
-      const normalizedUserKey = wallet.publicKey.toLowerCase().replace(/^0x/, "");
-      const approverIndex = account.publicKeys.findIndex(
-        pk => pk.toLowerCase().replace(/^0x/, "") === normalizedUserKey,
-      );
-
-      if (approverIndex === -1) {
-        closeModal("PROCESSING_TRANSACTION");
-        toast.error("Your public key is not an approver on this multisig account");
-        return;
-      }
-
-      await submitSignatureMutation.mutateAsync({
-        proposalId,
-        data: {
-          approverIndex,
-          approverPublicKey: wallet.publicKey,
-          signatureHex,
-        },
+      await signProposalMutation.mutateAsync({
+        proposal,
+        accountPublicKeys: account.publicKeys,
       });
 
       closeModal("PROCESSING_TRANSACTION");
@@ -205,16 +153,20 @@ export function TransactionsContainer() {
     }
   };
 
-  // Handle executing a proposal
+  // Handle executing a proposal via PSM
   const handleExecute = async (proposalId: number) => {
     const proposal = allProposals.find(p => p.id === proposalId);
+    if (!proposal) {
+      toast.error("Proposal not found");
+      return;
+    }
 
     try {
-      setActionLoadingId(proposal?.uuid || String(proposalId));
+      setActionLoadingId(proposal.uuid);
       setActionType("execute");
       openModal("PROCESSING_TRANSACTION");
 
-      await executeProposalMutation.mutateAsync({ proposalId });
+      await executeProposalMutation.mutateAsync({ proposalId, proposal });
 
       closeModal("PROCESSING_TRANSACTION");
       toast.success("Transaction executed successfully");
@@ -278,10 +230,48 @@ export function TransactionsContainer() {
       setIsCreatingProposal(true);
       openModal("PROCESSING_TRANSACTION");
 
+      // Build tokens array from selected notes' faucet IDs with amounts
+      const selectedNotes = consumableNotesData.notes.filter(n => selectedNoteIds.includes(n.note_id));
+      const faucetToAmount = new Map<string, string>();
+      selectedNotes.forEach(n => {
+        (n.assets || []).forEach((a: any) => {
+          if (a.faucet_id) {
+            const currentAmount = faucetToAmount.get(a.faucet_id) || "0";
+            const newAmount = (BigInt(currentAmount) + BigInt(a.amount || "0")).toString();
+            faucetToAmount.set(a.faucet_id, newAmount);
+          }
+        });
+      });
+
+      const faucetIds = Array.from(faucetToAmount.keys());
+      const tokenPromises = faucetIds.map(async faucetId => {
+        try {
+          const meta = await getFaucetMetadata(midenClient, faucetId);
+          return {
+            address: faucetId,
+            symbol: meta.symbol,
+            decimals: meta.decimals,
+            name: meta.symbol,
+            amount: faucetToAmount.get(faucetId) || "0",
+          };
+        } catch (err) {
+          // Fallback to minimal token dto
+          return {
+            address: faucetId,
+            symbol: faucetId,
+            decimals: 0,
+            name: faucetId,
+            amount: faucetToAmount.get(faucetId) || "0",
+          };
+        }
+      });
+      const tokens = await Promise.all(tokenPromises);
+
       await createConsumeProposalMutation.mutateAsync({
         accountId: activeTab,
         noteIds: selectedNoteIds,
         description: `Consume ${selectedNoteIds.length} note${selectedNoteIds.length !== 1 ? "s" : ""}`,
+        tokens,
       });
 
       closeModal("PROCESSING_TRANSACTION");
@@ -309,10 +299,44 @@ export function TransactionsContainer() {
       setIsCreatingProposal(true);
       openModal("PROCESSING_TRANSACTION");
 
+      // Build tokens array for this note with amounts
+      const note = consumableNotesData.notes.find(n => n.note_id === noteId);
+      const faucetToAmount = new Map<string, string>();
+      (note?.assets || []).forEach((a: any) => {
+        if (a.faucet_id) {
+          const currentAmount = faucetToAmount.get(a.faucet_id) || "0";
+          const newAmount = (BigInt(currentAmount) + BigInt(a.amount || "0")).toString();
+          faucetToAmount.set(a.faucet_id, newAmount);
+        }
+      });
+      const faucetIds = Array.from(faucetToAmount.keys());
+      const tokenPromises = faucetIds.map(async faucetId => {
+        try {
+          const meta = await getFaucetMetadata(midenClient, faucetId);
+          return {
+            address: faucetId,
+            symbol: meta.symbol,
+            decimals: meta.decimals,
+            name: meta.symbol,
+            amount: faucetToAmount.get(faucetId) || "0",
+          };
+        } catch (err) {
+          return {
+            address: faucetId,
+            symbol: faucetId,
+            decimals: 0,
+            name: faucetId,
+            amount: faucetToAmount.get(faucetId) || "0",
+          };
+        }
+      });
+      const tokens = await Promise.all(tokenPromises);
+
       await createConsumeProposalMutation.mutateAsync({
         accountId: activeTab,
         noteIds: [noteId],
         description: "Consume note",
+        tokens,
       });
 
       closeModal("PROCESSING_TRANSACTION");
@@ -367,6 +391,7 @@ export function TransactionsContainer() {
                       onClaimNote={handleClaimNote}
                       isLoading={isCreatingProposal}
                       isInProposal={isNoteInProposal}
+                      isViewer={isViewer}
                     />
                   );
                 })}
@@ -399,7 +424,8 @@ export function TransactionsContainer() {
                   isSignLoading={actionLoadingId === proposal.uuid && actionType === "sign"}
                   isExecuteLoading={actionLoadingId === proposal.uuid && actionType === "execute"}
                   isCancelLoading={actionLoadingId === proposal.uuid && actionType === "cancel"}
-                  userPublicKey={wallet?.publicKey}
+                  userPublicKey={signerCommitment ?? undefined}
+                  isViewer={isViewer}
                   onProposalClick={() => router.push(`/transactions/detail?proposalId=${proposal.id}`)}
                 />
               ))
@@ -432,7 +458,8 @@ export function TransactionsContainer() {
                   isSignLoading={actionLoadingId === proposal.uuid && actionType === "sign"}
                   isExecuteLoading={actionLoadingId === proposal.uuid && actionType === "execute"}
                   isCancelLoading={actionLoadingId === proposal.uuid && actionType === "cancel"}
-                  userPublicKey={wallet?.publicKey}
+                  userPublicKey={signerCommitment ?? undefined}
+                  isViewer={isViewer}
                   onProposalClick={() => router.push(`/transactions/detail?proposalId=${proposal.id}`)}
                 />
               ))

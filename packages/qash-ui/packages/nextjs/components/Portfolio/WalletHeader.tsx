@@ -1,16 +1,21 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import { formatNumberWithCommas } from "@/services/utils/formatNumber";
 import { useBalanceVisibility } from "@/contexts/BalanceVisibilityProvider";
-import { useMidenProvider } from "@/contexts/MidenProvider";
+import { useGetMyCompany } from "@/services/api/company";
+import { useListAccountsByCompany, useLocalAccountBalances } from "@/services/api/multisig";
 
 export function WalletHeader({ onClose, onChooseAccount }: { onClose: () => void; onChooseAccount: () => void }) {
   // **************** Custom Hooks *******************
   const { isBalanceVisible, toggleBalanceVisibility } = useBalanceVisibility();
-  // const blockNumber = 0;
-  // const transactions = useTransactionStore(state => state.transactions);
-  const { balances, balancesLoading, fetchBalances } = useMidenProvider();
+  const { data: myCompany } = useGetMyCompany();
+  const { data: multisigAccounts } = useListAccountsByCompany(myCompany?.id, { enabled: !!myCompany?.id });
+  const accountIds = useMemo(() => multisigAccounts?.map(a => a.accountId) || [], [multisigAccounts]);
+  const { data: localBalances, isLoading: balancesLoading } = useLocalAccountBalances(accountIds, {
+    enabled: accountIds.length > 0,
+  });
+  const totalUsd = localBalances?.totalBalance ?? 0;
   // const { moneyIn, moneyOut } = useMemo(() => {
   //   if (!blockNumber) {
   //     return { moneyIn: 0, moneyOut: 0 };
@@ -153,7 +158,7 @@ export function WalletHeader({ onClose, onChooseAccount }: { onClose: () => void
           <span className="text-4xl leading-9 text-text-secondary uppercase">$</span>
           {isBalanceVisible ? (
             <span className="text-4xl font-bold tracking-tighter leading-9 text-text-primary uppercase">
-              {formatNumberWithCommas(balances?.totalUsd || 0)}
+              {formatNumberWithCommas(totalUsd)}
             </span>
           ) : (
             <div className="flex gap-1 items-center">

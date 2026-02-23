@@ -27,7 +27,7 @@ import { PaymentLinkPreview } from "@/components/PaymentLink/PaymentLinkPreview"
 import { useMidenProvider } from "@/contexts/MidenProvider";
 import { useAuth } from "@/services/auth/context";
 import { useAccount as useParaAccount, useWallet } from "@getpara/react-sdk";
-import { useParaMiden } from "miden-para-react";
+import { useParaMiden } from "@miden-sdk/use-miden-para-react";
 
 const SubIcon = ({
   icon,
@@ -181,7 +181,7 @@ const PaymentLinkDetailPage = () => {
   }, [isConnected, isAuthenticated, authenticatingWithPara]);
 
   const handleSubmitPayment = async () => {
-    const midenSdk = await import("@demox-labs/miden-sdk");
+    const midenSdk = await import("@miden-sdk/miden-sdk");
     const {
       Note,
       WebClient,
@@ -250,7 +250,7 @@ const PaymentLinkDetailPage = () => {
       // Build transaction request with OutputNoteArray
       const outputNotesArray = new OutputNoteArray(p2idNotes);
       const transactionRequest = new TransactionRequestBuilder().withOwnOutputNotes(outputNotesArray).build();
-      const midenParaClient = midenClient as import("@demox-labs/miden-sdk").WebClient;
+      const midenParaClient = midenClient as import("@miden-sdk/miden-sdk").WebClient;
       const executedTx = await midenParaClient.executeTransaction(
         Address.fromBech32(walletAddress).accountId(),
         transactionRequest,
