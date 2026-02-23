@@ -11,7 +11,7 @@ import { useAuth } from "@/services/auth/context";
 import { useModal } from "@/contexts/ModalManagerProvider";
 import { ConfirmAndReviewInvoiceModalProps } from "@/types/modal";
 import { useModal as useParaModal, useWallet } from "@getpara/react-sdk";
-import { useParaMiden } from "miden-para-react";
+import { useParaMiden } from "@miden-sdk/use-miden-para-react";
 import { useAccount as useParaAccount } from "@getpara/react-sdk";
 import { SecondaryButton } from "../Common/SecondaryButton";
 import { useMidenProvider } from "@/contexts/MidenProvider";

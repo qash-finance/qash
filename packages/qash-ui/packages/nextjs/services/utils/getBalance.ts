@@ -9,8 +9,8 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: st
   ]);
 }
 
-export async function getBalance(client: import("@demox-labs/miden-sdk").WebClient, address: string) {
-  const { Address, BasicFungibleFaucetComponent, NetworkId } = await import("@demox-labs/miden-sdk");
+export async function getBalance(client: import("@miden-sdk/miden-sdk").WebClient, address: string) {
+  const { Address, BasicFungibleFaucetComponent, NetworkId } = await import("@miden-sdk/miden-sdk");
 
   // Add timeout to syncState to prevent hanging
   await withTimeout(client.syncState(), 30000, "Timeout: syncState took longer than 30 seconds");
@@ -26,7 +26,7 @@ export async function getBalance(client: import("@demox-labs/miden-sdk").WebClie
   // Use allSettled so one failure doesn't block others
   const assetsWithMetadata = await Promise.allSettled(
     assets.map(async asset => {
-      const faucetId = Address.fromAccountId(asset.faucetId()).toBech32(NetworkId.Testnet);
+      const faucetId = Address.fromAccountId(asset.faucetId()).toBech32(NetworkId.testnet());
 
       try {
         // Add timeout to prevent hanging (30 seconds per asset)

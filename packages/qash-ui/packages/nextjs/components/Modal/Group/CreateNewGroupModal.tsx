@@ -121,7 +121,7 @@ export function CreateNewGroupModal({ isOpen, onClose, zIndex }: ModalProp<Creat
 
   // Add manual address handler
   const handleAddManualAddress = async () => {
-    const { Address } = await import("@demox-labs/miden-sdk");
+    const { Address } = await import("@miden-sdk/miden-sdk");
 
     const manualAddress = (getValues("manualAddress") as string | undefined)?.trim() || "";
     if (!manualAddress) {

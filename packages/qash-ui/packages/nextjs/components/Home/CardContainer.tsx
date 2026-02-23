@@ -1,6 +1,6 @@
 "use client";
-import React, { useEffect, useState } from "react";
-import { useGetBatchAccountBalances, useListAccountsByCompany } from "@/services/api/multisig";
+import React, { useMemo } from "react";
+import { useMultisigAssets, useListAccountsByCompany } from "@/services/api/multisig";
 import { useGetMyCompany } from "@/services/api/company";
 import type { AccountBalanceStatDto } from "@qash/types/dto/multisig";
 
@@ -106,52 +106,22 @@ const UpcomingPayrollCard = ({ text, subtitle, icon }: { text: string; subtitle:
 export const CardContainer = () => {
   const { data: myCompany } = useGetMyCompany();
   const { data: multisigAccounts } = useListAccountsByCompany(myCompany?.id, { enabled: !!myCompany?.id });
-  const getBalances = useGetBatchAccountBalances();
-  const [treasuryStats, setTreasuryStats] = useState<AccountBalanceStatDto | undefined>();
 
-  useEffect(() => {
-    if (multisigAccounts && multisigAccounts.length !== 0) {
-      (async () => {
-        const { accounts } = await getBalances.mutateAsync({
-          accountIds: multisigAccounts.map(acc => acc.accountId),
-        });
+  const accountIds = multisigAccounts?.map(acc => acc.accountId);
+  const { data: assetsData } = useMultisigAssets(accountIds);
 
-        // Aggregate stats from all accounts
-        const aggregatedTokens = new Map<string, { symbol?: string; amount: number; amountUSD: number }>();
-        let totalUSD = 0;
-
-        for (const account of accounts) {
-          totalUSD += account.stats.totalUSD;
-          for (const token of account.stats.tokens) {
-            const key = token.faucetId;
-            if (aggregatedTokens.has(key)) {
-              const existing = aggregatedTokens.get(key)!;
-              existing.amount += token.amount;
-              existing.amountUSD += token.amountUSD;
-            } else {
-              aggregatedTokens.set(key, {
-                symbol: token.symbol,
-                amount: token.amount,
-                amountUSD: token.amountUSD,
-              });
-            }
-          }
-        }
-
-        const aggregatedStats: AccountBalanceStatDto = {
-          totalUSD,
-          tokens: Array.from(aggregatedTokens.entries()).map(([faucetId, data]) => ({
-            faucetId,
-            symbol: data.symbol,
-            amount: data.amount,
-            amountUSD: data.amountUSD,
-          })),
-        };
-
-        setTreasuryStats(aggregatedStats);
-      })();
-    }
-  }, [multisigAccounts]);
+  const treasuryStats: AccountBalanceStatDto | undefined = useMemo(() => {
+    if (!assetsData) return undefined;
+    return {
+      totalUSD: assetsData.totalUsd,
+      tokens: assetsData.balances.map(b => ({
+        faucetId: b.assetId,
+        symbol: b.symbol,
+        amount: parseFloat(b.balance) || 0,
+        amountUSD: parseFloat(b.balance) || 0,
+      })),
+    };
+  }, [assetsData]);
 
   return (
     <div className="w-full flex flex-row gap-2">

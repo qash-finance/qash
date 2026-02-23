@@ -13,11 +13,10 @@ import { ChooseAccountModalProps, InvoiceModalProps } from "@/types/modal";
 import { PrimaryButton } from "../Common/PrimaryButton";
 import toast from "react-hot-toast";
 import {
-  useCreateBatchSendProposal,
   useCreateProposalFromBills,
   useListAccountsByCompany,
 } from "@/services/api/multisig";
-import { CreateBatchSendProposalDto, BatchPaymentItem, CreateProposalFromBillsDto } from "@qash/types/dto/multisig";
+import { BatchPaymentItem } from "@qash/types/dto/multisig";
 import { useGetMyCompany } from "@/services/api/company";
 
 const InvoiceItem = ({
@@ -238,11 +237,19 @@ const BillReviewContainer = () => {
         };
       });
 
+      // Build per-invoice payments for PSM P2ID note construction
+      const payments: BatchPaymentItem[] = selectedInvoices.map(inv => ({
+        recipientId: inv.paymentWalletAddress,
+        faucetId: (inv.paymentToken as any)?.address,
+        amount: Math.floor(Number(inv.total) * Math.pow(10, (inv.paymentToken as any)?.decimals ?? 6)),
+      }));
+
       await createProposalMutation.mutateAsync({
         accountId,
         billUUIDs: selectedInvoices.map(inv => inv.bill.uuid),
         description: description,
         tokens,
+        payments,
       });
 
       closeModal("PROCESSING_TRANSACTION");

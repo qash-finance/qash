@@ -23,7 +23,7 @@ import { importAndGetAccount } from "@/services/utils/miden/account";
 import { TransactionOverviewModalProps } from "@/types/modal";
 import { confirmB2BInvoice, getB2BInvoiceByUUID, getB2BInvoiceByUUIDPublic } from "@/services/api/invoice";
 import { formatAddress } from "@/services/utils/miden/address";
-import { useParaMiden } from "miden-para-react";
+import { useParaMiden } from "@miden-sdk/use-miden-para-react";
 
 export interface InvoiceItem {
   description: string;
@@ -317,7 +317,7 @@ export const ClientInvoiceReviewContainer = () => {
     try {
       openModal("PROCESSING_TRANSACTION");
 
-      const midenSdk = await import("@demox-labs/miden-sdk");
+      const midenSdk = await import("@miden-sdk/miden-sdk");
       const {
         Note,
         WebClient,
@@ -362,7 +362,7 @@ export const ClientInvoiceReviewContainer = () => {
       const outputNotesArray = new OutputNoteArray(p2idNotes);
       const transactionRequest = new TransactionRequestBuilder().withOwnOutputNotes(outputNotesArray).build();
 
-      const midenParaClient = client as import("@demox-labs/miden-sdk").WebClient;
+      const midenParaClient = client as import("@miden-sdk/miden-sdk").WebClient;
       const executedTx = await midenParaClient.executeTransaction(
         Address.fromBech32(walletAddress).accountId(),
         transactionRequest,

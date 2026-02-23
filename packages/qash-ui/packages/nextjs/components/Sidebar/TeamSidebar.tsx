@@ -6,7 +6,7 @@ import { PrimaryButton } from "../Common/PrimaryButton";
 import { SecondaryButton } from "../Common/SecondaryButton";
 import { useGetTeamStats } from "@/services/api/team-member";
 import { useGetMyCompany } from "@/services/api/company";
-import { useGetAccountBalances, useListAccountsByCompany } from "@/services/api/multisig";
+import { useListAccountsByCompany } from "@/services/api/multisig";
 import MultisigAccountCard from "./MultisigAccountCard";
 import { useModal } from "@/contexts/ModalManagerProvider";
 import { useAuth } from "@/services/auth/context";

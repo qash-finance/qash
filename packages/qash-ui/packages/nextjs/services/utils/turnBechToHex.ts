@@ -2,7 +2,7 @@ let CustomAccountId: any = null;
 
 // Initialize AccountId on client side only
 if (typeof window !== "undefined") {
-  import("@demox-labs/miden-sdk").then(({ AccountId }) => {
+  import("@miden-sdk/miden-sdk").then(({ AccountId }) => {
     CustomAccountId = AccountId;
   });
 }

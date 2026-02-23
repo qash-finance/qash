@@ -6,6 +6,23 @@ import type * as SharedTypes from '@qash/types/dto/multisig';
 
 export class CreateMultisigAccountDto implements SharedTypes.CreateMultisigAccountDto {
   @ApiProperty({
+    description: 'Account ID created on-chain by the frontend (hex or bech32 format)',
+    example: '0x1234abcd...',
+  })
+  @IsString()
+  @IsNotEmpty()
+  accountId: string;
+
+  @ApiProperty({
+    description: 'Array of signer commitments / public keys used to create the multisig on-chain',
+    example: ['0xabc...', '0xdef...'],
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  publicKeys: string[];
+
+  @ApiProperty({
     description: 'Name of the multisig account',
     example: 'Company Treasury',
     maxLength: 255,
@@ -95,6 +112,38 @@ export class CreateConsumeProposalDto implements SharedTypes.CreateConsumePropos
   @ValidateNested({ each: true })
   @Type(() => TokenDto)
   tokens: TokenDto[];
+
+  @ApiProperty({
+    description: 'PSM proposal ID (from MultisigClient TransactionProposal.id)',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  psmProposalId?: string;
+
+  @ApiProperty({
+    description: 'PSM proposal commitment (hex). When provided, backend skips the Rust server.',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  summaryCommitment?: string;
+
+  @ApiProperty({
+    description: 'PSM txSummary (base64). Stored as summaryBytesHex.',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  summaryBytesHex?: string;
+
+  @ApiProperty({
+    description: 'Optional requestBytesHex for schema compatibility.',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  requestBytesHex?: string;
 }
 
 export class CreateSendProposalDto implements SharedTypes.CreateSendProposalDto {
@@ -143,71 +192,26 @@ export class CreateSendProposalDto implements SharedTypes.CreateSendProposalDto 
   @ValidateNested({ each: true })
   @Type(() => TokenDto)
   tokens: TokenDto[];
-}
 
-export class MintTokensDto implements SharedTypes.MintTokensDto {
-  @ApiProperty({
-    description: 'Faucet ID for the token source (bech32 format)',
-    example: 'mtst1faucet...',
-  })
+  @ApiProperty({ description: 'PSM proposal ID', required: false })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  faucetId: string;
+  psmProposalId?: string;
 
-  @ApiProperty({
-    description: 'Amount of tokens to mint',
-    example: 1000,
-  })
-  @IsInt()
-  @Min(1)
-  amount: number;
-}
+  @ApiProperty({ description: 'PSM proposal commitment (hex)', required: false })
+  @IsOptional()
+  @IsString()
+  summaryCommitment?: string;
 
-export class GetBatchAccountBalancesDto {
-  @ApiProperty({
-    description: 'Array of account IDs to get balances for (bech32 format)',
-    example: ['mtst1abc123...', 'mtst1def456...'],
-  })
-  @IsArray()
-  @ArrayMinSize(1)
-  @IsString({ each: true })
-  accountIds: string[];
-}
+  @ApiProperty({ description: 'PSM txSummary (base64)', required: false })
+  @IsOptional()
+  @IsString()
+  summaryBytesHex?: string;
 
-export class AccountBalanceDto {
-  @ApiProperty({
-    description: 'Faucet ID (bech32 format)',
-    example: 'mtst1faucet...',
-  })
-  faucetId: string;
-
-  @ApiProperty({
-    description: 'Amount of the asset',
-    example: 1000,
-  })
-  amount: number;
-}
-
-export class AccountBalancesInfoDto {
-  @ApiProperty({
-    description: 'Account ID (bech32 format)',
-    example: 'mtst1abc123...',
-  })
-  accountId: string;
-
-  @ApiProperty({
-    description: 'Array of assets in this account',
-    type: [AccountBalanceDto],
-  })
-  balances: AccountBalanceDto[];
-}
-
-export class GetBatchAccountBalancesResponseDto {
-  @ApiProperty({
-    description: 'Array of account balance information',
-    type: [AccountBalancesInfoDto],
-  })
-  accounts: AccountBalancesInfoDto[];
+  @ApiProperty({ description: 'PSM requestBytes (for schema compat)', required: false })
+  @IsOptional()
+  @IsString()
+  requestBytesHex?: string;
 }
 
 export class BatchPaymentItemDto {
@@ -275,6 +279,26 @@ export class CreateBatchSendProposalDto implements SharedTypes.CreateBatchSendPr
   @ValidateNested({ each: true })
   @Type(() => TokenDto)
   tokens: TokenDto[];
+
+  @ApiProperty({ description: 'PSM proposal ID', required: false })
+  @IsOptional()
+  @IsString()
+  psmProposalId?: string;
+
+  @ApiProperty({ description: 'PSM proposal commitment (hex)', required: false })
+  @IsOptional()
+  @IsString()
+  summaryCommitment?: string;
+
+  @ApiProperty({ description: 'PSM txSummary (base64)', required: false })
+  @IsOptional()
+  @IsString()
+  summaryBytesHex?: string;
+
+  @ApiProperty({ description: 'PSM requestBytes (for schema compat)', required: false })
+  @IsOptional()
+  @IsString()
+  requestBytesHex?: string;
 }
 
 export class SubmitSignatureDto implements SharedTypes.SubmitSignatureDto {
@@ -346,11 +370,12 @@ export class CreateProposalFromBillsDto implements SharedTypes.CreateProposalFro
       { recipientId: 'mtst1emp1...', faucetId: 'mtst1qash...', amount: 1000 },
       { recipientId: 'mtst1emp2...', faucetId: 'mtst1qash...', amount: 2000 },
     ],
+    required: false,
   })
+  @IsOptional()
   @IsArray()
-  @ArrayMinSize(1)
   @IsNotEmpty({ each: true })
-  payments: BatchPaymentItemDto[];
+  payments?: BatchPaymentItemDto[];
 
   @ApiProperty({
     description: 'Array of tokens involved in the proposal (full TokenDto expected)',
@@ -361,6 +386,26 @@ export class CreateProposalFromBillsDto implements SharedTypes.CreateProposalFro
   @ValidateNested({ each: true })
   @Type(() => TokenDto)
   tokens: TokenDto[];
+
+  @ApiProperty({ description: 'PSM proposal ID', required: false })
+  @IsOptional()
+  @IsString()
+  psmProposalId?: string;
+
+  @ApiProperty({ description: 'PSM proposal commitment (hex) — when provided, backend skips the Rust server', required: false })
+  @IsOptional()
+  @IsString()
+  summaryCommitment?: string;
+
+  @ApiProperty({ description: 'PSM txSummary (base64)', required: false })
+  @IsOptional()
+  @IsString()
+  summaryBytesHex?: string;
+
+  @ApiProperty({ description: 'PSM requestBytes (for schema compat)', required: false })
+  @IsOptional()
+  @IsString()
+  requestBytesHex?: string;
 }
 
 export class MultisigAccountResponseDto implements SharedTypes.MultisigAccountResponseDto {
@@ -421,6 +466,9 @@ export class MultisigProposalResponseDto implements SharedTypes.MultisigProposal
   @ApiProperty({ enum: ['CONSUME', 'SEND'] })
   proposalType: string;
 
+  @ApiProperty({ required: false })
+  psmProposalId?: string;
+
   @ApiProperty()
   summaryCommitment: string;
 
@@ -462,6 +510,10 @@ export class MultisigProposalResponseDto implements SharedTypes.MultisigProposal
 
   @ApiProperty({ required: false })
   amount?: string;
+
+  @ApiProperty({ type: [BatchPaymentItemDto], required: false })
+  @IsOptional()
+  payments?: BatchPaymentItemDto[];
 
   @ApiProperty({ type: [Object], required: false })
   signatures?: Array<{

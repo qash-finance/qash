@@ -2,7 +2,7 @@
 import { NODE_ENDPOINT } from "../constant";
 
 export async function deployAccount(isPublic: boolean) {
-  const { AccountStorageMode, WebClient } = await import("@demox-labs/miden-sdk");
+  const { AccountStorageMode, WebClient } = await import("@miden-sdk/miden-sdk");
 
   const client = await WebClient.createClient(NODE_ENDPOINT);
   const account = await client.newWallet(
@@ -17,7 +17,7 @@ export async function getAccountById(accountId: string) {
   if (typeof window === "undefined") throw new Error("getAccountById can only be used in the browser");
 
   try {
-    const { AccountId, WebClient } = await import("@demox-labs/miden-sdk");
+    const { AccountId, WebClient } = await import("@miden-sdk/miden-sdk");
 
     const client = await WebClient.createClient(NODE_ENDPOINT);
 
@@ -41,19 +41,29 @@ export async function getAccountById(accountId: string) {
 }
 
 export const importAndGetAccount = async (
-  client: import("@demox-labs/miden-sdk").WebClient,
+  client: import("@miden-sdk/miden-sdk").WebClient,
   account: string,
 ): Promise<any> => {
   const importPromise = (async () => {
-    const { Address } = await import("@demox-labs/miden-sdk");
-    const accountId = Address.fromBech32(account);
+    const { AccountId, Address } = await import("@miden-sdk/miden-sdk");
 
-    let accountContract = await client.getAccount(accountId.accountId());
+    // Resolve AccountId from hex or bech32 format
+    let accountId;
+    if (account.startsWith("0x") || account.startsWith("0X")) {
+      accountId = AccountId.fromHex(account);
+    } else if (/^[0-9a-fA-F]+$/.test(account)) {
+      accountId = AccountId.fromHex(`0x${account}`);
+    } else {
+      // bech32 format (e.g. mtst1..._...) — Address.fromBech32 handles full address with routing info
+      accountId = Address.fromBech32(account).accountId();
+    }
+
+    let accountContract = await client.getAccount(accountId);
 
     if (!accountContract) {
       try {
-        await client.importAccountById(accountId.accountId());
-        accountContract = await client.getAccount(accountId.accountId());
+        await client.importAccountById(accountId);
+        accountContract = await client.getAccount(accountId);
         if (!accountContract) {
           throw new Error(`Account not found after import: ${accountId}`);
         }
@@ -68,7 +78,7 @@ export const importAndGetAccount = async (
 };
 
 export const getAccounts = async () => {
-  const { WebClient, AccountInterface, NetworkId } = await import("@demox-labs/miden-sdk");
+  const { WebClient, AccountInterface, NetworkId } = await import("@miden-sdk/miden-sdk");
 
   const client = await WebClient.createClient(NODE_ENDPOINT);
 
@@ -89,12 +99,12 @@ export const getAccounts = async () => {
     }),
   );
 
-  return accountsWeOwn.map(account => account.id().toBech32(NetworkId.Testnet, AccountInterface.BasicWallet));
+  return accountsWeOwn.map(account => account.id().toBech32(NetworkId.testnet(), AccountInterface.BasicWallet));
 };
 
 export const exportAccounts = async () => {
   try {
-    const { WebClient } = await import("@demox-labs/miden-sdk");
+    const { WebClient } = await import("@miden-sdk/miden-sdk");
 
     const client = await WebClient.createClient(NODE_ENDPOINT);
 
@@ -107,7 +117,7 @@ export const exportAccounts = async () => {
 };
 
 export const importAccount = async (store: string) => {
-  const { WebClient } = await import("@demox-labs/miden-sdk");
+  const { WebClient } = await import("@miden-sdk/miden-sdk");
 
   const client = await WebClient.createClient(NODE_ENDPOINT);
   await client.forceImportStore(store);

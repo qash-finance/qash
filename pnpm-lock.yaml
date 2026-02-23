@@ -305,9 +305,6 @@ importers:
       '@cosmjs/cosmwasm-stargate':
         specifier: ^0.37.0
         version: 0.37.1(bufferutil@4.1.0)(utf-8-validate@5.0.10)
-      '@demox-labs/miden-sdk':
-        specifier: 0.12.5
-        version: 0.12.5(tslib@2.8.1)(typescript@5.9.3)
       '@dnd-kit/core':
         specifier: ^6.3.1
         version: 6.3.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -320,6 +317,21 @@ importers:
       '@getpara/react-sdk':
         specifier: ^2.0.0-alpha.73
         version: 2.4.0(emglw3qj5brrfxfluymy5h4tv4)
+      '@miden-sdk/miden-para':
+        specifier: ^0.13.0
+        version: 0.13.1(@getpara/web-sdk@2.4.0)(@miden-sdk/miden-sdk@0.13.1(tslib@2.8.1)(typescript@5.9.3))
+      '@miden-sdk/miden-sdk':
+        specifier: ^0.13.0
+        version: 0.13.1(tslib@2.8.1)(typescript@5.9.3)
+      '@miden-sdk/use-miden-para-react':
+        specifier: ^0.13.0
+        version: 0.13.1(@getpara/react-sdk-lite@2.4.0(@emotion/is-prop-valid@1.4.0)(@tanstack/react-query@5.90.16(react@19.2.3))(@types/react@19.2.8)(immer@10.2.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(@getpara/web-sdk@2.4.0)(@miden-sdk/miden-para@0.13.1(@getpara/web-sdk@2.4.0)(@miden-sdk/miden-sdk@0.13.1(tslib@2.8.1)(typescript@5.9.3)))(@miden-sdk/miden-sdk@0.13.1(tslib@2.8.1)(typescript@5.9.3))(@miden-sdk/react@0.13.2(@miden-sdk/miden-sdk@0.13.1(tslib@2.8.1)(typescript@5.9.3))(@types/react@19.2.8)(immer@10.2.0)(react@19.2.3)(use-sync-external-store@1.4.0(react@19.2.3)))(@tanstack/react-query@5.90.16(react@19.2.3))(react@19.2.3)
+      '@openzeppelin/miden-multisig-client':
+        specifier: ^0.13.0
+        version: 0.13.0(tslib@2.8.1)(typescript@5.9.3)
+      '@openzeppelin/psm-client':
+        specifier: ^0.13.0
+        version: 0.13.0
       '@qash/types':
         specifier: workspace:*
         version: link:../../../types
@@ -350,12 +362,6 @@ importers:
       lodash:
         specifier: ^4.17.21
         version: 4.17.21
-      miden-para:
-        specifier: ^0.10.9
-        version: 0.10.9(@demox-labs/miden-sdk@0.12.5(tslib@2.8.1)(typescript@5.9.3))(@getpara/web-sdk@2.4.0)
-      miden-para-react:
-        specifier: ^0.10.9
-        version: 0.10.9(@demox-labs/miden-sdk@0.12.5(tslib@2.8.1)(typescript@5.9.3))(@getpara/react-sdk@2.4.0(emglw3qj5brrfxfluymy5h4tv4))(miden-para@0.10.9(@demox-labs/miden-sdk@0.12.5(tslib@2.8.1)(typescript@5.9.3))(@getpara/web-sdk@2.4.0))(react@19.2.3)
       next:
         specifier: 15.3.6
         version: 15.3.6(@babel/core@7.28.6)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -1761,9 +1767,6 @@ packages:
   '@date-fns/tz@1.4.1':
     resolution: {integrity: sha512-P5LUNhtbj6YfI3iJjw5EL9eUAG6OitD0W3fWQcpQjDRc/QIsL0tRNuO1PcDvPccWL1fSTXXdE1ds+l95DV/OFA==}
 
-  '@demox-labs/miden-sdk@0.12.5':
-    resolution: {integrity: sha512-Oq+MKObtOEY3aro+q1coVSc2RKrIycWbz9hBvnxqIlUkHzn6iL8X4+TG8t14co03cyuVt1dz1F13w0ScQSBMuA==}
-
   '@discoveryjs/json-ext@0.5.7':
     resolution: {integrity: sha512-dBVuXR082gk3jsFp7Rd/JI4kytwGHecnCoTtXFb7DB6CNHp4rg5k1bhg0nWdLGLnOV71lmDzGQaLMy8iPLY0pw==}
     engines: {node: '>=10.0.0'}
@@ -2913,6 +2916,33 @@ packages:
   '@microsoft/tsdoc@0.16.0':
     resolution: {integrity: sha512-xgAyonlVVS+q7Vc7qLW0UrJU7rSFcETRWsqdXZtjzRU8dF+6CkozTK4V4y1LwOX7j8r/vHphjDeMeGI4tNGeGA==}
 
+  '@miden-sdk/miden-para@0.13.1':
+    resolution: {integrity: sha512-rvFKIy/tmbd5+8KfiZLXBxcF7/P4SPA3rgQYTqVwyeDbkJG3+mysaTfXNNABdc9v03wsCnYkaTa0lE718GOcRA==}
+    peerDependencies:
+      '@getpara/web-sdk': 2.0.0-alpha.73
+      '@miden-sdk/miden-sdk': ^0.13.0
+
+  '@miden-sdk/miden-sdk@0.13.1':
+    resolution: {integrity: sha512-GmlBBh3UhPQ6cNnU9l+CN6XrmlrRW6u2IDK5nZYhLc8wnbUgETj2UVbbWGKD51L5R4VXJeYk1fk4UMqTlpvf4w==}
+
+  '@miden-sdk/react@0.13.2':
+    resolution: {integrity: sha512-78i3/5YUUwitqvJA02HVXZ61RXEOyaiRsm1agVUtOblOmazuIgMEW4P3gdlX9YUiGr06l9O+Rw1ol5FZCOJTXQ==}
+    peerDependencies:
+      '@miden-sdk/miden-sdk': ^0.13.0
+      react: '>=18.0.0'
+
+  '@miden-sdk/use-miden-para-react@0.13.1':
+    resolution: {integrity: sha512-b/sbG8CXOwedYFUCL/zr2fSugzEdt9mTYSl/2Cf+EUAOwp2JMxDLV5BfdZU9/soV7BIyBdaYXOlNkr+/fxshcw==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      '@getpara/react-sdk-lite': ^2.2.0
+      '@getpara/web-sdk': 2.0.0-alpha.73
+      '@miden-sdk/miden-para': ^0.13.0
+      '@miden-sdk/miden-sdk': ^0.13.0
+      '@miden-sdk/react': ^0.13.1
+      '@tanstack/react-query': ^5.0.0
+      react: ^18.0.0 || ^19.0.0
+
   '@moonpay/moonpay-react@1.10.6':
     resolution: {integrity: sha512-o+fa3FDKITbOTlkKToT49865ZGKkoGT1/eI0XJnYh9KSNMz3oo2PuwDKJHqLLZ5qE642ZAebksWdEElRySD43Q==}
     peerDependencies:
@@ -3314,6 +3344,14 @@ packages:
 
   '@one-ini/wasm@0.1.1':
     resolution: {integrity: sha512-XuySG1E38YScSJoMlqovLru4KTUNSjgVTIjyh7qMX6aNN5HY5Ct5LhRJdxO79JtTzKfzV/bnWpz+zquYrISsvw==}
+
+  '@openzeppelin/miden-multisig-client@0.13.0':
+    resolution: {integrity: sha512-b0wxXCM6iSWlKLKb0QzG15z4+UeqKGv4920Gvk6jn1ofeth1uy8Q8pTdDICe/L1UvwUsgqLhicEADUKkB+KOiw==}
+    engines: {node: '>=18'}
+
+  '@openzeppelin/psm-client@0.13.0':
+    resolution: {integrity: sha512-pf/b5CpWfVDbYBSXCDxyuRgbgrKNCB8Y/Bw9U2vW3DteUmfGdsCeCX+PprwVbTvNo1thfja1NzbEfkAvO9XLIw==}
+    engines: {node: '>=18'}
 
   '@otplib/core@12.0.1':
     resolution: {integrity: sha512-4sGntwbA/AC+SbPhbsziRiD+jNDdIzsZ3JUyfZwjtKyc/wufl1pnSIaG4Uqx8ymPagujub0o92kgBnB89cuAMA==}
@@ -8170,6 +8208,7 @@ packages:
   glob@11.1.0:
     resolution: {integrity: sha512-vuNwKSaKiqm7g0THUBu2x7ckSs3XJLXE+2ssL7/MfTGPLLcrJQ/4Uq1CjPTtO5cCIiRxqvN6Twy1qOwhL0Xjcw==}
     engines: {node: 20 || >=22}
+    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
     hasBin: true
 
   glob@13.0.0:
@@ -9859,21 +9898,6 @@ packages:
   micromatch@4.0.8:
     resolution: {integrity: sha512-PXwfBhYu0hBCPw8Dn0E+WDYb7af3dSLVWKi3HGv84IdF4TyFoC0ysxFd0Goxw7nSv4T/PzEJQxsYsEiFCKo2BA==}
     engines: {node: '>=8.6'}
-
-  miden-para-react@0.10.9:
-    resolution: {integrity: sha512-UbOyelTHGJ2PHIMLiLYHmJrbm5qMN36FHX/I+v+loYfxdDxppOz+LIh7QTj9rEqhLQ9Y0kts74v3JGzP4t7gBg==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      '@demox-labs/miden-sdk': ^0.12.5
-      '@getpara/react-sdk': ^2.0.0-alpha.73
-      miden-para: ^0.10.9
-      react: ^18.0.0 || ^19.0.0
-
-  miden-para@0.10.9:
-    resolution: {integrity: sha512-QcbMOYa9dIgEhO2JAmG8PjjN0Nb28rwaArrb6oVTySSohl8bK0HnF12/ANNXxWf/93aq5hdciJwMtP0Oe28P9g==}
-    peerDependencies:
-      '@demox-labs/miden-sdk': ^0.12.5
-      '@getpara/web-sdk': 2.0.0-alpha.73
 
   mime-db@1.33.0:
     resolution: {integrity: sha512-BHJ/EKruNIqJf/QahvxwQZXKygOQ256myeN/Ew+THcAa5q+PjyTTMMeNQC4DZw5AwfvelsUrA6B67NKMqXDbzQ==}
@@ -16119,16 +16143,6 @@ snapshots:
 
   '@date-fns/tz@1.4.1': {}
 
-  '@demox-labs/miden-sdk@0.12.5(tslib@2.8.1)(typescript@5.9.3)':
-    dependencies:
-      '@rollup/plugin-typescript': 12.3.0(tslib@2.8.1)(typescript@5.9.3)
-      dexie: 4.2.1
-      glob: 11.1.0
-    transitivePeerDependencies:
-      - rollup
-      - tslib
-      - typescript
-
   '@discoveryjs/json-ext@0.5.7': {}
 
   '@dnd-kit/accessibility@3.1.1(react@19.2.3)':
@@ -18306,6 +18320,42 @@ snapshots:
 
   '@microsoft/tsdoc@0.16.0': {}
 
+  '@miden-sdk/miden-para@0.13.1(@getpara/web-sdk@2.4.0)(@miden-sdk/miden-sdk@0.13.1(tslib@2.8.1)(typescript@5.9.3))':
+    dependencies:
+      '@getpara/web-sdk': 2.4.0
+      '@miden-sdk/miden-sdk': 0.13.1(tslib@2.8.1)(typescript@5.9.3)
+      '@noble/hashes': 2.0.1
+
+  '@miden-sdk/miden-sdk@0.13.1(tslib@2.8.1)(typescript@5.9.3)':
+    dependencies:
+      '@rollup/plugin-typescript': 12.3.0(tslib@2.8.1)(typescript@5.9.3)
+      dexie: 4.2.1
+      glob: 11.1.0
+    transitivePeerDependencies:
+      - rollup
+      - tslib
+      - typescript
+
+  '@miden-sdk/react@0.13.2(@miden-sdk/miden-sdk@0.13.1(tslib@2.8.1)(typescript@5.9.3))(@types/react@19.2.8)(immer@10.2.0)(react@19.2.3)(use-sync-external-store@1.4.0(react@19.2.3))':
+    dependencies:
+      '@miden-sdk/miden-sdk': 0.13.1(tslib@2.8.1)(typescript@5.9.3)
+      react: 19.2.3
+      zustand: 5.0.10(@types/react@19.2.8)(immer@10.2.0)(react@19.2.3)(use-sync-external-store@1.4.0(react@19.2.3))
+    transitivePeerDependencies:
+      - '@types/react'
+      - immer
+      - use-sync-external-store
+
+  '@miden-sdk/use-miden-para-react@0.13.1(@getpara/react-sdk-lite@2.4.0(@emotion/is-prop-valid@1.4.0)(@tanstack/react-query@5.90.16(react@19.2.3))(@types/react@19.2.8)(immer@10.2.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(@getpara/web-sdk@2.4.0)(@miden-sdk/miden-para@0.13.1(@getpara/web-sdk@2.4.0)(@miden-sdk/miden-sdk@0.13.1(tslib@2.8.1)(typescript@5.9.3)))(@miden-sdk/miden-sdk@0.13.1(tslib@2.8.1)(typescript@5.9.3))(@miden-sdk/react@0.13.2(@miden-sdk/miden-sdk@0.13.1(tslib@2.8.1)(typescript@5.9.3))(@types/react@19.2.8)(immer@10.2.0)(react@19.2.3)(use-sync-external-store@1.4.0(react@19.2.3)))(@tanstack/react-query@5.90.16(react@19.2.3))(react@19.2.3)':
+    dependencies:
+      '@getpara/react-sdk-lite': 2.4.0(@emotion/is-prop-valid@1.4.0)(@tanstack/react-query@5.90.16(react@19.2.3))(@types/react@19.2.8)(immer@10.2.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      '@getpara/web-sdk': 2.4.0
+      '@miden-sdk/miden-para': 0.13.1(@getpara/web-sdk@2.4.0)(@miden-sdk/miden-sdk@0.13.1(tslib@2.8.1)(typescript@5.9.3))
+      '@miden-sdk/miden-sdk': 0.13.1(tslib@2.8.1)(typescript@5.9.3)
+      '@miden-sdk/react': 0.13.2(@miden-sdk/miden-sdk@0.13.1(tslib@2.8.1)(typescript@5.9.3))(@types/react@19.2.8)(immer@10.2.0)(react@19.2.3)(use-sync-external-store@1.4.0(react@19.2.3))
+      '@tanstack/react-query': 5.90.16(react@19.2.3)
+      react: 19.2.3
+
   '@moonpay/moonpay-react@1.10.6(react@19.2.3)':
     dependencies:
       react: 19.2.3
@@ -18678,6 +18728,18 @@ snapshots:
 
   '@one-ini/wasm@0.1.1':
     optional: true
+
+  '@openzeppelin/miden-multisig-client@0.13.0(tslib@2.8.1)(typescript@5.9.3)':
+    dependencies:
+      '@miden-sdk/miden-sdk': 0.13.1(tslib@2.8.1)(typescript@5.9.3)
+      '@noble/hashes': 2.0.1
+      '@openzeppelin/psm-client': 0.13.0
+    transitivePeerDependencies:
+      - rollup
+      - tslib
+      - typescript
+
+  '@openzeppelin/psm-client@0.13.0': {}
 
   '@otplib/core@12.0.1': {}
 
@@ -28883,19 +28945,6 @@ snapshots:
     dependencies:
       braces: 3.0.3
       picomatch: 2.3.1
-
-  miden-para-react@0.10.9(@demox-labs/miden-sdk@0.12.5(tslib@2.8.1)(typescript@5.9.3))(@getpara/react-sdk@2.4.0(emglw3qj5brrfxfluymy5h4tv4))(miden-para@0.10.9(@demox-labs/miden-sdk@0.12.5(tslib@2.8.1)(typescript@5.9.3))(@getpara/web-sdk@2.4.0))(react@19.2.3):
-    dependencies:
-      '@demox-labs/miden-sdk': 0.12.5(tslib@2.8.1)(typescript@5.9.3)
-      '@getpara/react-sdk': 2.4.0(emglw3qj5brrfxfluymy5h4tv4)
-      miden-para: 0.10.9(@demox-labs/miden-sdk@0.12.5(tslib@2.8.1)(typescript@5.9.3))(@getpara/web-sdk@2.4.0)
-      react: 19.2.3
-
-  miden-para@0.10.9(@demox-labs/miden-sdk@0.12.5(tslib@2.8.1)(typescript@5.9.3))(@getpara/web-sdk@2.4.0):
-    dependencies:
-      '@demox-labs/miden-sdk': 0.12.5(tslib@2.8.1)(typescript@5.9.3)
-      '@getpara/web-sdk': 2.4.0
-      '@noble/hashes': 2.0.1
 
   mime-db@1.33.0: {}
 

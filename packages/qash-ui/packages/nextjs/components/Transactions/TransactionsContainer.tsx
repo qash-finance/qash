@@ -7,7 +7,7 @@ import { useGetMyCompany } from "@/services/api/company";
 import {
   useListAccountsByCompany,
   useListProposalsByCompany,
-  useSubmitSignature,
+  useSignProposal,
   useExecuteProposal,
   useCancelProposal,
   useGetConsumableNotes,
@@ -16,10 +16,8 @@ import {
 import { MultisigProposalStatusEnum, TeamMemberRoleEnum } from "@qash/types/enums";
 import toast from "react-hot-toast";
 import { useModal } from "@/contexts/ModalManagerProvider";
-import { bytesToHex, fromHexSig, hexToBytes } from "@/utils";
-import { keccak_256 } from "@noble/hashes/sha3.js";
-import { useClient, useWallet } from "@getpara/react-sdk";
 import { useMidenProvider } from "@/contexts/MidenProvider";
+import { useParaSigner } from "@/hooks/web3/useParaSigner";
 import { getFaucetMetadata } from "@/services/utils/miden/faucet";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "../Common/PageHeader";
@@ -42,8 +40,7 @@ export function TransactionsContainer() {
   const [actionType, setActionType] = useState<"sign" | "execute" | "cancel" | null>(null);
   const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
   const [isCreatingProposal, setIsCreatingProposal] = useState(false);
-  const { data: wallet } = useWallet();
-  const paraClient = useClient();
+  const { commitment: signerCommitment } = useParaSigner();
   const { user } = useAuth();
 
   const isViewer = user?.teamMembership?.role === TeamMemberRoleEnum.VIEWER;
@@ -79,7 +76,7 @@ export function TransactionsContainer() {
     enabled: !!activeTab,
   });
 
-  const submitSignatureMutation = useSubmitSignature();
+  const signProposalMutation = useSignProposal();
   const executeProposalMutation = useExecuteProposal();
   const cancelProposalMutation = useCancelProposal();
   const createConsumeProposalMutation = useCreateConsumeProposal();
@@ -119,7 +116,7 @@ export function TransactionsContainer() {
       );
   }, [allProposals, activeTab]);
 
-  // Handle signing a proposal
+  // Handle signing a proposal via PSM MultisigClient
   const handleSign = async (proposalId: number) => {
     const proposal = allProposals.find(p => p.id === proposalId);
     if (!proposal) {
@@ -127,76 +124,20 @@ export function TransactionsContainer() {
       return;
     }
 
-    if (!wallet?.publicKey || !paraClient) {
-      throw new Error("Wallet not connected");
+    const account = multisigAccounts.find(a => a.accountId === proposal.accountId);
+    if (!account) {
+      toast.error("Multisig account not found");
+      return;
     }
 
     try {
       setActionLoadingId(proposal.uuid);
       setActionType("sign");
-
-      // Open signing modal - the actual signing will be done by Para wallet
       openModal("PROCESSING_TRANSACTION");
 
-      // The message to sign is the keccak256 hash of the transaction summary commitment
-      // This matches what miden-para does and what the Miden VM expects for ECDSA K256 Keccak verification
-      const summaryCommitment = proposal.summaryCommitment;
-      if (!summaryCommitment) {
-        throw new Error("Proposal missing summary commitment for signing");
-      }
-
-      // Remove 0x prefix if present, then convert to bytes and hash with keccak256
-      const commitmentHex = summaryCommitment.replace(/^0x/, "");
-      const commitmentBytes = hexToBytes(commitmentHex);
-      const hashedMessage = keccak_256(commitmentBytes);
-
-      // Convert keccak hash to base64 for Para SDK
-      const messageBase64 = btoa(String.fromCharCode(...hashedMessage));
-
-      // Sign with Para popup
-      const signResult = await paraClient.signMessage({
-        walletId: wallet.id,
-        messageBase64,
-      });
-
-      // Check if signing was successful
-      if (!("signature" in signResult) || !signResult.signature) {
-        throw new Error("Signing failed or was rejected");
-      }
-
-      // Convert Para hex signature to Miden serialized format
-      // This adds the ECDSA auth scheme byte prefix (1) and padding
-      const serializedSig = fromHexSig(signResult.signature as string);
-
-      // Convert to hex string for backend
-      const signatureHex = bytesToHex(serializedSig);
-
-      // Compute approver index by finding the user's public key in the account's publicKeys
-      const account = multisigAccounts.find(a => a.accountId === proposal.accountId);
-      if (!account) {
-        closeModal("PROCESSING_TRANSACTION");
-        toast.error("Multisig account not found");
-        return;
-      }
-
-      const normalizedUserKey = wallet.publicKey.toLowerCase().replace(/^0x/, "");
-      const approverIndex = account.publicKeys.findIndex(
-        pk => pk.toLowerCase().replace(/^0x/, "") === normalizedUserKey,
-      );
-
-      if (approverIndex === -1) {
-        closeModal("PROCESSING_TRANSACTION");
-        toast.error("Your public key is not an approver on this multisig account");
-        return;
-      }
-
-      await submitSignatureMutation.mutateAsync({
-        proposalId,
-        data: {
-          approverIndex,
-          approverPublicKey: wallet.publicKey,
-          signatureHex,
-        },
+      await signProposalMutation.mutateAsync({
+        proposal,
+        accountPublicKeys: account.publicKeys,
       });
 
       closeModal("PROCESSING_TRANSACTION");
@@ -212,16 +153,20 @@ export function TransactionsContainer() {
     }
   };
 
-  // Handle executing a proposal
+  // Handle executing a proposal via PSM
   const handleExecute = async (proposalId: number) => {
     const proposal = allProposals.find(p => p.id === proposalId);
+    if (!proposal) {
+      toast.error("Proposal not found");
+      return;
+    }
 
     try {
-      setActionLoadingId(proposal?.uuid || String(proposalId));
+      setActionLoadingId(proposal.uuid);
       setActionType("execute");
       openModal("PROCESSING_TRANSACTION");
 
-      await executeProposalMutation.mutateAsync({ proposalId });
+      await executeProposalMutation.mutateAsync({ proposalId, proposal });
 
       closeModal("PROCESSING_TRANSACTION");
       toast.success("Transaction executed successfully");
@@ -479,7 +424,7 @@ export function TransactionsContainer() {
                   isSignLoading={actionLoadingId === proposal.uuid && actionType === "sign"}
                   isExecuteLoading={actionLoadingId === proposal.uuid && actionType === "execute"}
                   isCancelLoading={actionLoadingId === proposal.uuid && actionType === "cancel"}
-                  userPublicKey={wallet?.publicKey}
+                  userPublicKey={signerCommitment ?? undefined}
                   isViewer={isViewer}
                   onProposalClick={() => router.push(`/transactions/detail?proposalId=${proposal.id}`)}
                 />
@@ -513,7 +458,7 @@ export function TransactionsContainer() {
                   isSignLoading={actionLoadingId === proposal.uuid && actionType === "sign"}
                   isExecuteLoading={actionLoadingId === proposal.uuid && actionType === "execute"}
                   isCancelLoading={actionLoadingId === proposal.uuid && actionType === "cancel"}
-                  userPublicKey={wallet?.publicKey}
+                  userPublicKey={signerCommitment ?? undefined}
                   isViewer={isViewer}
                   onProposalClick={() => router.push(`/transactions/detail?proposalId=${proposal.id}`)}
                 />

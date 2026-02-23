@@ -200,6 +200,8 @@ export class TeamMemberRepository extends BaseRepository<
             select: {
               id: true,
               email: true,
+              publicKey: true,
+              commitment: true,
             },
           },
         },

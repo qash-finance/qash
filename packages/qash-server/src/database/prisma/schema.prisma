@@ -18,7 +18,8 @@ model User {
   role      UserRoleEnum @default(USER)
   isActive  Boolean      @default(true) @map("is_active")
   lastLogin DateTime?    @map("last_login") @db.Timestamp(6)
-  publicKey String?      @map("public_key") @db.Text
+  publicKey  String?      @map("public_key") @db.Text
+  commitment String?      @map("commitment") @db.Text
 
   teamMembership TeamMember? // 1:1 relationship, each user is a company team member
   invitedMembers TeamMember[] @relation("TeamMemberInviter")
@@ -807,6 +808,9 @@ model MultisigProposal {
 
   // Tokens associated with this proposal (array of TokenDto JSON objects)
   tokens Json @db.Json
+
+  // PSM proposal identifier (from MultisigClient)
+  psmProposalId String? @map("psm_proposal_id") @db.VarChar(255)
 
   // Transaction data from Miden (hex-encoded)
   summaryCommitment String @map("summary_commitment") @db.VarChar(255)

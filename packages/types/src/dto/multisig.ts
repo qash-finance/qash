@@ -10,6 +10,8 @@ import { TokenDto } from './token.js';
 
 // Request DTOs
 export interface CreateMultisigAccountDto {
+  accountId: string;
+  publicKeys: string[];
   name: string;
   description?: string;
   logo?: string;
@@ -23,6 +25,14 @@ export interface CreateConsumeProposalDto {
   description: string;
   noteIds: string[];
   tokens: TokenDto[];
+  /** PSM proposal ID (from MultisigClient TransactionProposal.id) */
+  psmProposalId?: string;
+  /** PSM proposal commitment (hex) — when provided, backend skips the Rust server */
+  summaryCommitment?: string;
+  /** PSM txSummary (base64) — stored as summaryBytesHex */
+  summaryBytesHex?: string;
+  /** PSM-created proposal has no separate requestBytes; stored for schema compat */
+  requestBytesHex?: string;
 }
 
 export interface CreateSendProposalDto {
@@ -32,6 +42,14 @@ export interface CreateSendProposalDto {
   faucetId: string;
   amount: number;
   tokens: TokenDto[];
+  /** PSM proposal ID (from MultisigClient TransactionProposal.id) */
+  psmProposalId?: string;
+  /** PSM proposal commitment (hex) */
+  summaryCommitment?: string;
+  /** PSM txSummary (base64) — stored as summaryBytesHex */
+  summaryBytesHex?: string;
+  /** PSM requestBytes (for schema compat) */
+  requestBytesHex?: string;
 }
 
 export interface MintTokensDto {
@@ -81,6 +99,14 @@ export interface CreateBatchSendProposalDto {
   description: string;
   payments: BatchPaymentItem[];
   tokens: TokenDto[];
+  /** PSM proposal ID (from MultisigClient TransactionProposal.id) */
+  psmProposalId?: string;
+  /** PSM proposal commitment (hex) */
+  summaryCommitment?: string;
+  /** PSM txSummary (base64) — stored as summaryBytesHex */
+  summaryBytesHex?: string;
+  /** PSM requestBytes (for schema compat) */
+  requestBytesHex?: string;
 }
 
 export interface CreateProposalFromBillsDto {
@@ -88,6 +114,15 @@ export interface CreateProposalFromBillsDto {
   billUUIDs: string[];
   description: string;
   tokens: TokenDto[];
+  payments?: BatchPaymentItem[];
+  /** PSM proposal ID (from MultisigClient TransactionProposal.id) */
+  psmProposalId?: string;
+  /** PSM proposal commitment (hex) — when provided, backend skips the Rust server */
+  summaryCommitment?: string;
+  /** PSM txSummary (base64) — stored as summaryBytesHex */
+  summaryBytesHex?: string;
+  /** PSM-created proposal has no separate requestBytes; stored for schema compat */
+  requestBytesHex?: string;
 }
 
 export interface SubmitSignatureDto {
@@ -150,6 +185,7 @@ export interface MultisigProposalResponseDto {
   accountId: string;
   description: string;
   proposalType: MultisigProposalTypeEnum | string;
+  psmProposalId?: string;
   summaryCommitment: string;
   summaryBytesHex: string;
   requestBytesHex: string;

@@ -10,7 +10,7 @@ import { useAuth } from "@/services/auth/context";
 import toast from "react-hot-toast";
 import { User } from "@/types/user";
 import { useModal as useParaModal, useWallet } from "@getpara/react-sdk";
-import { useParaMiden } from "miden-para-react";
+import { useParaMiden } from "@miden-sdk/use-miden-para-react";
 import { useAccount as useParaAccount } from "@getpara/react-sdk";
 import { PrimaryButton } from "../Common/PrimaryButton";
 
@@ -54,16 +54,39 @@ export default function LoginContainer() {
 
       console.log("Para JWT issued:", { keyId: jwtResult.keyId });
 
-      // Extract wallet public key
-      const publicKey = wallet?.publicKey;
+      // Extract wallet public key from JWT payload (same source as useParaSigner)
+      // This ensures the commitment stored in DB matches what ParaSigner will derive
+      // when authenticating to PSM — prevents 401 mismatch for cosigners.
+      const jwtPayload = JSON.parse(window.atob(jwtResult.token.split(".")[1]));
+      const connectedWallets = jwtPayload.data?.connectedWallets || [];
+      const evmWallet = connectedWallets.find((w: any) => w.type === "EVM");
+      const publicKey = evmWallet?.publicKey || wallet?.publicKey;
 
       if (!publicKey) {
-        console.error("Wallet public key is missing");
+        console.error("Wallet public key is missing from both JWT and wallet state");
         return;
       }
 
-      // Send JWT and publicKey to backend
-      const userData = await loginWithPara(jwtResult.token, publicKey);
+      console.log("[Login] Public key source:", {
+        fromJwt: !!evmWallet?.publicKey,
+        fromWallet: !!wallet?.publicKey,
+        match: evmWallet?.publicKey === wallet?.publicKey,
+        publicKey: publicKey.slice(0, 40) + "...",
+      });
+
+      // Derive ECDSA commitment from wallet public key for multisig support
+      let commitment: string | undefined;
+      try {
+        const { tryComputeEcdsaCommitmentHex, EcdsaFormat } = await import("@openzeppelin/miden-multisig-client");
+        const compressedPk = EcdsaFormat.compressPublicKey(publicKey);
+        commitment = tryComputeEcdsaCommitmentHex(compressedPk) ?? undefined;
+        console.log("[Login] Derived commitment:", commitment);
+      } catch (err) {
+        console.warn("Failed to derive ECDSA commitment:", err);
+      }
+
+      // Send JWT, publicKey and commitment to backend
+      const userData = await loginWithPara(jwtResult.token, publicKey, commitment);
 
       toast.success("Successfully authenticated");
 

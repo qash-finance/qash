@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import Image from "next/image";
-import { useListAccountsByCompany } from "@/services/api/multisig";
+import { useListAccountsByCompany, useLocalAccountBalances } from "@/services/api/multisig";
 import { useGetMyCompany } from "@/services/api/company";
 
 // Account data type
@@ -36,23 +36,30 @@ const Accounts: React.FC<AccountsProps> = ({ accounts, onAccountSelect }) => {
   // Fetch accounts from API
   const { data: apiAccounts = [], isLoading } = useListAccountsByCompany(company?.id, { enabled: !!company?.id });
 
+  // Fetch local balances for multisig accounts
+  const accountIds = useMemo(() => apiAccounts.map(a => a.accountId), [apiAccounts]);
+  const { data: localBalances } = useLocalAccountBalances(accountIds, { enabled: accountIds.length > 0 });
+
   // Avatar colors for visual variety
   const avatarColors = ["#068DFF", "#3FDEC9", "#8C71F6", "#FF6B6B", "#FFA500"];
 
   // Transform API accounts to component format
   const transformedAccounts: Account[] = useMemo(() => {
-    return apiAccounts.map((apiAccount, index) => ({
-      id: apiAccount.accountId,
-      name: apiAccount.accountId.substring(0, 12) + "...",
-      label: apiAccount.name,
-      balance: "$ 0.00", // TODO: Fetch balance from API
-      avatar: {
-        backgroundColor: avatarColors[index % avatarColors.length],
-        icon: profileIcon,
-      },
-      isSelected: index === 0,
-    }));
-  }, [apiAccounts]);
+    return apiAccounts.map((apiAccount, index) => {
+      const accountBalance = localBalances?.accounts.find(a => a.accountId === apiAccount.accountId)?.balance ?? 0;
+      return {
+        id: apiAccount.accountId,
+        name: apiAccount.accountId.substring(0, 12) + "...",
+        label: apiAccount.name,
+        balance: `$ ${accountBalance.toFixed(2)}`,
+        avatar: {
+          backgroundColor: avatarColors[index % avatarColors.length],
+          icon: profileIcon,
+        },
+        isSelected: index === 0,
+      };
+    });
+  }, [apiAccounts, localBalances]);
 
   const displayAccounts = accounts || transformedAccounts;
 

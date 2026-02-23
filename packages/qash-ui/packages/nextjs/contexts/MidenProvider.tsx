@@ -4,9 +4,9 @@ import React, { createContext, useContext, ReactNode, useState, useEffect, useCa
 import { useAccount, useLogout, useModal, useWallet, Wallet } from "@getpara/react-sdk";
 import { useMiden } from "@/hooks/web3/useMiden";
 import { getBalance } from "@/services/utils/getBalance";
+import { NODE_ENDPOINT } from "@/services/utils/constant";
 import { UseMutateAsyncFunction } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import FullScreenLoading from "@/components/Loading/FullScreenLoading";
 
 interface BalanceData {
   balances: Array<{
@@ -48,20 +48,32 @@ export function MidenProvider({ children }: { children: ReactNode }) {
   const { data: wallet } = useWallet();
   const { openModal } = useModal();
   const { logoutAsync } = useLogout();
-  const { client, accountId: address } = useMiden("https://rpc.testnet.miden.io");
+  const { client, accountId: address } = useMiden(NODE_ENDPOINT);
 
   const isConsumingRef = useRef(false);
+  const isFetchingRef = useRef(false);
 
   const [balances, setBalances] = useState<BalanceData | null>(null);
   const [balancesLoading, setBalancesLoading] = useState<boolean>(false);
 
-  const fetchBalances = useCallback(async () => {
-    if (!address || !client) return;
+  // Use a stable reference for fetchBalances to avoid infinite re-render loops.
+  // The actual implementation reads address/client from refs so the callback
+  // identity never changes, preventing useEffect dependency churn.
+  const addressRef = useRef(address);
+  const clientRef = useRef(client);
+  addressRef.current = address;
+  clientRef.current = client;
 
+  const fetchBalances = useCallback(async () => {
+    const addr = addressRef.current;
+    const cl = clientRef.current;
+    if (!addr || !cl || isFetchingRef.current) return;
+
+    isFetchingRef.current = true;
     try {
       setBalancesLoading(true);
-      console.log("Fetching balances for address:", address);
-      const fetchedBalances = await getBalance(client, address);
+      console.log("Fetching balances for address:", addr);
+      const fetchedBalances = await getBalance(cl, addr);
       console.log("Fetched balances", fetchedBalances);
 
       // Normalize the balances (fetchedBalances is already resolved)
@@ -93,8 +105,9 @@ export function MidenProvider({ children }: { children: ReactNode }) {
       });
     } finally {
       setBalancesLoading(false);
+      isFetchingRef.current = false;
     }
-  }, [address, client]);
+  }, []);
 
   // Fetch balances when address, client, or connection status changes
   useEffect(() => {
@@ -117,7 +130,7 @@ export function MidenProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const { Address } = await import("@demox-labs/miden-sdk");
+      const { Address } = await import("@miden-sdk/miden-sdk");
       const to = await client.getAccount(Address.fromBech32(address).accountId());
 
       if (!to) {
@@ -167,7 +180,7 @@ export function MidenProvider({ children }: { children: ReactNode }) {
     fetchBalances,
   };
 
-  return <MidenContext.Provider value={value}>{isLoading ? <FullScreenLoading /> : children}</MidenContext.Provider>;
+  return <MidenContext.Provider value={value}>{children}</MidenContext.Provider>;
 }
 
 // Custom hook to use the context

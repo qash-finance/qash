@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Sector } from "recharts";
 import { PieSectorDataItem } from "recharts/types/polar/Pie";
-import { useGetBatchAccountBalances, useListAccountsByCompany, useGetMultisigAccount } from "@/services/api/multisig";
+import { useListAccountsByCompany, useLocalAccountBalances } from "@/services/api/multisig";
 import { useGetMyCompany } from "@/services/api/company";
 import Link from "next/link";
 
@@ -33,50 +33,31 @@ const TransactionHistory = () => {
   // Fetch company and accounts
   const { data: myCompany } = useGetMyCompany();
   const { data: multisigAccounts } = useListAccountsByCompany(myCompany?.id, { enabled: !!myCompany?.id });
-  const getBalances = useGetBatchAccountBalances();
-
-  // State for account data with balances and names
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  const accountIds = useMemo(() => multisigAccounts?.map(a => a.accountId) || [], [multisigAccounts]);
+  const { data: localBalances } = useLocalAccountBalances(accountIds, { enabled: accountIds.length > 0 });
 
   // Colors for pie chart
   const chartColors = ["#6366f1", "#3b82f6", "#60a5fa", "#93c5fd", "#a78bfa", "#c084fc"];
 
-  // Fetch balances and enrich account data
-  useEffect(() => {
-    if (multisigAccounts && multisigAccounts.length !== 0) {
-      (async () => {
-        try {
-          // Get batch balances
-          const { accounts: accountsWithBalances } = await getBalances.mutateAsync({
-            accountIds: multisigAccounts.map(acc => acc.accountId),
-          });
+  // Derive accounts from local balances
+  const accounts: Account[] = useMemo(() => {
+    if (!multisigAccounts || !localBalances) return [];
 
-          // Calculate total USD for percentage calculation
-          const totalUSD = accountsWithBalances.reduce((sum, acc) => sum + acc.stats.totalUSD, 0);
+    const totalBalance = localBalances.totalBalance;
 
-          // Create enriched accounts with names from multisigAccounts and balances
-          const enrichedAccounts: Account[] = accountsWithBalances.map((acc, index) => {
-            const percentage = totalUSD > 0 ? (acc.stats.totalUSD / totalUSD) * 100 : 0;
+    return localBalances.accounts.map((acc, index) => {
+      const matchingAccount = multisigAccounts.find(msa => msa.accountId === acc.accountId);
+      const percentage = totalBalance > 0 ? (acc.balance / totalBalance) * 100 : 0;
 
-            // Find matching account from multisigAccounts to get its name
-            const matchingAccount = multisigAccounts.find(msa => msa.accountId === acc.accountId);
-
-            return {
-              id: acc.accountId,
-              name: matchingAccount?.name || matchingAccount?.accountId.slice(0, 12) + "...",
-              percentage: Math.round(percentage),
-              balance: `$${acc.stats.totalUSD.toFixed(2)}`,
-              color: chartColors[index % chartColors.length],
-            };
-          });
-
-          setAccounts(enrichedAccounts);
-        } catch (error) {
-          console.error("Failed to fetch account balances:", error);
-        }
-      })();
-    }
-  }, [multisigAccounts]);
+      return {
+        id: acc.accountId,
+        name: matchingAccount?.name || acc.accountId.slice(0, 12) + "...",
+        percentage: Math.round(percentage),
+        balance: `$${acc.balance.toFixed(2)}`,
+        color: chartColors[index % chartColors.length],
+      };
+    });
+  }, [multisigAccounts, localBalances]);
 
   // Sample transaction data
   const transactions: Transaction[] = [

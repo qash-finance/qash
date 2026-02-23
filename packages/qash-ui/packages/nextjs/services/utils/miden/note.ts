@@ -9,7 +9,7 @@ import { WrappedNoteType } from "@/types/note";
 
 export async function getConsumableNotes(accountId: string) {
   try {
-    const { WebClient, Address } = await import("@demox-labs/miden-sdk");
+    const { WebClient, Address } = await import("@miden-sdk/miden-sdk");
 
     const client = await WebClient.createClient(NODE_ENDPOINT);
 
@@ -32,7 +32,7 @@ export async function createP2IDNote(
   noteType: WrappedNoteType,
 ) {
   const { FungibleAsset, OutputNote, Note, NoteAssets, Word, Felt, AccountId, NoteType, Address } = await import(
-    "@demox-labs/miden-sdk"
+    "@miden-sdk/miden-sdk"
   );
 
   return OutputNote.full(
@@ -55,7 +55,7 @@ export async function createP2IDENote(
   recallHeight: number,
 ): Promise<[any, string[], number]> {
   try {
-    const { OutputNote, WebClient } = await import("@demox-labs/miden-sdk");
+    const { OutputNote, WebClient } = await import("@miden-sdk/miden-sdk");
 
     const client = await WebClient.createClient(NODE_ENDPOINT);
     const serialNumbers = await randomSerialNumbers();
@@ -94,7 +94,7 @@ export async function consumeAllUnauthenticatedNotes(
 ) {
   try {
     const { WebClient, Address, Felt, NoteAndArgs, Note, TransactionRequestBuilder, NoteAndArgsArray } = await import(
-      "@demox-labs/miden-sdk"
+      "@miden-sdk/miden-sdk"
     );
 
     const client = await WebClient.createClient(NODE_ENDPOINT);
@@ -149,7 +149,7 @@ export async function consumeAllUnauthenticatedNotes(
 export async function consumeUnauthenticatedNote(account: string, partialNote: PartialConsumableNote) {
   try {
     const { WebClient, AccountId, Felt, TransactionRequestBuilder, NoteAndArgsArray, NoteAndArgs, Address } =
-      await import("@demox-labs/miden-sdk");
+      await import("@miden-sdk/miden-sdk");
 
     const client = await WebClient.createClient(NODE_ENDPOINT);
 
@@ -191,7 +191,7 @@ export async function consumeUnauthenticatedGiftNote(
 ) {
   try {
     const { WebClient, Address, TransactionRequestBuilder, NoteAndArgsArray, NoteAndArgs, Word, Felt } = await import(
-      "@demox-labs/miden-sdk"
+      "@miden-sdk/miden-sdk"
     );
 
     const client = await WebClient.createClient(NODE_ENDPOINT);
@@ -219,7 +219,7 @@ export async function consumeUnauthenticatedGiftNotes(
 ) {
   try {
     const { WebClient, Address, TransactionRequestBuilder, NoteAndArgsArray, NoteAndArgs, Word, Felt } = await import(
-      "@demox-labs/miden-sdk"
+      "@miden-sdk/miden-sdk"
     );
 
     const client = await WebClient.createClient(NODE_ENDPOINT);
@@ -250,7 +250,7 @@ export async function consumeUnauthenticatedGiftNotes(
 
 export async function consumeNoteByID(account: string, noteId: string) {
   try {
-    const { WebClient, Address } = await import("@demox-labs/miden-sdk");
+    const { WebClient, Address } = await import("@miden-sdk/miden-sdk");
 
     const client = await WebClient.createClient(NODE_ENDPOINT);
     const consumeTxRequest = client.newConsumeTransactionRequest([noteId]);
@@ -266,7 +266,7 @@ export async function consumeNoteByID(account: string, noteId: string) {
 
 export async function consumeNoteByIDs(account: string, noteIds: string[]) {
   try {
-    const { WebClient, Address } = await import("@demox-labs/miden-sdk");
+    const { WebClient, Address } = await import("@miden-sdk/miden-sdk");
 
     const client = await WebClient.createClient(NODE_ENDPOINT);
     const consumeTxRequest = client.newConsumeTransactionRequest(noteIds);
@@ -303,9 +303,9 @@ export async function createGiftNote(
     Word,
     Note,
     FungibleAsset,
-  } = await import("@demox-labs/miden-sdk");
+  } = await import("@miden-sdk/miden-sdk");
 
-  const { ScriptBuilder } = (await import("@demox-labs/miden-sdk")) as any;
+  const { ScriptBuilder } = (await import("@miden-sdk/miden-sdk")) as any;
 
   const giftNote = GIFT_NOTE_SCRIPT;
 
@@ -384,7 +384,7 @@ export async function createSchedulePaymentNote(
   timelockHeight: number,
 ) {
   try {
-    const { OutputNote } = await import("@demox-labs/miden-sdk");
+    const { OutputNote } = await import("@miden-sdk/miden-sdk");
 
     const serialNumbers = await randomSerialNumbers();
     const serialNumbersCopy = serialNumbers.map(felt => felt.toString());
@@ -454,7 +454,7 @@ export async function createBatchSchedulePaymentNote(
 // **************** HELPER METHODS ********************
 
 async function randomSerialNumbers(): Promise<any[]> {
-  const { Felt } = await import("@demox-labs/miden-sdk");
+  const { Felt } = await import("@miden-sdk/miden-sdk");
 
   const randomBytes = new Uint32Array(4);
   crypto.getRandomValues(randomBytes);
@@ -527,7 +527,7 @@ export async function customCreateP2IDENote(
     FungibleAsset,
     Note,
     Address,
-  } = await import("@demox-labs/miden-sdk");
+  } = await import("@miden-sdk/miden-sdk");
 
   const senderId = Address.fromBech32(sender).accountId();
   const receiverId = Address.fromBech32(receiver).accountId();

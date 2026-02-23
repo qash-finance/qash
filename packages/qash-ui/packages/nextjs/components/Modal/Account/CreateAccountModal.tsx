@@ -12,9 +12,12 @@ import { useGetMyCompany } from "@/services/api/company";
 import { useGetCompanyTeamMembers } from "@/services/api/team-member";
 import { useAuth } from "@/services/auth/context";
 import { useUploadMultisigLogo } from "@/services/api/upload";
+import { usePSMProvider } from "@/contexts/PSMProvider";
+import { useParaMiden } from "@miden-sdk/use-miden-para-react";
+import { useWallet } from "@getpara/react-sdk";
 import { TeamMemberRoleEnum } from "@qash/types/enums";
-import { MIDEN_EXPLORER_URL } from "@/services/utils/constant";
 import toast from "react-hot-toast";
+import { NODE_ENDPOINT } from "@/services/utils/constant";
 
 interface MemberItem {
   id: string;
@@ -22,6 +25,7 @@ interface MemberItem {
   email: string;
   role: TeamMemberRoleEnum;
   publicKey: string;
+  commitment?: string;
   companyRole?: string;
   profilePicture?: string;
 }
@@ -110,6 +114,9 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
   const { data: teamMembersData } = useGetCompanyTeamMembers(company?.id);
   const { user } = useAuth();
   const createAccountMutation = useCreateMultisigAccount();
+  const { multisigClient, psmCommitment, psmPublicKey, psmStatus } = usePSMProvider();
+  const { para } = useParaMiden(NODE_ENDPOINT);
+  const { data: wallet } = useWallet();
 
   const [isSuccess, setIsSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState<"detail" | "member" | "review">("detail");
@@ -137,6 +144,7 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
             role: currentUserMember.role,
             companyRole: currentUserMember.position,
             publicKey: currentUserMember.user!.publicKey,
+            commitment: currentUserMember.user?.commitment,
             profilePicture: currentUserMember.profilePicture || undefined,
           },
         ]);
@@ -236,12 +244,87 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
       return;
     }
 
+    if (!multisigClient || psmStatus !== "connected") {
+      toast.error("PSM not connected. Please wait and try again.");
+      return;
+    }
+
+    if (!para) {
+      toast.error("Para wallet not connected. Please reconnect.");
+      return;
+    }
+
     try {
       setIsLoading(true);
-      // Extract member IDs as public keys (server will map these to actual public keys)
-      const teamMemberIds = selectedMembers.map(member => member.id.toString());
 
+      // 1. Get current user's commitment and public key
+      const currentUser = selectedMembers.find(m => m.email === user?.email);
+      const currentUserCommitment = currentUser?.commitment;
+      const currentUserPublicKey = currentUser?.publicKey || wallet?.publicKey;
+
+      if (!currentUserCommitment) {
+        throw new Error("Your wallet commitment is not available. Please log out and log in again.");
+      }
+      if (!currentUserPublicKey) {
+        throw new Error("Your wallet public key is not available. Please reconnect.");
+      }
+
+      // 2. Collect other members' commitments
+      const otherMembers = selectedMembers.filter(m => m.email !== user?.email);
+      const otherCommitments: string[] = [];
+      for (const m of otherMembers) {
+        if (!m.commitment) {
+          throw new Error(`Missing commitment for team member "${m.name}". They need to log in first.`);
+        }
+        otherCommitments.push(m.commitment);
+      }
+
+      // 3. Import ParaSigner from OZ SDK (MultisigClient already initialized via PSMProvider)
+      const { ParaSigner } = await import("@openzeppelin/miden-multisig-client");
+
+      // 4. Get wallet ID for ParaSigner
+      const walletId = wallet?.id;
+      if (!walletId) {
+        throw new Error("Para wallet ID not available. Please reconnect.");
+      }
+
+      // 5. Create ParaSigner
+      const signer = new ParaSigner(para, walletId, currentUserCommitment, currentUserPublicKey);
+
+      // 6. Build signer commitments (current user first, then others)
+      const allCommitments = [currentUserCommitment, ...otherCommitments];
+
+      // 7. Create multisig account on-chain
+      const config = {
+        threshold: thresholdValue,
+        signerCommitments: allCommitments,
+        psmCommitment,
+        psmPublicKey,
+        psmEnabled: true,
+        storageMode: "private" as const,
+        signatureScheme: "ecdsa" as const,
+      };
+
+      console.log("Creating multisig account on-chain:", {
+        threshold: thresholdValue,
+        signerCount: allCommitments.length,
+      });
+
+      const ms = await multisigClient.create(config, signer);
+
+      // 8. Register on PSM
+      console.log("Registering multisig on PSM...");
+      await ms.registerOnPsm();
+
+      // 9. Extract accountId from the created multisig
+      const accountId = ms.accountId;
+      console.log("Multisig account created:", accountId);
+
+      // 10. Send accountId + publicKeys to backend for storage
+      const teamMemberIds = selectedMembers.map(member => member.id.toString());
       const response = await createAccountMutation.mutateAsync({
+        accountId,
+        publicKeys: allCommitments,
         name: accountName,
         description: accountDescription,
         teamMemberIds,
@@ -252,8 +335,10 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
 
       setCreatedAccountId(response.accountId);
       setIsSuccess(true);
+      toast.success("Multisig account created successfully!");
     } catch (error) {
       console.error("Failed to create multisig account:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to create multisig account");
     } finally {
       setIsLoading(false);
     }

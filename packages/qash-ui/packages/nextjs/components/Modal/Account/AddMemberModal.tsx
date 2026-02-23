@@ -20,6 +20,8 @@ interface MemberData {
   role: TeamMemberRoleEnum;
   companyRole?: string;
   profilePicture?: string;
+  publicKey?: string;
+  commitment?: string;
   status: TeamMemberStatusEnum;
   isSelected?: boolean;
 }
@@ -123,6 +125,8 @@ export function AddMemberModal({
             name: `${tm.firstName} ${tm.lastName}`,
             email: tm.user!.email,
             profilePicture: tm.profilePicture || undefined,
+            publicKey: tm.user?.publicKey,
+            commitment: tm.user?.commitment,
             role: tm.role,
             companyRole: tm.position,
             status: tm.status,

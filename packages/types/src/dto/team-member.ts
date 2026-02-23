@@ -77,6 +77,7 @@ export interface TeamMemberResponseDto {
     id: number;
     email: string;
     publicKey: string;
+    commitment?: string;
     avatar?: string;
     [key: string]: any;
   };

@@ -21,7 +21,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  transpilePackages: ["@getpara/web-sdk", "@getpara/react-sdk", "miden-para", "miden-para-react"],
+  transpilePackages: ["@getpara/web-sdk", "@getpara/react-sdk", "@miden-sdk/miden-para", "@miden-sdk/use-miden-para-react", "@openzeppelin/miden-multisig-client", "@openzeppelin/psm-client"],
   // async headers() {
   //   return [
   //     {

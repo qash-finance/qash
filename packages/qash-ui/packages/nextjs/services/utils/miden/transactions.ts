@@ -2,8 +2,8 @@ import { NODE_ENDPOINT } from "../constant";
 
 export async function submitTransactionWithOwnOutputNotes(sender: string, notes: any[]): Promise<string> {
   try {
-    const { WebClient, Address, OutputNotesArray, TransactionRequestBuilder } = await import("@demox-labs/miden-sdk");
-    const { OutputNoteArray } = (await import("@demox-labs/miden-sdk")) as any;
+    const { WebClient, Address, OutputNotesArray, TransactionRequestBuilder } = await import("@miden-sdk/miden-sdk");
+    const { OutputNoteArray } = (await import("@miden-sdk/miden-sdk")) as any;
     const client = await WebClient.createClient(NODE_ENDPOINT);
 
     const senderId = Address.fromBech32(sender);
@@ -24,7 +24,7 @@ export async function submitTransactionWithOwnOutputNotes(sender: string, notes:
 }
 
 export async function submitTransactionWithOwnInputNotes(notes: any[], sender: string): Promise<string> {
-  const { WebClient, Address, NoteAndArgsArray, TransactionRequestBuilder } = await import("@demox-labs/miden-sdk");
+  const { WebClient, Address, NoteAndArgsArray, TransactionRequestBuilder } = await import("@miden-sdk/miden-sdk");
 
   const client = await WebClient.createClient(NODE_ENDPOINT);
   const senderId = Address.fromBech32(sender);

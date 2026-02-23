@@ -4,7 +4,7 @@ import {
   useGetProposal,
   useListProposalsByCompany,
   useCancelProposal,
-  useSubmitSignature,
+  useSignProposal,
   useSubmitRejection,
   useGetMultisigAccount,
   useGetConsumableNotes,
@@ -16,23 +16,24 @@ import { SecondaryButton } from "../Common/SecondaryButton";
 import toast from "react-hot-toast";
 import { useModal } from "@/contexts/ModalManagerProvider";
 import { ApproveVote, ConfirmVote, FinalVoteApproved, FinalVoteRejected, RejectVote } from "./Vote";
-import { useClient, useWallet } from "@getpara/react-sdk";
-import { bytesToHex, fromHexSig, hexToBytes } from "@/utils";
-import { keccak_256 } from "@noble/hashes/sha3.js";
-import { QASH_TOKEN_ADDRESS, QASH_TOKEN_DECIMALS, QASH_TOKEN_SYMBOL } from "@/services/utils/constant";
+import { useParaSigner } from "@/hooks/web3/useParaSigner";
+import { useMidenProvider } from "@/contexts/MidenProvider";
+import { getFaucetMetadata } from "@/services/utils/miden/faucet";
+import { formatUnits } from "viem";
+import { formatAddress } from "@/services/utils/miden/address";
 
 const TransactionDetailContainer = () => {
   const router = useRouter();
   const { openModal, closeModal } = useModal();
   const searchParams = useSearchParams();
   const proposalId = parseInt(searchParams.get("proposalId") || "", 10);
-  const { data: wallet } = useWallet();
-  const paraClient = useClient();
+  const { commitment: signerCommitment } = useParaSigner();
+  const { client: midenClient } = useMidenProvider();
   const { data: proposal, isLoading, refetch: refetchProposal } = useGetProposal(proposalId);
   const { data: multisigAccount } = useGetMultisigAccount(proposal?.accountId, { enabled: !!proposal?.accountId });
 
   // Mutation hooks for voting
-  const { mutate: submitSignature, isPending: isSignaturePending } = useSubmitSignature();
+  const signProposalMutation = useSignProposal();
   const { mutate: submitRejection, isPending: isRejectionPending } = useSubmitRejection();
 
   const {
@@ -60,79 +61,22 @@ const TransactionDetailContainer = () => {
   const handleApproveProposal = async () => {
     if (!proposal || !multisigAccount) return;
 
-    if (!wallet?.publicKey || !paraClient) {
-      toast.error("Wallet not connected");
+    if (!signerCommitment) {
+      toast.error("Para signer not ready");
       return;
     }
 
     try {
-      // Open signing modal
       openModal("PROCESSING_TRANSACTION");
 
-      // Get summary commitment from proposal
-      const summaryCommitment = proposal.summaryCommitment;
-      if (!summaryCommitment) {
-        throw new Error("Proposal missing summary commitment for signing");
-      }
-
-      // Hash the commitment with keccak256 for signing
-      const commitmentHex = summaryCommitment.replace(/^0x/, "");
-      const commitmentBytes = hexToBytes(commitmentHex);
-      const hashedMessage = keccak_256(commitmentBytes);
-
-      // Convert keccak hash to base64 for Para SDK
-      const messageBase64 = btoa(String.fromCharCode(...hashedMessage));
-
-      // Sign with Para popup
-      const signResult = await paraClient.signMessage({
-        walletId: wallet.id,
-        messageBase64,
+      await signProposalMutation.mutateAsync({
+        proposal,
+        accountPublicKeys: multisigAccount.publicKeys,
       });
 
-      // Check if signing was successful
-      if (!("signature" in signResult) || !signResult.signature) {
-        throw new Error("Signing failed or was rejected");
-      }
-
-      // Convert Para hex signature to Miden serialized format
-      const serializedSig = fromHexSig(signResult.signature as string);
-      const signatureHex = bytesToHex(serializedSig);
-
-      // Find approver index by matching public key
-      const normalizedUserKey = wallet.publicKey.toLowerCase().replace(/^0x/, "");
-      const approverIndex = multisigAccount.publicKeys.findIndex(
-        pk => pk.toLowerCase().replace(/^0x/, "") === normalizedUserKey,
-      );
-
-      if (approverIndex === -1) {
-        closeModal("PROCESSING_TRANSACTION");
-        toast.error("Your public key is not an approver on this multisig account");
-        return;
-      }
-
-      // Submit signature
-      submitSignature(
-        {
-          proposalId,
-          data: {
-            approverIndex,
-            approverPublicKey: wallet.publicKey,
-            signatureHex,
-          },
-        },
-        {
-          onSuccess: () => {
-            closeModal("PROCESSING_TRANSACTION");
-            toast.success("Signature submitted successfully");
-            refetchProposal();
-          },
-          onError: err => {
-            closeModal("PROCESSING_TRANSACTION");
-            console.error("Failed to submit signature:", err);
-            toast.error("Failed to submit signature");
-          },
-        },
-      );
+      closeModal("PROCESSING_TRANSACTION");
+      toast.success("Signature submitted successfully");
+      refetchProposal();
     } catch (error) {
       closeModal("PROCESSING_TRANSACTION");
       console.error("Failed to approve proposal:", error);
@@ -209,53 +153,68 @@ const TransactionDetailContainer = () => {
 
   // Determine current user's voting status by checking signatures and rejections data
   // The backend enriches approver objects with 'signed' boolean and 'signature' object
-  // We check if the current user's wallet matches an approver with signed=true
+  // We check if the current user's signer commitment matches an approver with signed=true
 
   const hasUserApproved =
-    wallet?.publicKey &&
+    signerCommitment &&
     approvers.some((approver: any) => {
-      const normalizedUserKey = (wallet.publicKey as string).toLowerCase().replace(/^0x/, "");
-      const normalizedApproverKey = approver.publicKey.toLowerCase().replace(/^0x/, "");
-      return normalizedApproverKey === normalizedUserKey && approver.signed === true;
+      const normalizedCommitment = signerCommitment.toLowerCase().replace(/^0x/, "");
+      const normalizedApproverKey = (approver.publicKey || "").toLowerCase().replace(/^0x/, "");
+      return normalizedApproverKey === normalizedCommitment && approver.signed === true;
     });
 
   const hasUserRejected =
-    wallet?.publicKey &&
+    signerCommitment &&
     proposal?.rejections &&
     proposal.rejections.length > 0 &&
     approvers.some((approver: any) => {
-      const normalizedUserKey = (wallet.publicKey as string).toLowerCase().replace(/^0x/, "");
-      const normalizedApproverKey = approver.publicKey.toLowerCase().replace(/^0x/, "");
+      const normalizedCommitment = signerCommitment.toLowerCase().replace(/^0x/, "");
+      const normalizedApproverKey = (approver.publicKey || "").toLowerCase().replace(/^0x/, "");
       return (
-        normalizedApproverKey === normalizedUserKey &&
+        normalizedApproverKey === normalizedCommitment &&
         proposal.rejections?.some((rejection: any) => rejection.approverIndex === approver.id)
       );
     });
 
-  // Helper function to extract token info from consumable notes
-  const getNoteTokenInfo = (noteId: string) => {
-    const consumableNote = consumableNotesData?.notes?.find(
-      (note: any) => note.note_id.toLowerCase() === noteId.toLowerCase(),
-    );
+  // Resolved token info per note (fetched via faucet metadata)
+  const [noteTokenInfoMap, setNoteTokenInfoMap] = useState<Record<string, { symbol: string; amount: string; faucetId: string } | null>>({});
 
-    if (!consumableNote || !consumableNote.assets || consumableNote.assets.length === 0) {
-      return null;
-    }
+  useEffect(() => {
+    if (!midenClient || !consumableNotesData?.notes?.length || !proposal?.noteIds?.length) return;
+    let cancelled = false;
 
-    const asset = consumableNote.assets[0];
-    const isQashToken = QASH_TOKEN_ADDRESS.includes(asset.faucet_id);
+    const resolveNoteTokens = async () => {
+      const results: Record<string, { symbol: string; amount: string; faucetId: string } | null> = {};
 
-    if (!isQashToken) {
-      return null;
-    }
+      for (const noteId of proposal.noteIds || []) {
+        const consumableNote = consumableNotesData.notes.find(
+          (note: any) => note.note_id.toLowerCase() === noteId.toLowerCase(),
+        );
 
-    const normalizedAmount = asset.amount / Math.pow(10, QASH_TOKEN_DECIMALS);
+        if (!consumableNote || !consumableNote.assets || consumableNote.assets.length === 0) {
+          results[noteId] = null;
+          continue;
+        }
 
-    return {
-      symbol: QASH_TOKEN_SYMBOL,
-      amount: normalizedAmount,
+        const asset = consumableNote.assets[0];
+        try {
+          const meta = await getFaucetMetadata(midenClient, asset.faucet_id);
+          const formatted = formatUnits(BigInt(asset.amount), meta.decimals);
+          results[noteId] = { symbol: meta.symbol, amount: formatted, faucetId: asset.faucet_id };
+        } catch {
+          results[noteId] = { symbol: formatAddress(asset.faucet_id), amount: String(asset.amount), faucetId: asset.faucet_id };
+        }
+      }
+
+      if (!cancelled) setNoteTokenInfoMap(results);
     };
-  };
+
+    resolveNoteTokens();
+    return () => { cancelled = true; };
+  }, [midenClient, consumableNotesData, proposal?.noteIds]);
+
+  // Helper function to get resolved token info for a note
+  const getNoteTokenInfo = (noteId: string) => noteTokenInfoMap[noteId] ?? null;
 
   // Helper function to render appropriate vote component based on proposal status and user state
   const renderVoteComponent = () => {
@@ -270,7 +229,7 @@ const TransactionDetailContainer = () => {
         <ConfirmVote
           onApprove={handleApproveProposal}
           onDeny={handleRejectProposal}
-          isLoading={isSignaturePending || isRejectionPending}
+          isLoading={signProposalMutation.isPending || isRejectionPending}
         />
       );
     }
@@ -304,6 +263,26 @@ const TransactionDetailContainer = () => {
     return null;
   };
 
+  // Resolve token metadata from proposal's tokens array or bill paymentToken
+  const token = proposal?.tokens?.[0];
+  const sendFaucetId = token?.address || "";
+  const [sendFaucetMeta, setSendFaucetMeta] = useState<{ symbol: string; decimals: number } | null>(null);
+
+  useEffect(() => {
+    if (!midenClient || !sendFaucetId) return;
+    let cancelled = false;
+    getFaucetMetadata(midenClient, sendFaucetId)
+      .then(meta => { if (!cancelled) setSendFaucetMeta(meta); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [midenClient, sendFaucetId]);
+
+  const sendTokenSymbol = sendFaucetMeta?.symbol || token?.symbol || (proposal?.bills?.[0]?.paymentToken as any)?.name || "TOKEN";
+  const sendTokenDecimals = sendFaucetMeta?.decimals ?? token?.decimals ?? 0;
+  const displayAmount = token?.amount
+    ? (() => { try { return formatUnits(BigInt(token.amount), sendTokenDecimals); } catch { return proposal?.amount || "-"; } })()
+    : proposal?.amount || "-";
+
   if (isLoading || !proposal) {
     return (
       <div className="flex items-center justify-center w-full h-full">
@@ -312,7 +291,6 @@ const TransactionDetailContainer = () => {
     );
   }
   const statusBadge = getStatusBadge(proposal.status);
-  const tokenMetadata = (proposal.bills?.[0]?.paymentToken as any) || { name: "TOKEN" };
   const pendingCount = pendingMembers.length;
 
   return (
@@ -420,7 +398,7 @@ const TransactionDetailContainer = () => {
                   <div className="flex gap-2 items-center">
                     <span className="text-sm text-text-secondary font-medium">Amount</span>
                     <span className="text-sm text-text-primary font-semibold">
-                      {proposal.amount} {tokenMetadata.name?.toUpperCase() || "TOKEN"}
+                      {displayAmount} {sendTokenSymbol.toUpperCase()}
                     </span>
                   </div>
                 )}
@@ -440,7 +418,7 @@ const TransactionDetailContainer = () => {
                   </div>
                   <div className="flex flex-col gap-1 text-right">
                     <p className="text-sm text-text-primary font-semibold">
-                      {proposal.amount} {tokenMetadata.name?.toUpperCase() || "TOKEN"}
+                      {displayAmount} {sendTokenSymbol.toUpperCase()}
                     </p>
                   </div>
                   <div className="flex justify-end">
