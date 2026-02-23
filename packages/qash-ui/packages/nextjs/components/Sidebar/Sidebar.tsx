@@ -337,6 +337,42 @@ export const Sidebar: React.FC<NavProps> = ({ onActionItemClick }) => {
             <NavSections sections={action} onItemClick={handleActionItemClick} onSubmenuClick={handleSubmenuClick} />
           </div>
 
+          <div
+            className="m-3 rounded-2xl overflow-hidden shadow-[0_8px_15px_rgba(0,0,0,0.12)]"
+            style={{
+              background: "linear-gradient(182deg, #6AF -54.8%, #FBFBFB 39.98%)",
+            }}
+          >
+            <div className="px-4 py-2">
+              <div className="flex items-center gap-3">
+                <img src="/misc/two-star-blue-icon.svg" alt="Plan icon" className="w-6 h-6" />
+                <div className="flex flex-col">
+                  <span className="text-xs text-[rgba(27,27,27,0.6)]">Current plan</span>
+                  <span className="text-base font-semibold">Free Trial</span>
+                </div>
+              </div>
+            </div>
+
+            <div
+              className="bg-[#f6f6f6] border-t border-primary-divider px-4 py-3 rounded-2xl"
+              style={{
+                boxShadow: "0 0 8.4px 0 rgba(0, 0, 0, 0.15)",
+              }}
+            >
+              <p className="text-sm text-text-secondary mb-3">
+                Upgrade to Pro to get the latest and exclusive features
+              </p>
+              <button
+                onClick={() => router.push("/subscription")}
+                className="flex-1 flex-row flex w-full justify-center items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-sm hover:shadow- cursor-pointer"
+                aria-label="View your plan"
+              >
+                <img src="/misc/blue-lightning-icon.svg" alt="flash icon" className="w-4 h-4" />
+                <span className="text-sm text-primary-blue font-medium">View your plan</span>
+              </button>
+            </div>
+          </div>
+
           {/* Connect/Account section */}
           <div className="flex flex-col justify-center p-5 border-t border-primary-divider mb-5">
             {/* <Connect /> */}

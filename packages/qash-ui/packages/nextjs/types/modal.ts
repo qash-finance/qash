@@ -66,6 +66,7 @@ import InviteTeamMember from "@/components/Modal/TeamMember/InviteTeamMember";
 import RemoveTeamMember from "@/components/Modal/TeamMember/RemoveTeamMember";
 import EditTeamMember from "@/components/Modal/TeamMember/EditTeamMember";
 import ChooseAccountModal from "@/components/Modal/Account/ChooseAccountModal";
+import ReviewPlanModal from "@/components/Modal/ReviewPlanModal";
 import PermissionRequiredModal from "@/components/Modal/PermissionRequiredModal";
 import PayrollNotSavedModal from "@/components/Modal/Payroll/PayrollNotSavedModal";
 import { Group } from "./group-payment";
@@ -149,6 +150,7 @@ export const MODAL_IDS = {
   EDIT_TEAM_MEMBER: "EDIT_TEAM_MEMBER",
   PERMISSION_REQUIRED: "PERMISSION_REQUIRED",
   CHOOSE_ACCOUNT: "CHOOSE_ACCOUNT",
+  REVIEW_PLAN: "REVIEW_PLAN",
   PAYROLL_NOT_SAVED: "PAYROLL_NOT_SAVED",
 } as const;
 
@@ -532,6 +534,8 @@ export interface ChooseAccountModalProps extends BaseModalProps {
   onConfirm?: (account: MultisigAccountResponseDto) => void;
 }
 
+export interface ReviewPlanModalProps extends BaseModalProps {}
+
 export interface PermissionRequiredModalProps extends BaseModalProps {
   onConfirm?: () => void;
   role?: string;
@@ -607,6 +611,7 @@ export type ModalPropsMap = {
   [MODAL_IDS.REMOVE_TEAM_MEMBER]: RemoveTeamMemberProps;
   [MODAL_IDS.EDIT_TEAM_MEMBER]: EditTeamMemberProps;
   [MODAL_IDS.CHOOSE_ACCOUNT]: ChooseAccountModalProps;
+  [MODAL_IDS.REVIEW_PLAN]: ReviewPlanModalProps;
   [MODAL_IDS.PERMISSION_REQUIRED]: PermissionRequiredModalProps;
   [MODAL_IDS.PAYROLL_NOT_SAVED]: PayrollNotSavedModalProps;
 };
@@ -680,6 +685,7 @@ export const modalRegistry = {
   [MODAL_IDS.REMOVE_TEAM_MEMBER]: RemoveTeamMember,
   [MODAL_IDS.EDIT_TEAM_MEMBER]: EditTeamMember,
   [MODAL_IDS.CHOOSE_ACCOUNT]: ChooseAccountModal,
+  [MODAL_IDS.REVIEW_PLAN]: ReviewPlanModal,
   [MODAL_IDS.PERMISSION_REQUIRED]: PermissionRequiredModal,
   [MODAL_IDS.PAYROLL_NOT_SAVED]: PayrollNotSavedModal,
 } as const;
