@@ -417,6 +417,19 @@ export class PayrollStatsDto implements SharedTypes.PayrollStatsDto {
     example: 20,
   })
   dueThisMonth: number;
+
+  @ApiProperty({
+    description: 'ISO date string of the nearest upcoming pay date, or null if none',
+    example: '2026-03-01T00:00:00.000Z',
+    nullable: true,
+  })
+  nextPayDate: string | null;
+
+  @ApiProperty({
+    description: 'Total number of active payees (employees with active payrolls)',
+    example: 15,
+  })
+  totalPayees: number;
 }
 
 export class PendingInvoiceReviewsDto implements SharedTypes.PendingInvoiceReviewsDto {

@@ -120,7 +120,6 @@ export class AdminCompanyService {
         where: {
           companyId,
           status: TeamMemberStatusEnum.ACTIVE,
-          user: { isNot: null },
         },
         include: { user: true },
       });

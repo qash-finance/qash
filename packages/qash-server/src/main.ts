@@ -148,6 +148,15 @@ async function bootstrap() {
 
   app.use(helmet());
 
+  // Graceful shutdown — release port before watch-mode restart
+  const shutdown = async (signal: string) => {
+    console.info(`\n${signal} received — closing server…`);
+    await app.close();
+    process.exit(0);
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+
   await app.listen(port, host, async () => {
     console.info(`API server is running on http://${host}:${port}`);
   });

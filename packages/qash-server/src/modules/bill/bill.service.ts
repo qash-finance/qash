@@ -319,7 +319,6 @@ export class BillService {
           where: {
             companyId,
             role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
-            user: { isNot: null },
           },
           include: { user: true },
         });
@@ -407,7 +406,6 @@ export class BillService {
           where: {
             companyId,
             role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
-            user: { isNot: null },
           },
           include: { user: true },
         });
@@ -545,7 +543,6 @@ export class BillService {
         where: {
           companyId,
           role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
-          user: { isNot: null },
         },
         include: { user: true },
       });
@@ -582,7 +579,7 @@ export class BillService {
   /**
    * Send payslip emails to employees for their paid invoices
    */
-  private async sendPayslipEmails(bills: BillWithInvoice[]): Promise<void> {
+  async sendPayslipEmails(bills: BillWithInvoice[]): Promise<void> {
     const emailPromises = bills
       .filter((bill) => {
         const invoice = bill.invoice as any;
@@ -814,7 +811,6 @@ export class BillService {
             where: {
               companyId,
               role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
-              user: { isNot: null },
             },
             include: { user: true },
           });

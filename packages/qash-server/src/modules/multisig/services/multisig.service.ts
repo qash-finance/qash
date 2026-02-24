@@ -204,13 +204,26 @@ export class MultisigService {
   }
 
   /**
-   * List all multisig accounts for a company
+   * List multisig accounts for a company, filtered to only accounts
+   * where the requesting user is a signer (via MultisigAccountMember).
+   * This prevents balance inconsistency when different team members
+   * have access to different multisig accounts.
    */
   async listAccountsByCompany(
     companyId: number,
+    userId: number,
   ): Promise<MultisigAccountResponseDto[]> {
     return this.prisma.multisigAccount.findMany({
-      where: { companyId },
+      where: {
+        companyId,
+        teamMembers: {
+          some: {
+            teamMember: {
+              userId,
+            },
+          },
+        },
+      },
       include: {
         teamMembers: true,
       },
@@ -969,11 +982,19 @@ export class MultisigService {
    */
   async listProposalsByCompany(
     companyId: number,
+    userId: number,
   ): Promise<MultisigProposalResponseDto[]> {
     const proposals = await this.prisma.multisigProposal.findMany({
       where: {
         account: {
           companyId,
+          teamMembers: {
+            some: {
+              teamMember: {
+                userId,
+              },
+            },
+          },
         },
       },
       include: {
@@ -1024,7 +1045,11 @@ export class MultisigService {
         },
         bills: {
           include: {
-            invoice: true,
+            invoice: {
+              include: {
+                employee: { include: { group: true } },
+              },
+            },
           },
         },
       },
@@ -1436,7 +1461,9 @@ export class MultisigService {
     const validBills = proposal.bills.filter(
       (b) =>
         b.invoice !== null &&
-        (b.status === BillStatusEnum.PENDING || b.status === BillStatusEnum.OVERDUE),
+        (b.status === BillStatusEnum.PROPOSED ||
+          b.status === BillStatusEnum.PENDING ||
+          b.status === BillStatusEnum.OVERDUE),
     );
 
     await this.prisma.$transaction(async (tx) => {
@@ -1515,6 +1542,29 @@ export class MultisigService {
     } catch (error) {
       this.logger.error('Failed to create notifications for executed proposal', error);
       // Don't throw - notification failure should not block execution result
+    }
+
+    // Send payslip emails for employee invoices (payroll)
+    if (validBills.length > 0) {
+      try {
+        const billIds = validBills.map((b) => b.id);
+        const billsWithFullRelations = await this.prisma.bill.findMany({
+          where: { id: { in: billIds } },
+          include: {
+            invoice: {
+              include: {
+                employee: { include: { group: true } },
+                payroll: { include: { company: true } },
+                items: true,
+              },
+            },
+          },
+        });
+        await this.billService.sendPayslipEmails(billsWithFullRelations as any);
+      } catch (error) {
+        this.logger.error('Failed to send payslip emails after proposal execution', error);
+        // Don't throw - email failure should not block execution result
+      }
     }
 
     return { success: true, transactionId };
@@ -1617,12 +1667,23 @@ export class MultisigService {
       approvers,
       bills: proposal.bills?.map((bill: any) => ({
         uuid: bill.uuid,
+        invoiceUuid: bill.invoice?.uuid,
         invoiceNumber: bill.invoice?.invoiceNumber,
+        invoiceType: bill.invoice?.invoiceType,
         amount: bill.invoice?.total,
         status: bill.status,
-        recipientName: bill.invoice?.employee?.name || bill.invoice?.fromDetails?.name,
+        recipientName: bill.invoice?.employee?.name || bill.invoice?.toCompanyName || bill.invoice?.fromDetails?.name,
         recipientAddress: bill.invoice?.paymentWalletAddress,
         paymentToken: bill.invoice?.paymentToken || null,
+        group: bill.invoice?.employee?.group
+          ? {
+              name: bill.invoice.employee.group.name,
+              color: bill.invoice.employee.group.color,
+              shape: bill.invoice.employee.group.shape,
+            }
+          : bill.invoice?.invoiceType === 'B2B'
+            ? { name: 'Client', color: '#35ADE9', shape: 'CIRCLE' }
+            : undefined,
       })) || [],
       createdAt: proposal.createdAt,
       updatedAt: proposal.updatedAt,

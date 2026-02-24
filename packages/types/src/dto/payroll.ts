@@ -68,6 +68,8 @@ export interface PayrollStatsDto {
   totalCompleted: number;
   totalMonthlyAmount: string;
   dueThisMonth: number;
+  nextPayDate: string | null;
+  totalPayees: number;
 }
 
 export interface PendingInvoiceReviewsDto {

@@ -118,16 +118,19 @@ export class CompanyService {
   ): Promise<CompanyModel> {
     try {
       return await this.prisma.$transaction(async (tx) => {
-        const existingCompany =
-          await this.companyRepository.findByRegistrationNumber(
-            dto.registrationNumber,
-            tx,
-          );
+        // Only check for duplicate registration number if one is provided
+        if (dto.registrationNumber) {
+          const existingCompany =
+            await this.companyRepository.findByRegistrationNumber(
+              dto.registrationNumber,
+              tx,
+            );
 
-        if (existingCompany) {
-          throw new ConflictException(
-            ErrorCompany.RegistrationNumberAlreadyExists,
-          );
+          if (existingCompany) {
+            throw new ConflictException(
+              ErrorCompany.RegistrationNumberAlreadyExists,
+            );
+          }
         }
 
         // Find if the user is already a team member of any company

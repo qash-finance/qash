@@ -16,13 +16,13 @@ import {
 
 export interface CreateCompanyData {
   companyName: string;
-  registrationNumber: string;
-  companyType: CompanyTypeEnum;
-  country: string;
-  address1: string;
+  registrationNumber?: string;
+  companyType?: CompanyTypeEnum;
+  country?: string;
+  address1?: string;
   address2?: string;
-  city: string;
-  postalCode: string;
+  city?: string;
+  postalCode?: string;
   metadata?: any;
 }
 

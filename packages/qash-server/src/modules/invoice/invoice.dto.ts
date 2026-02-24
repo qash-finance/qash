@@ -1097,7 +1097,7 @@ export class CreateB2BInvoiceDto implements SharedTypes.CreateB2BInvoiceDto {
   // Email configuration
   @ApiPropertyOptional({
     description: 'Custom email subject',
-    example: 'Invoice #INV-B2B-0001 from My Company',
+    example: 'Invoice #INV-0001 from My Company',
   })
   @IsOptional()
   @IsString()

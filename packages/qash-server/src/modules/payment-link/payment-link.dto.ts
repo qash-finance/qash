@@ -55,9 +55,9 @@ export class CreatePaymentLinkDto implements SharedTypes.CreatePaymentLinkDto {
   })
   @IsNotEmpty()
   @IsString()
-  @Matches(/^mtst1[a-z0-9_]+$/i, {
+  @Matches(/^(mtst1[a-z0-9_]+|0x[a-f0-9]+)$/i, {
     message:
-      "Address must start with 'mtst1' and contain only letters, numbers, and underscores",
+      "Address must start with 'mtst1' (bech32) or '0x' (hex)",
   })
   @MinLength(3, { message: 'paymentWalletAddress is too short' })
   paymentWalletAddress: string;

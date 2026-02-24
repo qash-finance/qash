@@ -226,12 +226,19 @@ export interface MultisigProposalResponseDto {
 
 export interface MultisigProposalBillDto {
   uuid: string;
+  invoiceUuid?: string;
   invoiceNumber?: string;
+  invoiceType?: string;
   amount?: string;
   status: string;
   recipientName?: string;
   recipientAddress?: string;
   paymentToken?: any; // token metadata from invoice.paymentToken
+  group?: {
+    name: string;
+    color: string;
+    shape: string;
+  };
 }
 
 export interface ExecuteTransactionResponseDto {

@@ -22,7 +22,7 @@ pnpm install
 | Package        | Description              | Path                               |
 | -------------- | ------------------------ | ---------------------------------- |
 | `@qash/server` | NestJS API Server        | `packages/qash-server`             |
-| `@qash/web`    | Next.js Web Application  | `packages/qash-ui/packages/nextjs` |
+| `@qash/web`    | Next.js Web Application  | `packages/qash-ui`                 |
 | `qash-doc`     | Docusaurus Documentation | `packages/qash-doc`                |
 
 ## Development
@@ -128,9 +128,7 @@ qash/
 └── packages/
     ├── qash-server/       # @qash/server - NestJS API
     ├── qash-doc/          # qash-doc - Docusaurus documentation
-    └── qash-ui/           # UI packages
-        └── packages/
-            └── nextjs/    # @qash/web - Next.js app
+    └── qash-ui/           # @qash/web - Next.js app
 ```
 
 ## License

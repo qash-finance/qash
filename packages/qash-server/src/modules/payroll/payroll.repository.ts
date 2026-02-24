@@ -123,6 +123,8 @@ export class PayrollRepository extends BaseRepository<
     totalCompleted: number;
     totalMonthlyAmount: string;
     dueThisMonth: number;
+    nextPayDate: string | null;
+    totalPayees: number;
   }> {
     const client = this.getModel(tx);
 
@@ -164,7 +166,11 @@ export class PayrollRepository extends BaseRepository<
       }),
       client.findMany({
         where: { ...baseWhere, status: PayrollStatusEnum.ACTIVE },
-        select: { amount: true },
+        select: {
+          amount: true,
+          payStartDate: true,
+          currentCycleNumber: true,
+        },
       }),
     ]);
 
@@ -173,12 +179,29 @@ export class PayrollRepository extends BaseRepository<
       .reduce((sum, payroll) => sum + parseFloat(payroll.amount), 0)
       .toFixed(2);
 
+    // Calculate nearest upcoming pay date across all active payrolls
+    let nextPayDate: string | null = null;
+    let earliestDate: Date | null = null;
+    for (const payroll of allActivePayrolls) {
+      const next = new Date(payroll.payStartDate);
+      next.setMonth(next.getMonth() + payroll.currentCycleNumber);
+      // Only consider future dates
+      if (next >= now && (earliestDate === null || next < earliestDate)) {
+        earliestDate = next;
+      }
+    }
+    if (earliestDate) {
+      nextPayDate = earliestDate.toISOString();
+    }
+
     return {
       totalActive: activePayrolls,
       totalPaused: pausedPayrolls,
       totalCompleted: completedPayrolls,
       totalMonthlyAmount,
       dueThisMonth,
+      nextPayDate,
+      totalPayees: activePayrolls,
     };
   }
 

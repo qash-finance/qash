@@ -1015,7 +1015,6 @@ export class TeamMemberService {
         where: {
           companyId,
           status: TeamMemberStatusEnum.ACTIVE,
-          user: { isNot: null },
         },
         include: { user: true },
       });
@@ -1065,7 +1064,6 @@ export class TeamMemberService {
         where: {
           companyId,
           role: TeamMemberRoleEnum.OWNER,
-          user: { isNot: null },
         },
         include: { user: true },
       });

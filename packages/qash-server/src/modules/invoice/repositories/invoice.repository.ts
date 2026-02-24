@@ -358,7 +358,7 @@ export class InvoiceRepository extends BaseRepository<
 
   /**
    * Generate B2B invoice number
-   * Format: INV-B2B-{0001}
+   * Format: INV-{0001}
    * Sequence increments per recipient company per month
    */
   async generateB2BInvoiceNumber(
@@ -368,15 +368,13 @@ export class InvoiceRepository extends BaseRepository<
     tx?: PrismaTransactionClient,
   ): Promise<string> {
     const model = this.getModel(tx);
-    const prefix = `INV-B2B-`;
+    const prefix = `INV-`;
 
-    // Build where clause: filter by sender company, month, and recipient
+    // Build where clause: filter by sender company and B2B type
+    // Match both old "INV-B2B-" and new "INV-" prefixed invoices
     const where: Prisma.InvoiceWhereInput = {
       fromCompanyId: companyId,
       invoiceType: InvoiceTypeEnum.B2B,
-      invoiceNumber: {
-        startsWith: prefix,
-      },
     };
 
     // If recipient company is identified, filter by it
@@ -386,7 +384,7 @@ export class InvoiceRepository extends BaseRepository<
       where.toCompanyName = toCompanyName;
     }
 
-    // Get the latest B2B invoice for this company and recipient in the current month
+    // Get the latest B2B invoice for this company and recipient
     const latestInvoice = await model.findFirst({
       where,
       orderBy: {
@@ -399,7 +397,7 @@ export class InvoiceRepository extends BaseRepository<
 
     let sequence = 1;
     if (latestInvoice) {
-      // Extract the sequence number from the invoice number
+      // Extract the trailing sequence number from the invoice number
       const match = latestInvoice.invoiceNumber.match(/(\d{4})$/);
       if (match) {
         sequence = parseInt(match[1], 10) + 1;

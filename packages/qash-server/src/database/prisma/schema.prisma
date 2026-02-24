@@ -94,19 +94,19 @@ model Company {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
 
-  companyName        String          @map("company_name") @db.VarChar(255)
-  registrationNumber String          @unique @map("registration_number") @db.VarChar(100)
-  companyType        CompanyTypeEnum @map("company_type")
-  taxId              String?         @map("tax_id") @db.VarChar(100)
-  notificationEmail  String?         @map("notification_email") @db.VarChar(255)
-  ccNotifications    String[]        @map("cc_notifications") @db.VarChar(255)
-  logo               String?         @db.Text
+  companyName        String           @map("company_name") @db.VarChar(255)
+  registrationNumber String?          @unique @map("registration_number") @db.VarChar(100)
+  companyType        CompanyTypeEnum? @map("company_type")
+  taxId              String?          @map("tax_id") @db.VarChar(100)
+  notificationEmail  String?          @map("notification_email") @db.VarChar(255)
+  ccNotifications    String[]         @map("cc_notifications") @db.VarChar(255)
+  logo               String?          @db.Text
 
-  country    String  @db.VarChar(100)
-  address1   String  @map("address_1") @db.VarChar(255)
+  country    String? @db.VarChar(100)
+  address1   String? @map("address_1") @db.VarChar(255)
   address2   String? @map("address_2") @db.VarChar(255)
-  city       String  @db.VarChar(100)
-  postalCode String  @map("postal_code") @db.VarChar(20)
+  city       String? @db.VarChar(100)
+  postalCode String? @map("postal_code") @db.VarChar(20)
 
   verificationStatus CompanyVerificationStatusEnum @default(PENDING) @map("verification_status")
   isActive           Boolean                       @default(true) @map("is_active")

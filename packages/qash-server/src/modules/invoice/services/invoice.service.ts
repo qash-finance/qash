@@ -213,8 +213,9 @@ export class InvoiceService {
             const teamMembers = await this.prisma.teamMember.findMany({
               where: {
                 companyId,
-                role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
-                user: { isNot: null },
+                role: {
+                  in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN],
+                },
               },
               include: { user: true },
             });
@@ -354,8 +355,9 @@ export class InvoiceService {
           const teamMembers = await this.prisma.teamMember.findMany({
             where: {
               companyId,
-              role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
-              user: { isNot: null },
+              role: {
+                in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN],
+              },
             },
             include: { user: true },
           });
@@ -419,8 +421,9 @@ export class InvoiceService {
           const teamMembers = await this.prisma.teamMember.findMany({
             where: {
               companyId,
-              role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
-              user: { isNot: null },
+              role: {
+                in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN],
+              },
             },
             include: { user: true },
           });
@@ -642,8 +645,9 @@ export class InvoiceService {
           const teamMembers = await this.prisma.teamMember.findMany({
             where: {
               companyId: invoice.payroll.companyId,
-              role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
-              user: { isNot: null },
+              role: {
+                in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN],
+              },
             },
             include: { user: true },
           });
@@ -771,8 +775,9 @@ export class InvoiceService {
           const teamMembers = await this.prisma.teamMember.findMany({
             where: {
               companyId: invoice.payroll.companyId,
-              role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
-              user: { isNot: null },
+              role: {
+                in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN],
+              },
             },
             include: { user: true },
           });
@@ -879,9 +884,9 @@ export class InvoiceService {
       const sameMonth =
         latestInvoice.issueDate.getUTCFullYear() === now.getUTCFullYear() &&
         latestInvoice.issueDate.getUTCMonth() === now.getUTCMonth();
-      if (sameMonth) {
-        throw new ConflictException(ErrorInvoice.InvoiceAlreadyExistsThisMonth);
-      }
+      // if (sameMonth) {
+      //   throw new ConflictException(ErrorInvoice.InvoiceAlreadyExistsThisMonth);
+      // }
     }
 
     // Generate invoice number

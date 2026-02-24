@@ -176,7 +176,6 @@ export class InvoiceSchedulerService {
               role: {
                 in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN],
               },
-              user: { isNot: null },
             },
             include: { user: true },
           });
@@ -269,7 +268,6 @@ export class InvoiceSchedulerService {
                   where: {
                     companyId: payroll.companyId,
                     role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
-                    user: { isNot: null },
                   },
                   include: { user: true },
                 });

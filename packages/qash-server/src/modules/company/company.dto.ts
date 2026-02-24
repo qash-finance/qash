@@ -42,40 +42,41 @@ export class CreateCompanyDto implements SharedTypes.CreateCompanyDto {
   @Length(2, 255)
   companyName: string;
 
-  @ApiProperty({
-    description: 'Company registration number',
+  @ApiPropertyOptional({
+    description: 'Company registration number (min 5 characters)',
     example: 'REG123456789',
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @Length(5, 100)
-  registrationNumber: string;
+  registrationNumber?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Type of company',
     enum: CompanyTypeEnum,
     example: CompanyTypeEnum.CORPORATION,
   })
+  @IsOptional()
   @IsEnum(CompanyTypeEnum)
-  companyType: CompanyTypeEnum;
+  companyType?: CompanyTypeEnum;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Country where company is registered',
     example: 'United States',
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @Length(2, 100)
-  country: string;
+  country?: string;
 
-  @ApiProperty({
-    description: 'Primary address line',
+  @ApiPropertyOptional({
+    description: 'Primary address line (min 5 characters)',
     example: '123 Business Street',
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @Length(5, 255)
-  address1: string;
+  address1?: string;
 
   @ApiPropertyOptional({
     description: 'Secondary address line',
@@ -86,23 +87,23 @@ export class CreateCompanyDto implements SharedTypes.CreateCompanyDto {
   @Length(1, 255)
   address2?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'City',
     example: 'New York',
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @Length(2, 100)
-  city: string;
+  city?: string;
 
-  @ApiProperty({
-    description: 'Postal/ZIP code',
+  @ApiPropertyOptional({
+    description: 'Postal/ZIP code (min 3 characters)',
     example: '10001',
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @Length(3, 20)
-  postalCode: string;
+  postalCode?: string;
 
   @ApiPropertyOptional({
     description: 'Additional metadata',
@@ -242,33 +243,35 @@ export class CompanyResponseDto implements SharedTypes.CompanyResponseDto {
   })
   companyName: string;
 
-  @ApiProperty({ description: 'Registration number', example: 'REG123456789' })
-  registrationNumber: string;
+  @ApiPropertyOptional({ description: 'Registration number', example: 'REG123456789', nullable: true })
+  registrationNumber?: string | null;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Company type',
     enum: CompanyTypeEnum,
     example: CompanyTypeEnum.CORPORATION,
+    nullable: true,
   })
-  companyType: CompanyTypeEnum;
+  companyType?: CompanyTypeEnum | null;
 
-  @ApiProperty({ description: 'Country', example: 'United States' })
-  country: string;
+  @ApiPropertyOptional({ description: 'Country', example: 'United States', nullable: true })
+  country?: string | null;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Address line 1',
     example: '123 Business Street',
+    nullable: true,
   })
-  address1: string;
+  address1?: string | null;
 
-  @ApiPropertyOptional({ description: 'Address line 2', example: 'Suite 456' })
-  address2?: string;
+  @ApiPropertyOptional({ description: 'Address line 2', example: 'Suite 456', nullable: true })
+  address2?: string | null;
 
-  @ApiProperty({ description: 'City', example: 'New York' })
-  city: string;
+  @ApiPropertyOptional({ description: 'City', example: 'New York', nullable: true })
+  city?: string | null;
 
-  @ApiProperty({ description: 'Postal code', example: '10001' })
-  postalCode: string;
+  @ApiPropertyOptional({ description: 'Postal code', example: '10001', nullable: true })
+  postalCode?: string | null;
 
   @ApiProperty({
     description: 'Verification status',

@@ -380,7 +380,6 @@ export class EmployeeService {
             where: {
               companyId: company.id,
               role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
-              user: { isNot: null },
             },
             include: { user: true },
           });
@@ -525,7 +524,6 @@ export class EmployeeService {
             where: {
               companyId,
               role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
-              user: { isNot: null },
             },
             include: { user: true },
           });
@@ -648,7 +646,6 @@ export class EmployeeService {
             where: {
               companyId,
               role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
-              user: { isNot: null },
             },
             include: { user: true },
           });

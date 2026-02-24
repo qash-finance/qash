@@ -699,7 +699,6 @@ export class PayrollService {
         where: {
           companyId,
           role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
-          user: { isNot: null },
         },
         include: { user: true },
       });
@@ -746,7 +745,6 @@ export class PayrollService {
         where: {
           companyId,
           role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
-          user: { isNot: null },
         },
         include: { user: true },
       });

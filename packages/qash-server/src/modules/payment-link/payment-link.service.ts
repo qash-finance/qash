@@ -165,7 +165,6 @@ export class PaymentLinkService {
           where: {
             companyId,
             role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
-            user: { isNot: null },
           },
           include: { user: true },
         });
@@ -241,7 +240,6 @@ export class PaymentLinkService {
           where: {
             companyId: link.companyId,
             role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
-            user: { isNot: null },
           },
           include: { user: true },
         });
@@ -392,7 +390,6 @@ export class PaymentLinkService {
           where: {
             companyId,
             role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
-            user: { isNot: null },
           },
           include: { user: true },
         });
@@ -464,7 +461,6 @@ export class PaymentLinkService {
           where: {
             companyId,
             role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
-            user: { isNot: null },
           },
           include: { user: true },
         });

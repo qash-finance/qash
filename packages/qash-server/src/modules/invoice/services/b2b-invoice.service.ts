@@ -587,6 +587,8 @@ export class B2BInvoiceService {
             invoice.emailSubject || `Invoice ${invoice.invoiceNumber}`,
             reviewUrl,
             billCreated,
+            (invoice.emailCc as string[]) || [],
+            (invoice.emailBcc as string[]) || [],
           );
         } catch (emailError) {
           this.logger.error(
@@ -601,7 +603,6 @@ export class B2BInvoiceService {
             where: {
               companyId,
               role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
-              user: { isNot: null },
             },
             include: { user: true },
           });
@@ -709,7 +710,6 @@ export class B2BInvoiceService {
             where: {
               companyId: invoice.fromCompanyId,
               role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
-              user: { isNot: null },
             },
             include: { user: true },
           });
@@ -800,7 +800,6 @@ export class B2BInvoiceService {
             where: {
               companyId,
               role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
-              user: { isNot: null },
             },
             include: { user: true },
           });

@@ -65,7 +65,8 @@ export class MultisigController {
   }
 
   @Get('companies/:companyId/accounts')
-  @ApiOperation({ summary: 'List all multisig accounts for a company' })
+  @CompanyAuth()
+  @ApiOperation({ summary: 'List multisig accounts for a company (filtered to accounts where the requesting user is a signer)' })
   @ApiResponse({
     status: 200,
     description: 'List of multisig accounts',
@@ -73,8 +74,9 @@ export class MultisigController {
   })
   async listAccountsByCompany(
     @Param('companyId', ParseIntPipe) companyId: number,
+    @CurrentUser('withCompany') user: UserWithCompany,
   ): Promise<MultisigAccountResponseDto[]> {
-    return this.multisigService.listAccountsByCompany(companyId);
+    return this.multisigService.listAccountsByCompany(companyId, user.internalUserId);
   }
 
   @Get('accounts/:accountId/members')
@@ -177,7 +179,8 @@ export class MultisigController {
   }
 
   @Get('companies/:companyId/proposals')
-  @ApiOperation({ summary: 'List all proposals for a company across all multisig accounts' })
+  @CompanyAuth()
+  @ApiOperation({ summary: 'List proposals for a company (filtered to accounts where the requesting user is a signer)' })
   @ApiResponse({
     status: 200,
     description: 'List of proposals for the company',
@@ -185,8 +188,9 @@ export class MultisigController {
   })
   async listProposalsByCompany(
     @Param('companyId', ParseIntPipe) companyId: number,
+    @CurrentUser('withCompany') user: UserWithCompany,
   ): Promise<MultisigProposalResponseDto[]> {
-    return this.multisigService.listProposalsByCompany(companyId);
+    return this.multisigService.listProposalsByCompany(companyId, user.internalUserId);
   }
 
   @Post('proposals/:proposalId/signatures')
