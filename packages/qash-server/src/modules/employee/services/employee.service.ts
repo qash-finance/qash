@@ -30,6 +30,8 @@ import { sanitizeInput } from 'src/common/utils/sanitize';
 import { EmployeeGroupRepository } from '../repositories/employee-group.repository';
 import { EmployeeRepository } from '../repositories/employee.repository';
 import { CompanyModel } from 'src/database/generated/models';
+import { NotificationService } from '../../notification/notification.service';
+import { NotificationsTypeEnum, TeamMemberRoleEnum } from 'src/database/generated/enums';
 
 @Injectable()
 export class EmployeeService {
@@ -39,6 +41,7 @@ export class EmployeeService {
     private readonly employeeRepository: EmployeeRepository,
     private readonly employeeGroupRepository: EmployeeGroupRepository,
     private readonly prisma: PrismaService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   //# region GET METHODS service
@@ -310,8 +313,10 @@ export class EmployeeService {
     dto: CreateContactDto,
     company: CompanyModel,
   ): Promise<Employee> {
+    let newEntry: Employee | undefined;
+
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      newEntry = await this.prisma.$transaction(async (tx) => {
         dto = sanitizeInput(dto);
 
         // Find if the group exists for this company
@@ -348,7 +353,7 @@ export class EmployeeService {
           tx,
         );
 
-        const newEntry = await this.employeeRepository.create(
+        const createdEmployee = await this.employeeRepository.create(
           {
             company: { connect: { id: company.id } },
             group: { connect: { id: group.id } },
@@ -366,8 +371,41 @@ export class EmployeeService {
           tx,
         );
 
-        return newEntry;
+        return createdEmployee;
       });
+
+      setTimeout(async () => {
+        try {
+          const teamMembers = await this.prisma.teamMember.findMany({
+            where: {
+              companyId: company.id,
+              role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+            },
+            include: { user: true },
+          });
+
+          for (const member of teamMembers) {
+            if (member.user) {
+              await this.notificationService.createNotification({
+                title: 'Employee Added',
+                message: `A new employee ${newEntry?.name || 'Unknown'} has been added.`,
+                type: NotificationsTypeEnum.EMPLOYEE_ADDED,
+                userId: member.user.id,
+                metadata: {
+                  companyId: company.id,
+                  employeeId: newEntry?.id,
+                  employeeName: newEntry?.name,
+                  groupId: newEntry?.groupId,
+                },
+              });
+            }
+          }
+        } catch (error) {
+          this.logger.error('Failed to send employee added notification:', error);
+        }
+      }, 0);
+
+      return newEntry;
     } catch (error) {
       this.logger.error('Failed to create new employee:', error);
       handleError(error, this.logger);
@@ -384,8 +422,10 @@ export class EmployeeService {
     contactId: number,
     dto: UpdateAddressBookDto,
   ): Promise<Employee> {
+    let updatedContact: Employee | undefined;
+
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      updatedContact = await this.prisma.$transaction(async (tx) => {
         const existingContact = await this.employeeRepository.findOne(
           {
             id: contactId,
@@ -469,14 +509,49 @@ export class EmployeeService {
         }
 
         // Update the contact
-        const updatedContact = await this.employeeRepository.update(
+        const updatedEmployee = await this.employeeRepository.update(
           { id: contactId, companyId },
           updateData,
           tx,
         );
 
-        return updatedContact;
+        return updatedEmployee;
       });
+
+      setTimeout(async () => {
+        try {
+          const teamMembers = await this.prisma.teamMember.findMany({
+            where: {
+              companyId,
+              role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+            },
+            include: { user: true },
+          });
+
+          for (const member of teamMembers) {
+            if (member.user) {
+              await this.notificationService.createNotification({
+                title: 'Employee Updated',
+                message: `Employee ${updatedContact?.name || 'Unknown'} has been updated.`,
+                type: NotificationsTypeEnum.EMPLOYEE_UPDATED,
+                userId: member.user.id,
+                metadata: {
+                  companyId,
+                  employeeId: updatedContact?.id,
+                  employeeName: updatedContact?.name,
+                  updatedFields: Object.keys(dto).filter(
+                    (key) => dto[key as keyof UpdateAddressBookDto] !== undefined,
+                  ),
+                },
+              });
+            }
+          }
+        } catch (error) {
+          this.logger.error('Failed to send employee updated notification:', error);
+        }
+      }, 0);
+
+      return updatedContact;
     } catch (error) {
       this.logger.error('Failed to update employee:', error);
       handleError(error, this.logger);
@@ -541,8 +616,10 @@ export class EmployeeService {
    * Delete contact by ID
    */
   async deleteEmployee(companyId: number, contactId: number) {
+    let deletedContactName: string | null = null;
+
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const result = await this.prisma.$transaction(async (tx) => {
         const contact = await this.employeeRepository.findOne(
           {
             id: contactId,
@@ -555,11 +632,45 @@ export class EmployeeService {
           throw new NotFoundException(ErrorEmployee.ContactNotFound);
         }
 
+        deletedContactName = contact.name;
+
         await this.employeeRepository.delete({ id: contactId, companyId }, tx);
         return {
           message: 'Employee deleted successfully',
         };
       });
+
+      setTimeout(async () => {
+        try {
+          const teamMembers = await this.prisma.teamMember.findMany({
+            where: {
+              companyId,
+              role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+            },
+            include: { user: true },
+          });
+
+          for (const member of teamMembers) {
+            if (member.user) {
+              await this.notificationService.createNotification({
+                title: 'Employee Removed',
+                message: `Employee ${deletedContactName || 'Unknown'} has been removed.`,
+                type: NotificationsTypeEnum.EMPLOYEE_REMOVED,
+                userId: member.user.id,
+                metadata: {
+                  companyId,
+                  employeeId: contactId,
+                  employeeName: deletedContactName,
+                },
+              });
+            }
+          }
+        } catch (error) {
+          this.logger.error('Failed to send employee removed notification:', error);
+        }
+      }, 0);
+
+      return result;
     } catch (error) {
       this.logger.error('Failed to delete employee:', error);
       handleError(error, this.logger);

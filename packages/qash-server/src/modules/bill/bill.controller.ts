@@ -8,6 +8,7 @@ import {
   Query,
   ParseIntPipe,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -31,6 +32,8 @@ import {
   CurrentUser,
   UserWithCompany,
 } from '../auth/decorators/current-user.decorator';
+import { AdminOnly } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
 
 @ApiTags('Bill')
 @ApiBearerAuth()
@@ -102,6 +105,8 @@ export class BillController {
   // **************** POST METHODS *******************
   // *************************************************
   @Post('pay')
+  @UseGuards(RolesGuard)
+  @AdminOnly()
   @ApiOperation({ summary: 'Pay multiple bills in batch' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -120,6 +125,8 @@ export class BillController {
   }
 
   @Patch(':id/status/:status')
+  @UseGuards(RolesGuard)
+  @AdminOnly()
   @ApiOperation({ summary: 'Update bill status manually' })
   @ApiResponse({
     status: HttpStatus.OK,

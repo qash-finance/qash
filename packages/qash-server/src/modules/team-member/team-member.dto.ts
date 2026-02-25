@@ -11,10 +11,15 @@ import {
   IsUrl,
   IsNumber,
   IsPositive,
+  IsUUID,
 } from 'class-validator';
-import { TeamMemberRoleEnum } from '../../database/generated/client';
+import {
+  TeamMemberRoleEnum,
+  TeamMemberStatusEnum,
+} from '@qash/types/enums';
+import type * as SharedTypes from '@qash/types/dto/team-member';
 
-export class CreateTeamMemberDto {
+export class CreateTeamMemberDto implements SharedTypes.CreateTeamMemberDto {
   @ApiProperty({
     description: 'First name',
     example: 'John',
@@ -24,14 +29,14 @@ export class CreateTeamMemberDto {
   @Length(1, 100)
   firstName: string;
 
-  @ApiProperty({
-    description: 'Last name',
+  @ApiPropertyOptional({
+    description: 'Last name (may be empty)',
     example: 'Doe',
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  @Length(1, 100)
-  lastName: string;
+  @Length(0, 100)
+  lastName?: string;
 
   @ApiProperty({
     description: 'Email address',
@@ -83,7 +88,7 @@ export class CreateTeamMemberDto {
   metadata?: any;
 }
 
-export class UpdateTeamMemberDto {
+export class UpdateTeamMemberDto implements SharedTypes.UpdateTeamMemberDto {
   @ApiPropertyOptional({
     description: 'First name',
     example: 'John',
@@ -95,13 +100,12 @@ export class UpdateTeamMemberDto {
   firstName?: string;
 
   @ApiPropertyOptional({
-    description: 'Last name',
+    description: 'Last name (may be empty)',
     example: 'Doe',
   })
   @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  @Length(1, 100)
+  @Length(0, 100)
   lastName?: string;
 
   @ApiPropertyOptional({
@@ -138,7 +142,25 @@ export class UpdateTeamMemberDto {
   metadata?: any;
 }
 
-export class UpdateTeamMemberRoleDto {
+export class UpdateAvatarDto {
+  @ApiProperty({
+    description: 'Avatar URL',
+    example: 'https://supabase.co/storage/v1/object/public/avatars/user-123.jpg',
+  })
+  @IsUrl()
+  @IsNotEmpty()
+  profilePicture: string;
+}
+
+export class UpdateAvatarResponseDto {
+  @ApiProperty({
+    description: 'Updated profile picture URL',
+    example: 'https://supabase.co/storage/v1/object/public/avatars/user-123.jpg',
+  })
+  profilePicture: string;
+}
+
+export class UpdateTeamMemberRoleDto implements SharedTypes.UpdateTeamMemberRoleDto {
   @ApiProperty({
     description: 'New role for team member',
     enum: TeamMemberRoleEnum,
@@ -148,7 +170,7 @@ export class UpdateTeamMemberRoleDto {
   role: TeamMemberRoleEnum;
 }
 
-export class InviteTeamMemberDto {
+export class InviteTeamMemberDto implements SharedTypes.InviteTeamMemberDto {
   @ApiProperty({
     description: 'First name',
     example: 'Jane',
@@ -158,14 +180,14 @@ export class InviteTeamMemberDto {
   @Length(1, 100)
   firstName: string;
 
-  @ApiProperty({
-    description: 'Last name',
+  @ApiPropertyOptional({
+    description: 'Last name (may be empty)',
     example: 'Smith',
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  @Length(1, 100)
-  lastName: string;
+  @Length(0, 100)
+  lastName?: string;
 
   @ApiProperty({
     description: 'Email address to send invitation',
@@ -201,18 +223,29 @@ export class InviteTeamMemberDto {
   metadata?: any;
 }
 
-export class TeamMemberResponseDto {
+export class AcceptInvitationByTokenDto implements SharedTypes.AcceptInvitationByTokenDto {
+  @ApiProperty({
+    description: 'Invitation token from email link',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @IsUUID()
+  token: string;
+}
+
+export class TeamMemberResponseDto implements SharedTypes.TeamMemberResponseDto {
   @ApiProperty({ description: 'Team member ID', example: 1 })
   id: number;
+
+  @ApiProperty({ description: 'UUID', example: 'cuid123' })
+  uuid: string;
 
   @ApiProperty({ description: 'First name', example: 'John' })
   firstName: string;
 
   @ApiProperty({ description: 'Last name', example: 'Doe' })
   lastName: string;
-
-  @ApiProperty({ description: 'Email address', example: 'john.doe@acme.com' })
-  email: string;
 
   @ApiPropertyOptional({ description: 'Position', example: 'CEO' })
   position?: string;
@@ -230,14 +263,21 @@ export class TeamMemberResponseDto {
   })
   role: TeamMemberRoleEnum;
 
-  @ApiProperty({ description: 'Is active', example: true })
-  isActive: boolean;
+  @ApiProperty({
+    description: 'Status',
+    enum: TeamMemberStatusEnum,
+    example: TeamMemberStatusEnum.ACTIVE,
+  })
+  status: TeamMemberStatusEnum;
 
   @ApiProperty({ description: 'Company ID', example: 1 })
   companyId: number;
 
   @ApiPropertyOptional({ description: 'User ID if linked', example: 1 })
   userId?: number;
+
+  @ApiPropertyOptional({ description: 'Email address for the team member', example: 'user@example.com' })
+  email?: string;
 
   @ApiPropertyOptional({ description: 'Invited by user ID', example: 1 })
   invitedBy?: number;
@@ -291,7 +331,7 @@ export class TeamMemberWithRelationsResponseDto extends TeamMemberResponseDto {
   inviter?: any;
 }
 
-export class TeamMemberStatsResponseDto {
+export class TeamMemberStatsResponseDto implements SharedTypes.TeamMemberStatsResponseDto {
   @ApiProperty({ description: 'Total team members', example: 10 })
   total: number;
 
@@ -301,17 +341,23 @@ export class TeamMemberStatsResponseDto {
   @ApiProperty({ description: 'Number of admins', example: 3 })
   admins: number;
 
-  @ApiProperty({ description: 'Number of viewers', example: 6 })
+  @ApiProperty({ description: 'Number of reviewers', example: 2 })
+  reviewers: number;
+
+  @ApiProperty({ description: 'Number of viewers', example: 4 })
   viewers: number;
 
-  @ApiProperty({ description: 'Active members', example: 9 })
+  @ApiProperty({ description: 'Active members', example: 8 })
   active: number;
 
   @ApiProperty({ description: 'Pending invitations', example: 2 })
   pending: number;
+
+  @ApiProperty({ description: 'Suspended members', example: 0 })
+  suspended: number;
 }
 
-export class TeamMemberSearchQueryDto {
+export class TeamMemberSearchQueryDto implements SharedTypes.TeamMemberSearchQueryDto {
   @ApiPropertyOptional({
     description: 'Role filter',
     enum: TeamMemberRoleEnum,
@@ -321,12 +367,12 @@ export class TeamMemberSearchQueryDto {
   role?: TeamMemberRoleEnum;
 
   @ApiPropertyOptional({
-    description: 'Active status filter',
-    example: true,
+    description: 'Status filter',
+    enum: TeamMemberStatusEnum,
   })
   @IsOptional()
-  @IsBoolean()
-  isActive?: boolean;
+  @IsEnum(TeamMemberStatusEnum)
+  status?: TeamMemberStatusEnum;
 
   @ApiPropertyOptional({
     description: 'Filter by whether member has user account',
@@ -346,7 +392,7 @@ export class TeamMemberSearchQueryDto {
   search?: string;
 }
 
-export class AcceptInvitationDto {
+export class AcceptInvitationDto implements SharedTypes.AcceptInvitationDto {
   @ApiPropertyOptional({
     description: 'Profile picture URL',
     example: 'https://example.com/profile.jpg',
@@ -364,7 +410,7 @@ export class AcceptInvitationDto {
   metadata?: any;
 }
 
-export class BulkInviteTeamMembersDto {
+export class BulkInviteTeamMembersDto implements SharedTypes.BulkInviteTeamMembersDto {
   @ApiProperty({
     description: 'List of team members to invite',
     type: [InviteTeamMemberDto],

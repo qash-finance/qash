@@ -10,8 +10,9 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { BillStatusEnum } from 'src/database/generated/client';
+import type * as SharedTypes from '@qash/types/dto/bill';
 
-export class BillQueryDto {
+export class BillQueryDto implements SharedTypes.BillQueryDto {
   @ApiPropertyOptional({
     description: 'Page number for pagination',
     example: 1,
@@ -60,7 +61,7 @@ export class BillQueryDto {
   search?: string;
 }
 
-export class BillStatsDto {
+export class BillStatsDto implements SharedTypes.BillStatsDto {
   @ApiProperty({
     description: 'Total number of bills',
     example: 50,
@@ -72,6 +73,12 @@ export class BillStatsDto {
     example: 15,
   })
   totalPending: number;
+
+  @ApiProperty({
+    description: 'Total number of proposed bills',
+    example: 5,
+  })
+  totalProposed: number;
 
   @ApiProperty({
     description: 'Total number of paid bills',
@@ -98,6 +105,12 @@ export class BillStatsDto {
   pendingAmount: string;
 
   @ApiProperty({
+    description: 'Total amount of proposed bills',
+    example: '15000.00',
+  })
+  proposedAmount: string;
+
+  @ApiProperty({
     description: 'Total amount of paid bills',
     example: '75000.00',
   })
@@ -110,7 +123,7 @@ export class BillStatsDto {
   overdueAmount: string;
 }
 
-export class PayBillsDto {
+export class PayBillsDto implements SharedTypes.PayBillsDto {
   @ApiProperty({
     description: 'Array of bill IDs to pay',
     example: [
@@ -132,7 +145,7 @@ export class PayBillsDto {
   transactionHash?: string;
 }
 
-export class BillTimelineDto {
+export class BillTimelineDto implements SharedTypes.BillTimelineDto {
   @ApiProperty({
     description: 'Timeline event type',
     example: 'created',
@@ -151,7 +164,7 @@ export class BillTimelineDto {
   metadata?: Record<string, any>;
 }
 
-export class BatchPaymentResultDto {
+export class BatchPaymentResultDto implements SharedTypes.BatchPaymentResultDto {
   @ApiProperty({
     description: 'Total amount paid',
     example: '15000.00',

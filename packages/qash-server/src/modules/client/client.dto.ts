@@ -7,8 +7,10 @@ import {
   IsString,
   MaxLength,
 } from 'class-validator';
+import type * as SharedTypes from '@qash/types/dto/client';
+import type { PaginationMetaDto as SharedPaginationMetaDto } from '@qash/types/dto/common';
 
-export class CreateClientDto {
+export class CreateClientDto implements SharedTypes.CreateClientDto {
   @ApiProperty({
     description: 'Contact email',
     example: 'client@example.com',
@@ -121,7 +123,7 @@ export class CreateClientDto {
 
 export class UpdateClientDto extends PartialType(CreateClientDto) {}
 
-export class ClientResponseDto {
+export class ClientResponseDto implements SharedTypes.ClientResponseDto {
   @ApiProperty()
   id: number;
 
@@ -168,7 +170,7 @@ export class ClientResponseDto {
   updatedAt: Date;
 }
 
-class PaginationMetaDto {
+class PaginationMetaDto implements SharedPaginationMetaDto {
   @ApiProperty()
   page: number;
 
@@ -188,7 +190,7 @@ class PaginationMetaDto {
   hasPrev: boolean;
 }
 
-export class PaginatedClientsResponseDto {
+export class PaginatedClientsResponseDto implements SharedTypes.PaginatedClientsResponseDto {
   @ApiProperty({ type: [ClientResponseDto] })
   data: ClientResponseDto[];
 

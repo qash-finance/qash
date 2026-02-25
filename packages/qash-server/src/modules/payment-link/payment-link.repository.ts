@@ -11,6 +11,7 @@ import {
   BaseRepository,
   PrismaTransactionClient,
 } from '../../database/base.repository';
+import { CompanyModel } from 'src/database/generated/models';
 
 @Injectable()
 export class PaymentLinkRepository extends BaseRepository<
@@ -60,7 +61,7 @@ export class PaymentLinkRepository extends BaseRepository<
   async findByCodeWithCompany(
     code: string,
     tx?: PrismaTransactionClient,
-  ): Promise<(PaymentLink & { company: any }) | null> {
+  ): Promise<(PaymentLink & { company: CompanyModel }) | null> {
     const model = this.getModel(tx);
     return model.findFirst({
       where: { code },

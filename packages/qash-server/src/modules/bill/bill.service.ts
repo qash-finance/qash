@@ -9,6 +9,7 @@ import { BillRepository, BillWithInvoice } from './bill.repository';
 import { InvoiceRepository } from '../invoice/repositories/invoice.repository';
 import { PdfService } from '../invoice/services/pdf.service';
 import { MailService } from '../mail/mail.service';
+import { NotificationService } from '../notification/notification.service';
 import {
   BillQueryDto,
   BillStatsDto,
@@ -21,6 +22,8 @@ import {
   BillStatusEnum,
   InvoiceStatusEnum,
   InvoiceTypeEnum,
+  NotificationsTypeEnum,
+  TeamMemberRoleEnum,
 } from 'src/database/generated/client';
 import { handleError } from 'src/common/utils/errors';
 import { PrismaService } from 'src/database/prisma.service';
@@ -37,6 +40,7 @@ export class BillService {
     private readonly invoiceRepository: InvoiceRepository,
     private readonly pdfService: PdfService,
     private readonly mailService: MailService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   //#region GET METHODS
@@ -165,6 +169,60 @@ export class BillService {
         });
       }
 
+      // Multisig proposal events
+      if (bill.multisigProposal) {
+        // Proposal created
+        timeline.push({
+          event: 'proposal_created',
+          timestamp: bill.multisigProposal.createdAt,
+          metadata: {
+            proposalUuid: bill.multisigProposal.uuid,
+            status: bill.multisigProposal.status,
+          },
+        });
+
+        // Add signature events
+        if (bill.multisigProposal.signatures) {
+          for (const sig of bill.multisigProposal.signatures) {
+            timeline.push({
+              event: 'proposal_signed',
+              timestamp: sig.createdAt,
+              metadata: {
+                signerName: `Approver ${sig.approverIndex + 1}`,
+                approverPublicKey: sig.approverPublicKey,
+              },
+            });
+          }
+        }
+
+        // Proposal executed
+        if (bill.multisigProposal.status === 'EXECUTED' && bill.multisigProposal.updatedAt) {
+          timeline.push({
+            event: 'proposal_executed',
+            timestamp: bill.multisigProposal.updatedAt,
+            metadata: {
+              transactionId: bill.multisigProposal.transactionId,
+            },
+          });
+        }
+
+        // Proposal cancelled
+        if (bill.multisigProposal.status === 'CANCELLED' && bill.multisigProposal.updatedAt) {
+          timeline.push({
+            event: 'proposal_cancelled',
+            timestamp: bill.multisigProposal.updatedAt,
+          });
+        }
+
+        // Proposal failed
+        if (bill.multisigProposal.status === 'FAILED' && bill.multisigProposal.updatedAt) {
+          timeline.push({
+            event: 'proposal_failed',
+            timestamp: bill.multisigProposal.updatedAt,
+          });
+        }
+      }
+
       // Sort timeline by timestamp
       timeline.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 
@@ -254,6 +312,38 @@ export class BillService {
 
     const bill = await this.billRepository.create(billData, tx);
 
+    // Notify company team members asynchronously (don't block transaction)
+    setTimeout(async () => {
+      try {
+        const teamMembers = await this.prisma.teamMember.findMany({
+          where: {
+            companyId,
+            role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+          },
+          include: { user: true },
+        });
+
+        for (const member of teamMembers) {
+          if (member.user) {
+            await this.notificationService.createNotification({
+              title: 'Bill Created',
+              message: `A new bill has been created for invoice ${invoice.invoiceNumber}.`,
+              type: NotificationsTypeEnum.BILL_CREATED,
+              userId: member.user.id,
+              metadata: {
+                companyId,
+                billId: bill.uuid,
+                invoiceId: invoice.uuid,
+                invoiceNumber: invoice.invoiceNumber,
+              },
+            });
+          }
+        }
+      } catch (error) {
+        this.logger.error('Error sending bill creation notification:', error);
+      }
+    }, 0);
+
     return bill;
   }
 
@@ -309,6 +399,39 @@ export class BillService {
 
     const bill = await this.billRepository.create(billData, tx);
 
+    // Notify company team members asynchronously (don't block transaction)
+    setTimeout(async () => {
+      try {
+        const teamMembers = await this.prisma.teamMember.findMany({
+          where: {
+            companyId,
+            role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+          },
+          include: { user: true },
+        });
+
+        for (const member of teamMembers) {
+          if (member.user) {
+            await this.notificationService.createNotification({
+              title: 'Bill Created',
+              message: `A new B2B bill has been created for invoice ${invoice.invoiceNumber}.`,
+              type: NotificationsTypeEnum.BILL_CREATED,
+              userId: member.user.id,
+              metadata: {
+                companyId,
+                billId: bill.uuid,
+                invoiceId: invoice.uuid,
+                invoiceNumber: invoice.invoiceNumber,
+                fromCompanyName: invoice.fromCompany?.companyName,
+              },
+            });
+          }
+        }
+      } catch (error) {
+        this.logger.error('Error sending B2B bill creation notification:', error);
+      }
+    }, 0);
+
     return bill;
   }
   async payBills(
@@ -353,6 +476,20 @@ export class BillService {
 
       if (notFoundBillIds.length > 0) {
         throw new NotFoundException(ErrorBill.BillsNotFoundOrNotPayable);
+      }
+
+      // Check if any bill has a proposed transaction status
+      const proposedBills = bills.filter(
+        (bill) => bill.status === BillStatusEnum.PROPOSED,
+      );
+
+      if (proposedBills.length > 0) {
+        const proposedBillIds = proposedBills
+          .map((bill) => bill.uuid)
+          .join(', ');
+        throw new ConflictException(
+          `Bills with IDs [${proposedBillIds}] have pending multisig proposals and cannot be paid. Please cancel the proposals first.`,
+        );
       }
 
       // Calculate total amount
@@ -400,6 +537,38 @@ export class BillService {
       timeout: 60000, // 60 seconds timeout for transaction
     });
 
+    // Notify company team members about bill payment
+    try {
+      const teamMembers = await this.prisma.teamMember.findMany({
+        where: {
+          companyId,
+          role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+        },
+        include: { user: true },
+      });
+
+      for (const member of teamMembers) {
+        if (member.user) {
+          await this.notificationService.createNotification({
+            title: 'Bills Paid',
+            message: `${billsWithInvoices.length} bill(s) have been marked as paid.`,
+            type: NotificationsTypeEnum.BILL_PAID,
+            userId: member.user.id,
+            metadata: {
+              count: billsWithInvoices.length,
+              companyId,
+              billIds: billsWithInvoices.map((bill) => bill.uuid),
+              totalAmount: result.totalAmount,
+              transactionHash: dto.transactionHash,
+            },
+          });
+        }
+      }
+    } catch (error) {
+      this.logger.error('Error sending bill payment notifications:', error);
+      // Don't throw - notification failure should not block bill payment
+    }
+
     // After successful transaction, send payslip emails for employee invoices
     // This is done outside the transaction to avoid blocking it
     await this.sendPayslipEmails(billsWithInvoices);
@@ -410,7 +579,7 @@ export class BillService {
   /**
    * Send payslip emails to employees for their paid invoices
    */
-  private async sendPayslipEmails(bills: BillWithInvoice[]): Promise<void> {
+  async sendPayslipEmails(bills: BillWithInvoice[]): Promise<void> {
     const emailPromises = bills
       .filter((bill) => {
         const invoice = bill.invoice as any;
@@ -556,4 +725,185 @@ export class BillService {
     );
   }
   //#endregion DELETE METHODS
+
+  //#region MULTISIG INTEGRATION METHODS
+  // *************************************************
+  // *** MULTISIG INTEGRATION METHODS ***
+  // *************************************************
+
+  /**
+   * Update bills status to PROPOSED when linked to a multisig proposal
+   * Called by MultisigService when a proposal is created with bills
+   */
+  async updateBillsStatusToProposed(
+    billUUIDs: string[],
+    proposalId: number,
+    tx: PrismaTransactionClient,
+  ): Promise<void> {
+    try {
+      if (billUUIDs.length === 0) {
+        return;
+      }
+
+      // Update all bills to PROPOSED status and link to proposal
+      const model = tx || this.prisma;
+      await model.bill.updateMany({
+        where: {
+          uuid: {
+            in: billUUIDs,
+          },
+        },
+        data: {
+          status: BillStatusEnum.PROPOSED,
+          multisigProposalId: proposalId,
+        },
+      });
+
+      this.logger.log(
+        `Updated ${billUUIDs.length} bills to PROPOSED status for proposal ${proposalId}`,
+      );
+
+      // Notify asynchronously (don't block the transaction)
+      setTimeout(async () => {
+        try {
+          // Fetch bills to get companyId and invoice details
+          const bills = await this.prisma.bill.findMany({
+            where: {
+              uuid: { in: billUUIDs },
+            },
+            include: {
+              invoice: true,
+              company: true,
+            },
+          });
+
+          if (bills.length === 0) return;
+
+          // Fetch the multisig proposal and account to get signers
+          const proposal = await this.prisma.multisigProposal.findUnique({
+            where: { id: proposalId },
+            include: {
+              account: {
+                include: {
+                  teamMembers: {
+                    include: {
+                      teamMember: {
+                        include: {
+                          user: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          });
+
+          if (!proposal || !proposal.account) return;
+
+          const companyId = bills[0].companyId;
+          const totalAmount = bills
+            .reduce((sum, bill) => sum + parseFloat(bill.invoice.total || '0'), 0)
+            .toFixed(2);
+
+          // Notify company team members
+          const teamMembers = await this.prisma.teamMember.findMany({
+            where: {
+              companyId,
+              role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+            },
+            include: { user: true },
+          });
+
+          for (const member of teamMembers) {
+            if (member.user) {
+              await this.notificationService.createNotification({
+                title: 'Bills Pending Approval',
+                message: `${billUUIDs.length} bill(s) totaling ${totalAmount} are pending multisig approval.`,
+                type: NotificationsTypeEnum.BILL_PROPOSED,
+                userId: member.user.id,
+                metadata: {
+                  companyId,
+                  billIds: billUUIDs,
+                  proposalId,
+                  totalAmount,
+                  count: billUUIDs.length,
+                },
+              });
+            }
+          }
+
+          // Notify multisig signers
+          for (const memberLink of proposal.account.teamMembers) {
+            if (memberLink.teamMember?.user) {
+              await this.notificationService.createNotification({
+                title: 'Multisig Approval Needed',
+                message: `${billUUIDs.length} bill(s) totaling ${totalAmount} require your signature for approval.`,
+                type: NotificationsTypeEnum.BILL_PROPOSED,
+                userId: memberLink.teamMember.user.id,
+                metadata: {
+                  companyId,
+                  billIds: billUUIDs,
+                  proposalId,
+                  totalAmount,
+                  count: billUUIDs.length,
+                },
+              });
+            }
+          }
+        } catch (error) {
+          this.logger.error('Error sending bill proposal notifications:', error);
+        }
+      }, 0);
+    } catch (error) {
+      this.logger.error('Error updating bills to PROPOSED status:', error);
+      handleError(error, this.logger);
+    }
+  }
+
+  /**
+   * Revert bills from PROPOSED back to PENDING when proposal is cancelled/failed
+   * Called by MultisigService when a proposal is cancelled or fails
+   */
+  async revertBillsFromProposed(
+    proposalId: number,
+    tx: PrismaTransactionClient,
+  ): Promise<void> {
+    try {
+      const model = tx || this.prisma;
+
+      // Find all bills linked to this proposal
+      const billsToRevert = await model.bill.findMany({
+        where: {
+          multisigProposalId: proposalId,
+          status: BillStatusEnum.PROPOSED,
+        },
+      });
+
+      if (billsToRevert.length === 0) {
+        return;
+      }
+
+      // Revert all bills back to PENDING and remove proposal link
+      await model.bill.updateMany({
+        where: {
+          multisigProposalId: proposalId,
+          status: BillStatusEnum.PROPOSED,
+        },
+        data: {
+          status: BillStatusEnum.PENDING,
+          multisigProposalId: null,
+        },
+      });
+
+      this.logger.log(
+        `Reverted ${billsToRevert.length} bills from PROPOSED to PENDING for cancelled proposal ${proposalId}`,
+      );
+    } catch (error) {
+      this.logger.error('Error reverting bills from PROPOSED status:', error);
+      handleError(error, this.logger);
+    }
+  }
+
+  //#endregion MULTISIG INTEGRATION METHODS
 }

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class MessageResponseDto {
   @ApiProperty({
@@ -112,7 +112,7 @@ export class TeamMembershipInfoDto {
   role: string;
 
   @ApiProperty({ description: 'Is team member active', example: true })
-  isActive: boolean;
+  status: string;
 
   @ApiProperty({ description: 'Creation timestamp' })
   createdAt: Date;
@@ -207,6 +207,22 @@ export class SetJwtCookieDto {
   @IsString({ message: 'JWT token must be a string' })
   @IsNotEmpty({ message: 'JWT token is required' })
   token: string;
+
+  @ApiPropertyOptional({
+    description: 'Wallet public key from Para wallet',
+    example: '0x04a1b2c3...',
+  })
+  @IsOptional()
+  @IsString({ message: 'Public key must be a string' })
+  publicKey?: string;
+
+  @ApiPropertyOptional({
+    description: 'ECDSA commitment derived from wallet public key (for multisig)',
+    example: '0x1234abcd...',
+  })
+  @IsOptional()
+  @IsString({ message: 'Commitment must be a string' })
+  commitment?: string;
 }
 
 export class SetJwtCookieResponseDto {

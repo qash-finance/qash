@@ -28,6 +28,11 @@ export type BillWithInvoice = Prisma.BillGetPayload<{
         items: true;
       };
     };
+    multisigProposal: {
+      include: {
+        signatures: true;
+      };
+    };
   };
 }>;
 
@@ -99,6 +104,11 @@ export class BillRepository extends BaseRepository<
           },
         },
         company: true,
+        multisigProposal: {
+          include: {
+            signatures: true,
+          },
+        },
       },
     });
   }
@@ -109,10 +119,12 @@ export class BillRepository extends BaseRepository<
   ): Promise<{
     totalBills: number;
     totalPending: number;
+    totalProposed: number;
     totalPaid: number;
     totalOverdue: number;
     totalAmount: string;
     pendingAmount: string;
+    proposedAmount: string;
     paidAmount: string;
     overdueAmount: string;
   }> {
@@ -122,16 +134,21 @@ export class BillRepository extends BaseRepository<
     const [
       totalBills,
       pendingBills,
+      proposedBills,
       paidBills,
       overdueBills,
       allBills,
       pendingBillsWithAmount,
+      proposedBillsWithAmount,
       paidBillsWithAmount,
       overdueBillsWithAmount,
     ] = await Promise.all([
       model.count({ where: baseWhere }),
       model.count({
         where: { ...baseWhere, status: BillStatusEnum.PENDING },
+      }),
+      model.count({
+        where: { ...baseWhere, status: BillStatusEnum.PROPOSED },
       }),
       model.count({
         where: { ...baseWhere, status: BillStatusEnum.PAID },
@@ -152,6 +169,14 @@ export class BillRepository extends BaseRepository<
       }),
       model.findMany({
         where: { ...baseWhere, status: BillStatusEnum.PENDING },
+        include: {
+          invoice: {
+            select: { total: true },
+          },
+        },
+      }),
+      model.findMany({
+        where: { ...baseWhere, status: BillStatusEnum.PROPOSED },
         include: {
           invoice: {
             select: { total: true },
@@ -185,6 +210,10 @@ export class BillRepository extends BaseRepository<
       .reduce((sum, bill) => sum + parseFloat(bill.invoice.total), 0)
       .toFixed(2);
 
+    const proposedAmount = proposedBillsWithAmount
+      .reduce((sum, bill) => sum + parseFloat(bill.invoice.total), 0)
+      .toFixed(2);
+
     const paidAmount = paidBillsWithAmount
       .reduce((sum, bill) => sum + parseFloat(bill.invoice.total), 0)
       .toFixed(2);
@@ -196,10 +225,12 @@ export class BillRepository extends BaseRepository<
     return {
       totalBills,
       totalPending: pendingBills,
+      totalProposed: proposedBills,
       totalPaid: paidBills,
       totalOverdue: overdueBills,
       totalAmount,
       pendingAmount,
+      proposedAmount,
       paidAmount,
       overdueAmount,
     };

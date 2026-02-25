@@ -20,6 +20,7 @@ import { EmployeeModule } from '../employee/employee.module';
 import { BillModule } from '../bill/bill.module';
 import { TeamMemberModule } from '../team-member/team-member.module';
 import { ClientModule } from '../client/client.module';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { ClientModule } from '../client/client.module';
     EmployeeModule,
     TeamMemberModule,
     ClientModule,
+    NotificationModule,
     forwardRef(() => BillModule),
   ],
   controllers: [InvoiceController, B2BInvoiceController],

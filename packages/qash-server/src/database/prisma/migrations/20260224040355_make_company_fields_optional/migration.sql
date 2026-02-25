@@ -1,0 +1,7 @@
+-- AlterTable
+ALTER TABLE "companies" ALTER COLUMN "registration_number" DROP NOT NULL,
+ALTER COLUMN "company_type" DROP NOT NULL,
+ALTER COLUMN "country" DROP NOT NULL,
+ALTER COLUMN "address_1" DROP NOT NULL,
+ALTER COLUMN "city" DROP NOT NULL,
+ALTER COLUMN "postal_code" DROP NOT NULL;

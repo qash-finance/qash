@@ -19,20 +19,22 @@ pnpm install
 
 ## Packages
 
-| Package | Description | Path |
-|---------|-------------|------|
-| `@qash/server` | NestJS API Server | `packages/qash-server` |
-| `@qash/web` | Next.js Web Application | `packages/qash-ui/packages/nextjs` |
-| `@qash/docs` | Docusaurus Documentation | `packages/qash-ui/packages/docs` |
+| Package        | Description              | Path                               |
+| -------------- | ------------------------ | ---------------------------------- |
+| `@qash/server` | NestJS API Server        | `packages/qash-server`             |
+| `@qash/web`    | Next.js Web Application  | `packages/qash-ui`                 |
+| `qash-doc`     | Docusaurus Documentation | `packages/qash-doc`                |
 
 ## Development
 
 ### Run all packages in development mode
+
 ```bash
 pnpm dev
 ```
 
 ### Run individual packages
+
 ```bash
 # Web app
 pnpm dev:web
@@ -47,11 +49,13 @@ pnpm dev:docs
 ## Build
 
 ### Build all packages
+
 ```bash
 pnpm build
 ```
 
 ### Build individual packages
+
 ```bash
 pnpm build:web
 pnpm build:server
@@ -123,10 +127,8 @@ qash/
 ├── tsconfig.json          # Root TypeScript config
 └── packages/
     ├── qash-server/       # @qash/server - NestJS API
-    └── qash-ui/      # UI packages
-        └── packages/
-            ├── nextjs/    # @qash/web - Next.js app
-            └── docs/      # @qash/docs - Docusaurus
+    ├── qash-doc/          # qash-doc - Docusaurus documentation
+    └── qash-ui/           # @qash/web - Next.js app
 ```
 
 ## License

@@ -1,0 +1,25 @@
+import { Module } from '@nestjs/common';
+import { MultisigController } from './multisig.controller';
+import { MultisigService } from './services/multisig.service';
+import { PrismaService } from '../../database/prisma.service';
+import { ConfigModule } from '@nestjs/config';
+import { AuthModule } from '../auth/auth.module';
+import { ActivityLogModule } from '../activity-log/activity-log.module';
+import { CompanyModule } from '../company/company.module';
+import { BillModule } from '../bill/bill.module';
+import { NotificationModule } from '../notification/notification.module';
+
+@Module({
+  imports: [
+    ConfigModule,
+    AuthModule,
+    ActivityLogModule,
+    CompanyModule,
+    BillModule,
+    NotificationModule,
+  ],
+  controllers: [MultisigController],
+  providers: [MultisigService, PrismaService],
+  exports: [MultisigService],
+})
+export class MultisigModule {}

@@ -5,10 +5,12 @@ import {
   ConflictException,
   ForbiddenException,
   BadRequestException,
+  GoneException,
 } from '@nestjs/common';
 import { TeamMemberRepository } from './team-member.repository';
 import { CompanyRepository } from '../company/company.repository';
 import { MailService } from '../mail/mail.service';
+import { NotificationService } from '../notification/notification.service';
 import { UserRepository } from '../auth/repositories/user.repository';
 import {
   CreateTeamMemberDto,
@@ -17,11 +19,22 @@ import {
   TeamMemberSearchQueryDto,
   AcceptInvitationDto,
   BulkInviteTeamMembersDto,
+  AcceptInvitationByTokenDto,
+  UpdateAvatarDto,
+  UpdateAvatarResponseDto,
 } from './team-member.dto';
-import { TeamMemberRoleEnum } from '../../database/generated/client';
+import {
+  NotificationsTypeEnum,
+  TeamMemberRoleEnum,
+  TeamMemberStatusEnum,
+} from '../../database/generated/client';
 import { ErrorCompany, ErrorTeamMember } from 'src/common/constants/errors';
 import { PrismaService } from 'src/database/prisma.service';
 import { handleError } from 'src/common/utils/errors';
+import { randomUUID } from 'crypto';
+import { ConfigService } from '@nestjs/config';
+import { CompanyModel } from 'src/database/generated/models';
+import { TeamMember } from 'src/database/generated/browser';
 
 @Injectable()
 export class TeamMemberService {
@@ -33,6 +46,8 @@ export class TeamMemberService {
     private readonly teamMemberRepository: TeamMemberRepository,
     private readonly companyRepository: CompanyRepository,
     private readonly userRepository: UserRepository,
+    private readonly configService: ConfigService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   /**
@@ -43,7 +58,7 @@ export class TeamMemberService {
     createTeamMemberDto: CreateTeamMemberDto,
   ) {
     try {
-      await this.prisma.$transaction(async (tx) => {
+      return await this.prisma.$transaction(async (tx) => {
         const { companyId } = createTeamMemberDto;
 
         // Check if user can manage team
@@ -114,7 +129,7 @@ export class TeamMemberService {
     inviteDto: InviteTeamMemberDto,
   ) {
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const result = await this.prisma.$transaction(async (tx) => {
         // Check if user can manage team
         const canManage = await this.teamMemberRepository.hasPermission(
           companyId,
@@ -146,6 +161,11 @@ export class TeamMemberService {
           throw new ConflictException(ErrorTeamMember.EmailAlreadyInvited);
         }
 
+        // Generate invitation token with 7-day expiry
+        const invitationToken = randomUUID();
+        const invitationExpiresAt = new Date();
+        invitationExpiresAt.setDate(invitationExpiresAt.getDate() + 7);
+
         // Create user first (required for 1:1 relationship)
         const user = await this.userRepository.create(
           {
@@ -154,13 +174,17 @@ export class TeamMemberService {
           tx,
         );
 
-        // Create team member record
+        // Create team member record with PENDING status
         const teamMember = await this.teamMemberRepository.create(
           {
             firstName: inviteDto.firstName,
             lastName: inviteDto.lastName,
             position: inviteDto.position,
             role: inviteDto.role,
+            status: TeamMemberStatusEnum.PENDING,
+            invitationToken,
+            invitationExpiresAt,
+            invitedAt: new Date(),
             company: {
               connect: {
                 id: companyId,
@@ -183,14 +207,29 @@ export class TeamMemberService {
 
         // Send invitation email
         try {
-          await this.sendInvitationEmail(teamMember, company);
+          const stats = await this.teamMemberRepository.getCompanyStats(
+            companyId,
+            tx,
+          );
+          await this.sendInvitationEmail(
+            teamMember,
+            company,
+            invitationToken,
+            inviteDto.email,
+            stats.total,
+          );
         } catch (error) {
           this.logger.error('Failed to send invitation email:', error);
           // Don't throw error, invitation is created but email failed
         }
 
-        return teamMember;
+        return {
+          ...teamMember,
+          email: inviteDto.email,
+        };
       });
+
+      return result;
     } catch (error) {
       this.logger.error('Failed to invite team member:', error);
       handleError(error, this.logger);
@@ -219,31 +258,35 @@ export class TeamMemberService {
         );
       }
 
-      const results = [];
-      const errors = [];
+      // Execute invites in parallel and collect results
+      const settled = await Promise.allSettled(
+        bulkInviteDto.members.map((member) =>
+          this.inviteTeamMember(userId, companyId, member),
+        ),
+      );
 
-      for (const memberDto of bulkInviteDto.members) {
-        try {
-          const result = await this.inviteTeamMember(
-            userId,
-            companyId,
-            memberDto,
-          );
-          results.push(result);
-        } catch (error) {
-          errors.push({
-            email: memberDto.email,
-            error: error.message,
-          });
+      const successful: any[] = [];
+      const failed: Array<{ email: string; error: string }> = [];
+
+      for (let i = 0; i < settled.length; i++) {
+        const res = settled[i];
+        const member = bulkInviteDto.members[i];
+
+        if (res.status === 'fulfilled') {
+          successful.push(res.value);
+        } else {
+          const err = res.reason;
+          const message = err instanceof Error ? err.message : JSON.stringify(err);
+          failed.push({ email: member.email, error: message });
         }
       }
 
       return {
-        successful: results,
-        failed: errors,
+        successful,
+        failed,
         totalProcessed: bulkInviteDto.members.length,
-        successCount: results.length,
-        failureCount: errors.length,
+        successCount: successful.length,
+        failureCount: failed.length,
       };
     } catch (error) {
       this.logger.error('Failed to bulk invite team members:', error);
@@ -270,6 +313,7 @@ export class TeamMemberService {
         [
           TeamMemberRoleEnum.OWNER,
           TeamMemberRoleEnum.ADMIN,
+          TeamMemberRoleEnum.REVIEWER,
           TeamMemberRoleEnum.VIEWER,
         ],
       );
@@ -301,6 +345,7 @@ export class TeamMemberService {
         [
           TeamMemberRoleEnum.OWNER,
           TeamMemberRoleEnum.ADMIN,
+          TeamMemberRoleEnum.REVIEWER,
           TeamMemberRoleEnum.VIEWER,
         ],
       );
@@ -376,6 +421,55 @@ export class TeamMemberService {
   }
 
   /**
+   * Update team member avatar
+   */
+  async updateAvatar(
+    teamMemberId: number,
+    userId: number,
+    avatarUrl: string,
+  ): Promise<UpdateAvatarResponseDto> {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const teamMember =
+          await this.teamMemberRepository.findByIdWithRelations(
+            teamMemberId,
+            tx,
+          );
+        if (!teamMember) {
+          throw new NotFoundException(ErrorTeamMember.NotFound);
+        }
+
+        // Check if user can update: own profile or admin
+        const canManage = await this.teamMemberRepository.hasPermission(
+          teamMember.companyId,
+          userId,
+          [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN],
+          tx,
+        );
+
+        const isOwnProfile = teamMember.userId === userId;
+
+        if (!canManage && !isOwnProfile) {
+          throw new ForbiddenException(ErrorTeamMember.InsufficientPermissions);
+        }
+
+        const updated = await this.teamMemberRepository.updateById(
+          teamMemberId,
+          { profilePicture: avatarUrl },
+          tx,
+        );
+
+        return {
+          profilePicture: updated.profilePicture || '',
+        };
+      });
+    } catch (error) {
+      this.logger.error(`Failed to update avatar for team member ${teamMemberId}:`, error);
+      handleError(error, this.logger);
+    }
+  }
+
+  /**
    * Update team member role
    */
   async updateTeamMemberRole(
@@ -384,7 +478,7 @@ export class TeamMemberService {
     newRole: TeamMemberRoleEnum,
   ) {
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const updatedMember = await this.prisma.$transaction(async (tx) => {
         const teamMember = await this.teamMemberRepository.findById(
           teamMemberId,
           tx,
@@ -393,7 +487,7 @@ export class TeamMemberService {
           throw new NotFoundException(ErrorTeamMember.NotFound);
         }
 
-        // Only owners can change roles, and admins can change viewer roles
+        // Only OWNER can change roles for ADMIN, and ADMIN can change REVIEWER/VIEWER roles
         const userRole = await this.teamMemberRepository.getUserRoleInCompany(
           teamMember.companyId,
           userId,
@@ -404,43 +498,43 @@ export class TeamMemberService {
           throw new ForbiddenException(ErrorTeamMember.AccessDenied);
         }
 
-        // Role change permissions
+        // Cannot change OWNER role - only one OWNER per company
+        if (newRole === TeamMemberRoleEnum.OWNER) {
+          throw new ForbiddenException(ErrorTeamMember.CannotAssignOwnerRole);
+        }
+
+        // Role change permissions based on hierarchy: OWNER > ADMIN > REVIEWER > VIEWER
         if (userRole === TeamMemberRoleEnum.OWNER) {
-          // Owners can change any role
+          // Owner can change any role except to OWNER (handled above)
         } else if (userRole === TeamMemberRoleEnum.ADMIN) {
-          // Admins can only change viewer roles and cannot promote to owner
+          // Admin cannot change OWNER or other ADMIN roles
           if (
-            teamMember.role !== TeamMemberRoleEnum.VIEWER ||
-            newRole === TeamMemberRoleEnum.OWNER
+            teamMember.role === TeamMemberRoleEnum.OWNER ||
+            teamMember.role === TeamMemberRoleEnum.ADMIN ||
+            newRole === TeamMemberRoleEnum.ADMIN
           ) {
             throw new ForbiddenException(
               ErrorTeamMember.InsufficientPermissions,
             );
           }
         } else {
+          // REVIEWER and VIEWER cannot change roles
           throw new ForbiddenException(ErrorTeamMember.InsufficientPermissions);
-        }
-
-        // Prevent removing the last owner
-        if (
-          teamMember.role === TeamMemberRoleEnum.OWNER &&
-          newRole !== TeamMemberRoleEnum.OWNER
-        ) {
-          const ownerCount = await this.teamMemberRepository.countByCompany(
-            teamMember.companyId,
-            { role: TeamMemberRoleEnum.OWNER, isActive: true },
-            tx,
-          );
-
-          if (ownerCount <= 1) {
-            throw new BadRequestException(
-              ErrorTeamMember.CannotRemoveLastOwner,
-            );
-          }
         }
 
         return this.teamMemberRepository.updateRole(teamMemberId, newRole, tx);
       });
+
+      setTimeout(async () => {
+        await this.notifyTeamMemberRoleChanged(
+          updatedMember.companyId,
+          updatedMember.userId,
+          updatedMember.id,
+          newRole,
+        );
+      }, 0);
+
+      return updatedMember;
     } catch (error) {
       this.logger.error(
         `Failed to update team member role ${teamMemberId}:`,
@@ -464,7 +558,246 @@ export class TeamMemberService {
           throw new NotFoundException(ErrorTeamMember.NotFound);
         }
 
-        // Check permissions
+        // Get the requesting user's role
+        const userRole = await this.teamMemberRepository.getUserRoleInCompany(
+          teamMember.companyId,
+          userId,
+          tx,
+        );
+
+        if (!userRole) {
+          throw new ForbiddenException(ErrorTeamMember.AccessDenied);
+        }
+
+        // Cannot remove the OWNER
+        if (teamMember.role === TeamMemberRoleEnum.OWNER) {
+          throw new BadRequestException(ErrorTeamMember.CannotRemoveOwner);
+        }
+
+        // Only OWNER can remove ADMIN members
+        if (
+          teamMember.role === TeamMemberRoleEnum.ADMIN &&
+          userRole !== TeamMemberRoleEnum.OWNER
+        ) {
+          throw new ForbiddenException(
+            ErrorTeamMember.OnlyOwnerCanRemoveAdmin,
+          );
+        }
+
+        // ADMIN can remove REVIEWER and VIEWER
+        if (
+          userRole !== TeamMemberRoleEnum.OWNER &&
+          userRole !== TeamMemberRoleEnum.ADMIN
+        ) {
+          throw new ForbiddenException(ErrorTeamMember.InsufficientPermissions);
+        }
+
+        // Permanently delete the team member (not just suspend)
+        const deletedTeamMember = await this.teamMemberRepository.delete({ id: teamMemberId }, tx);
+
+        // Nullify any invitedBy references from this user on other team members to avoid FK constraint
+        if (deletedTeamMember.userId) {
+          const model = tx.teamMember;
+          await model.updateMany({
+            where: { invitedBy: deletedTeamMember.userId },
+            data: { invitedBy: null },
+          });
+
+          // Also delete the associated User account (1:1 relationship)
+          await this.userRepository.delete({ id: deletedTeamMember.userId }, tx);
+        }
+
+        return deletedTeamMember;
+      });
+    } catch (error) {
+      this.logger.error(`Failed to remove team member ${teamMemberId}:`, error);
+      handleError(error, this.logger);
+    }
+  }
+
+  /**
+   * Suspend team member
+   */
+  async suspendTeamMember(teamMemberId: number, userId: number) {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const teamMember = await this.teamMemberRepository.findById(
+          teamMemberId,
+          tx,
+        );
+        if (!teamMember) {
+          throw new NotFoundException(ErrorTeamMember.NotFound);
+        }
+
+        // Get the requesting user's role
+        const userRole = await this.teamMemberRepository.getUserRoleInCompany(
+          teamMember.companyId,
+          userId,
+          tx,
+        );
+
+        if (!userRole) {
+          throw new ForbiddenException(ErrorTeamMember.AccessDenied);
+        }
+
+        // Cannot suspend the OWNER
+        if (teamMember.role === TeamMemberRoleEnum.OWNER) {
+          throw new BadRequestException(ErrorTeamMember.CannotRemoveOwner);
+        }
+
+        // Only OWNER can suspend ADMIN members
+        if (
+          teamMember.role === TeamMemberRoleEnum.ADMIN &&
+          userRole !== TeamMemberRoleEnum.OWNER
+        ) {
+          throw new ForbiddenException(
+            ErrorTeamMember.OnlyOwnerCanRemoveAdmin,
+          );
+        }
+
+        // ADMIN can suspend REVIEWER and VIEWER
+        if (
+          userRole !== TeamMemberRoleEnum.OWNER &&
+          userRole !== TeamMemberRoleEnum.ADMIN
+        ) {
+          throw new ForbiddenException(ErrorTeamMember.InsufficientPermissions);
+        }
+
+        return this.teamMemberRepository.suspend(teamMemberId, tx);
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to suspend team member ${teamMemberId}:`,
+        error,
+      );
+      handleError(error, this.logger);
+    }
+  }
+
+  /**
+   * Reactivate suspended team member
+   */
+  async reactivateTeamMember(teamMemberId: number, userId: number) {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const teamMember = await this.teamMemberRepository.findById(
+          teamMemberId,
+          tx,
+        );
+        if (!teamMember) {
+          throw new NotFoundException(ErrorTeamMember.NotFound);
+        }
+
+        // Only SUSPENDED members can be reactivated
+        if (teamMember.status !== TeamMemberStatusEnum.SUSPENDED) {
+          throw new BadRequestException(ErrorTeamMember.NotSuspended);
+        }
+
+        // Get the requesting user's role
+        const userRole = await this.teamMemberRepository.getUserRoleInCompany(
+          teamMember.companyId,
+          userId,
+          tx,
+        );
+
+        if (!userRole) {
+          throw new ForbiddenException(ErrorTeamMember.AccessDenied);
+        }
+
+        // Only OWNER can reactivate ADMIN members
+        if (
+          teamMember.role === TeamMemberRoleEnum.ADMIN &&
+          userRole !== TeamMemberRoleEnum.OWNER
+        ) {
+          throw new ForbiddenException(
+            ErrorTeamMember.InsufficientPermissions,
+          );
+        }
+
+        // ADMIN can reactivate REVIEWER and VIEWER
+        if (
+          userRole !== TeamMemberRoleEnum.OWNER &&
+          userRole !== TeamMemberRoleEnum.ADMIN
+        ) {
+          throw new ForbiddenException(ErrorTeamMember.InsufficientPermissions);
+        }
+
+        return this.teamMemberRepository.activate(teamMemberId, tx);
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to reactivate team member ${teamMemberId}:`,
+        error,
+      );
+      handleError(error, this.logger);
+    }
+  }
+
+  /**
+   * Accept invitation by token (from email link)
+   */
+  async acceptInvitationByToken(token: string) {
+    try {
+      const activatedMember = await this.prisma.$transaction(async (tx) => {
+        const teamMember =
+          await this.teamMemberRepository.findByInvitationToken(token, tx);
+
+        if (!teamMember) {
+          throw new NotFoundException(ErrorTeamMember.InvalidInvitationToken);
+        }
+
+        if (teamMember.status !== TeamMemberStatusEnum.PENDING) {
+          throw new BadRequestException(ErrorTeamMember.InvitationNotActive);
+        }
+
+        // Check if invitation has expired
+        if (
+          teamMember.invitationExpiresAt &&
+          new Date() > teamMember.invitationExpiresAt
+        ) {
+          throw new GoneException(ErrorTeamMember.InvitationExpired);
+        }
+
+        // Activate the team member
+        return this.teamMemberRepository.activate(teamMember.id, tx);
+      });
+
+      setTimeout(async () => {
+        await this.notifyTeamMemberJoined(
+          activatedMember.companyId,
+          activatedMember.id,
+          activatedMember.userId,
+        );
+      }, 0);
+
+      return activatedMember;
+    } catch (error) {
+      this.logger.error('Failed to accept invitation by token:', error);
+      handleError(error, this.logger);
+    }
+  }
+
+  /**
+   * Resend invitation email
+   */
+  async resendInvitation(teamMemberId: number, userId: number) {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const teamMember =
+          await this.teamMemberRepository.findByIdWithRelations(
+            teamMemberId,
+            tx,
+          );
+
+        if (!teamMember) {
+          throw new NotFoundException(ErrorTeamMember.NotFound);
+        }
+
+        if (teamMember.status !== TeamMemberStatusEnum.PENDING) {
+          throw new BadRequestException(ErrorTeamMember.NotPendingInvitation);
+        }
+
+        // Check if user can manage team
         const canManage = await this.teamMemberRepository.hasPermission(
           teamMember.companyId,
           userId,
@@ -476,31 +809,53 @@ export class TeamMemberService {
           throw new ForbiddenException(ErrorTeamMember.InsufficientPermissions);
         }
 
-        // Prevent removing the last owner
-        if (teamMember.role === TeamMemberRoleEnum.OWNER) {
-          const ownerCount = await this.teamMemberRepository.countByCompany(
-            teamMember.companyId,
-            { role: TeamMemberRoleEnum.OWNER, isActive: true },
-            tx,
-          );
+        // Generate new invitation token with 7-day expiry
+        const invitationToken = randomUUID();
+        const invitationExpiresAt = new Date();
+        invitationExpiresAt.setDate(invitationExpiresAt.getDate() + 7);
 
-          if (ownerCount <= 1) {
-            throw new BadRequestException(
-              ErrorTeamMember.CannotRemoveLastOwner,
-            );
-          }
+        await this.teamMemberRepository.updateInvitationToken(
+          teamMemberId,
+          invitationToken,
+          invitationExpiresAt,
+          tx,
+        );
+
+        // Get company details
+        const company = await this.companyRepository.findById(
+          teamMember.companyId,
+          tx,
+        );
+        if (!company) {
+          throw new NotFoundException(ErrorCompany.CompanyNotFound);
         }
 
-        return this.teamMemberRepository.deactivate(teamMemberId, tx);
+        // Send invitation email
+        const stats = await this.teamMemberRepository.getCompanyStats(
+          teamMember.companyId,
+          tx,
+        );
+        await this.sendInvitationEmail(
+          { ...teamMember, invitationToken },
+          company,
+          invitationToken,
+          teamMember.user?.email,
+          stats.total,
+        );
+
+        return { message: 'Invitation resent successfully' };
       });
     } catch (error) {
-      this.logger.error(`Failed to remove team member ${teamMemberId}:`, error);
+      this.logger.error(
+        `Failed to resend invitation for team member ${teamMemberId}:`,
+        error,
+      );
       handleError(error, this.logger);
     }
   }
 
   /**
-   * Accept invitation (when user creates account)
+   * Accept invitation (when user creates account) - deprecated, use acceptInvitationByToken
    */
   async acceptInvitation(
     teamMemberId: number,
@@ -508,7 +863,7 @@ export class TeamMemberService {
     acceptDto?: AcceptInvitationDto,
   ) {
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const activatedMember = await this.prisma.$transaction(async (tx) => {
         const teamMember = await this.teamMemberRepository.findById(
           teamMemberId,
           tx,
@@ -517,22 +872,21 @@ export class TeamMemberService {
           throw new NotFoundException(ErrorTeamMember.NotFound);
         }
 
-        if (teamMember.userId) {
-          throw new BadRequestException(ErrorTeamMember.UserAlreadyJoined);
+        // Check if team member is the current user
+        if (teamMember.userId !== userId) {
+          throw new ForbiddenException(ErrorTeamMember.AccessDenied);
         }
 
-        if (!teamMember.isActive) {
+        if (teamMember.status !== TeamMemberStatusEnum.PENDING) {
           throw new BadRequestException(ErrorTeamMember.InvitationNotActive);
         }
 
         // Prepare update data
         const updateData: any = {
-          user: {
-            connect: {
-              id: userId,
-            },
-          },
+          status: TeamMemberStatusEnum.ACTIVE,
           joinedAt: new Date(),
+          invitationToken: null,
+          invitationExpiresAt: null,
         };
 
         if (acceptDto?.profilePicture) {
@@ -556,6 +910,16 @@ export class TeamMemberService {
           tx,
         );
       });
+
+      setTimeout(async () => {
+        await this.notifyTeamMemberJoined(
+          activatedMember.companyId,
+          activatedMember.id,
+          activatedMember.userId,
+        );
+      }, 0);
+
+      return activatedMember;
     } catch (error) {
       this.logger.error(`Failed to accept invitation ${teamMemberId}:`, error);
       handleError(error, this.logger);
@@ -591,6 +955,7 @@ export class TeamMemberService {
         [
           TeamMemberRoleEnum.OWNER,
           TeamMemberRoleEnum.ADMIN,
+          TeamMemberRoleEnum.REVIEWER,
           TeamMemberRoleEnum.VIEWER,
         ],
       );
@@ -640,24 +1005,137 @@ export class TeamMemberService {
     }
   }
 
+  private async notifyTeamMemberJoined(
+    companyId: number,
+    teamMemberId: number,
+    userId: number | null,
+  ): Promise<void> {
+    try {
+      const recipients = await this.prisma.teamMember.findMany({
+        where: {
+          companyId,
+          status: TeamMemberStatusEnum.ACTIVE,
+        },
+        include: { user: true },
+      });
+
+      for (const recipient of recipients) {
+        if (recipient.user) {
+          await this.notificationService.createNotification({
+            title: 'Team Member Joined',
+            message: 'A new team member has joined your company.',
+            type: NotificationsTypeEnum.TEAM_MEMBER_JOINED,
+            userId: recipient.user.id,
+            metadata: {
+              companyId,
+              teamMemberId,
+              joinedUserId: userId,
+            },
+          });
+        }
+      }
+    } catch (error) {
+      this.logger.error('Failed to send team joined notifications:', error);
+    }
+  }
+
+  private async notifyTeamMemberRoleChanged(
+    companyId: number,
+    affectedUserId: number | null,
+    teamMemberId: number,
+    newRole: TeamMemberRoleEnum,
+  ): Promise<void> {
+    try {
+      if (affectedUserId) {
+        await this.notificationService.createNotification({
+          title: 'Your Team Role Changed',
+          message: `Your role has been updated to ${newRole}.`,
+          type: NotificationsTypeEnum.TEAM_MEMBER_ROLE_CHANGED,
+          userId: affectedUserId,
+          metadata: {
+            companyId,
+            teamMemberId,
+            newRole,
+          },
+        });
+      }
+
+      const owners = await this.prisma.teamMember.findMany({
+        where: {
+          companyId,
+          role: TeamMemberRoleEnum.OWNER,
+        },
+        include: { user: true },
+      });
+
+      for (const owner of owners) {
+        if (owner.user) {
+          await this.notificationService.createNotification({
+            title: 'Team Member Role Changed',
+            message: `A team member role has been updated to ${newRole}.`,
+            type: NotificationsTypeEnum.TEAM_MEMBER_ROLE_CHANGED,
+            userId: owner.user.id,
+            metadata: {
+              companyId,
+              teamMemberId,
+              newRole,
+            },
+          });
+        }
+      }
+    } catch (error) {
+      this.logger.error('Failed to send role change notifications:', error);
+    }
+  }
+
   /**
    * Send invitation email
    */
-  private async sendInvitationEmail(teamMember: any, company: any) {
+  private async sendInvitationEmail(
+    teamMember: TeamMember,
+    company: CompanyModel,
+    invitationToken: string,
+    toEmail: string,
+    teamMemberCount: number,
+  ) {
     const subject = `Invitation to join ${company.companyName}`;
-    const html = this.getInvitationEmailTemplate(teamMember, company);
+    const html = this.getInvitationEmailTemplate(
+      teamMember,
+      company,
+      invitationToken,
+      teamMemberCount,
+      toEmail
+    );
 
-    await this.mailService.sendEmail({
-      to: teamMember.email,
+    const mailgunDomain = this.configService.get<string>('MAILGUN_DOMAIN');
+
+    const fromEmail = 'noreply@' + mailgunDomain;
+
+    const emailData = {
+      to: toEmail,
+      fromEmail,
       subject,
       html,
-    });
+    };
+
+    await this.mailService.sendEmail(emailData);
   }
 
   /**
    * Get invitation email template
    */
-  private getInvitationEmailTemplate(teamMember: any, company: any): string {
+  private getInvitationEmailTemplate(
+    teamMember: TeamMember,
+    company: CompanyModel,
+    invitationToken: string,
+    teamMemberCount: number,
+    toEmail: string,
+  ): string {
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    const acceptUrl = `${frontendUrl}/team-invite?token=${invitationToken}&company=${encodeURIComponent(company.companyName)}&teamMemberCount=${teamMemberCount}&email=${encodeURIComponent(toEmail)}${company.logo ? `&companyLogo=${encodeURIComponent(company.logo)}` : ''}`;
+    const firstName = teamMember.firstName || 'there';
+
     return `
       <!DOCTYPE html>
       <html>
@@ -665,92 +1143,32 @@ export class TeamMemberService {
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Team Invitation</title>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { text-align: center; margin-bottom: 30px; }
-          .invitation-box { 
-            background: #f8f9fa; 
-            border: 2px solid #007bff; 
-            border-radius: 8px; 
-            padding: 20px; 
-            margin: 20px 0; 
-          }
-          .company-info {
-            background: #e9ecef;
-            padding: 15px;
-            border-radius: 4px;
-            margin: 15px 0;
-          }
-          .role-badge {
-            display: inline-block;
-            background: #007bff;
-            color: white;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: bold;
-          }
-          .cta-button {
-            display: inline-block;
-            background: #007bff;
-            color: white;
-            padding: 12px 24px;
-            text-decoration: none;
-            border-radius: 4px;
-            margin: 20px 0;
-          }
-          .footer { 
-            text-align: center; 
-            margin-top: 30px; 
-            font-size: 14px; 
-            color: #666; 
-          }
-        </style>
       </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>You're Invited to Join a Team!</h1>
-          </div>
-          
-          <p>Hello ${teamMember.firstName} ${teamMember.lastName},</p>
-          
-          <p>You have been invited to join <strong>${company.companyName}</strong> as a team member.</p>
-          
-          <div class="invitation-box">
-            <h3>Invitation Details</h3>
-            <div class="company-info">
-              <strong>Company:</strong> ${company.companyName}<br>
-              <strong>Registration:</strong> ${company.registrationNumber}<br>
-              <strong>Your Role:</strong> <span class="role-badge">${teamMember.role}</span><br>
-              ${teamMember.position ? `<strong>Position:</strong> ${teamMember.position}<br>` : ''}
+      <body style="margin: 0; padding: 0; background: #0e3ee0; font-family: 'Barlow', Arial, sans-serif; color: #0f172a;">
+        <img src="https://raw.githubusercontent.com/qash-finance/qash-server/refs/heads/main/images/top.png" style="height: 50px; width: 100%; display: block;" alt=""/>
+        <div style="width: 100%; background: #0e3ee0; padding: 32px 12px; box-sizing: border-box;">
+          <div style="max-width: 720px; margin: 0 auto; background: #f5f7fb; overflow: hidden;">
+            <div style="padding: 24px 24px 0 24px; text-align: left; border-bottom: 1px solid rgba(153, 160, 174, 0.24);">
+              <p style="font-size: 24px; font-weight: 600; margin: 0 0 16px 0; color: #1b1b1b; line-height: 1;">Your invitation to join ${company.companyName}</p>
             </div>
-          </div>
-          
-          <p>To accept this invitation and join the team:</p>
-          <ol>
-            <li>Create an account or sign in with this email address</li>
-            <li>Navigate to your pending invitations</li>
-            <li>Accept the invitation from ${company.companyName}</li>
-          </ol>
-          
-          <div style="text-align: center;">
-            <a href="#" class="cta-button">Accept Invitation</a>
-          </div>
-          
-          <p><strong>What you'll be able to do:</strong></p>
-          <ul>
-            ${teamMember.role === 'OWNER' ? '<li>Full company management access</li><li>Manage team members and permissions</li><li>Update company information</li>' : ''}
-            ${teamMember.role === 'ADMIN' ? '<li>Manage team members</li><li>Update company information</li><li>View all company data</li>' : ''}
-            ${teamMember.role === 'VIEWER' ? '<li>View company information</li><li>Access team directory</li>' : ''}
-          </ul>
-          
-          <p>If you have any questions, please contact the person who invited you.</p>
-          
-          <div class="footer">
-            <p>This invitation was sent to ${teamMember.email}</p>
-            <p>If you didn't expect this invitation, you can safely ignore this email.</p>
+            <div style="padding: 24px 24px 0 24px;">
+              <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px;">
+                <p style="font-size: 14px; font-weight: 600; margin: 0; color: #1b1b1b; line-height: 20px;">Hi ${firstName},</p>
+                <p style="font-size: 14px; font-weight: 500; margin: 0; color: #848484; line-height: 20px;">You've been invited to join the ${company.companyName} on Qash. Please click the button below to accept the invitation.</p>
+              </div>
+            </div>
+            <div style="padding: 24px 24px; border-top: 1px dashed rgba(153, 160, 174, 0.4); text-align: center;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(0deg, #002c69 0%, #0061e7 100%); border-radius: 10px; padding: 2px; margin: 0;">
+                <tr>
+                  <td align="center" style="background: #066eff; border-top: 2px solid #4888ff; border-radius: 8px; padding: 8px 12px;">
+                    <a href="${acceptUrl}" style="color: white; font-size: 14px; text-decoration: none; font-weight: 500; display: block; line-height: 20px;">Join now</a>
+                  </td>
+                </tr>
+              </table>
+            </div>
+            <div style="padding: 0 24px 28px 24px; font-size: 13px; color: #6b7280; line-height: 1.5;">
+              <p style="margin: 0;">This is an automated message, please do not reply to this email.</p>
+            </div>
           </div>
         </div>
       </body>

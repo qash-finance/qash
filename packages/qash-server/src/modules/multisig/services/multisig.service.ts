@@ -1,0 +1,1740 @@
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
+import { PrismaService } from '../../../database/prisma.service';
+import {
+  CreateMultisigAccountDto,
+  CreateConsumeProposalDto,
+  CreateSendProposalDto,
+  CreateBatchSendProposalDto,
+  CreateProposalFromBillsDto,
+  SubmitSignatureDto,
+  SubmitRejectionDto,
+  MultisigAccountResponseDto,
+  MultisigProposalResponseDto,
+  ExecuteTransactionResponseDto,
+} from '../dto/multisig.dto';
+import { UserWithCompany } from '../../auth/decorators/current-user.decorator';
+import { ActivityActionEnum, ActivityEntityTypeEnum, BillStatusEnum, NotificationsTypeEnum } from '../../../database/generated/client';
+import { ActivityLogService } from 'src/modules/activity-log/activity-log.service';
+import { BillService } from 'src/modules/bill/bill.service';
+import { NotificationService } from 'src/modules/notification/notification.service';
+
+@Injectable()
+export class MultisigService {
+  private readonly logger = new Logger(MultisigService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly activityLogService: ActivityLogService,
+    private readonly billService: BillService,
+    private readonly notificationService: NotificationService,
+  ) {}
+
+  /**
+   * Create a new multisig account
+   */
+  async createAccount(
+    dto: CreateMultisigAccountDto,
+    user: UserWithCompany,
+  ): Promise<MultisigAccountResponseDto> {
+    this.logger.log(
+      `Creating multisig account for company ${dto.companyId} with threshold ${dto.threshold}`,
+    );
+
+    // Verify company matches authenticated user's company
+    if (dto.companyId !== user.company.id) {
+      throw new BadRequestException(
+        'Cannot create multisig account for a different company',
+      );
+    }
+
+    // Validate company exists
+    const company = await this.prisma.company.findUnique({
+      where: { id: dto.companyId },
+    });
+
+    if (!company) {
+      throw new NotFoundException(
+        `Company with ID ${dto.companyId} not found`,
+      );
+    }
+
+    // Get team member (owner/creator)
+    const creatorTeamMember = await this.prisma.teamMember.findUnique({
+      where: { userId: user.internalUserId },
+    });
+
+    if (!creatorTeamMember) {
+      throw new NotFoundException(
+        `Team member not found for user ${user.internalUserId}`,
+      );
+    }
+
+    // Prepare team member IDs (always include creator) and convert to numbers
+    const memberIds = new Set<number>([creatorTeamMember.id]);
+    if (dto.teamMemberIds) {
+      dto.teamMemberIds.forEach((idStr) => {
+        const idNum = Number(idStr);
+        if (Number.isNaN(idNum)) {
+          throw new BadRequestException(`Invalid team member ID: ${idStr}`);
+        }
+        memberIds.add(idNum);
+      });
+    }
+
+    // Verify all team members exist, belong to the company, and fetch related user (for publicKey)
+    const memberIdArray = Array.from(memberIds);
+    const teamMembers = await this.prisma.teamMember.findMany({
+      where: {
+        id: { in: memberIdArray },
+        companyId: dto.companyId,
+      },
+      include: { user: true },
+    });
+
+    if (teamMembers.length !== memberIdArray.length) {
+      throw new BadRequestException(
+        'One or more team members do not exist or do not belong to this company',
+      );
+    }
+
+    // Validate threshold against number of approvers
+    if (dto.threshold > memberIdArray.length) {
+      throw new BadRequestException(
+        `Threshold (${dto.threshold}) cannot be greater than number of approvers (${memberIdArray.length})`,
+      );
+    }
+
+    // Use the frontend-provided accountId and publicKeys (created on-chain by OZ SDK)
+    const accountId = dto.accountId;
+    const publicKeys = dto.publicKeys;
+
+    // Store in database with team members
+    const account = await this.prisma.multisigAccount.create({
+      data: {
+        accountId,
+        name: dto.name,
+        description: dto.description,
+        publicKeys,
+        threshold: dto.threshold,
+        companyId: dto.companyId,
+        logo: dto.logo,
+        teamMembers: {
+          create: memberIdArray.map((teamMemberId) => ({
+            teamMemberId,
+          })),
+        },
+      },
+      include: {
+        teamMembers: true,
+      },
+    });
+
+    this.logger.log(`Multisig account created: ${accountId} with ${memberIds.size} team members`);
+
+    // Log activity
+    await this.activityLogService.logActivity({
+      companyId: dto.companyId,
+      teamMemberId: creatorTeamMember.id,
+      action: ActivityActionEnum.CREATE,
+      entityType: ActivityEntityTypeEnum.MULTISIG_ACCOUNT,
+      entityId: account.id,
+      entityUuid: account.uuid,
+      description: `Created multisig account "${dto.name}" (${accountId}) with ${memberIds.size} members and threshold ${dto.threshold}`,
+      metadata: {
+        accountId,
+        name: dto.name,
+        description: dto.description,
+        threshold: dto.threshold,
+        memberCount: memberIds.size,
+        logo: dto.logo,
+      },
+    });
+
+    // Create notifications for all team members involved
+    try {
+      for (const teamMember of teamMembers) {
+        if (teamMember.user) {
+          await this.notificationService.createNotification({
+            title: 'Multisig Account Created',
+            message: `Multisig account "${dto.name}" has been created with ${memberIds.size} members and a threshold of ${dto.threshold}.`,
+            type: NotificationsTypeEnum.MULTISIG_ACCOUNT_CREATED,
+            userId: teamMember.user.id,
+            metadata: {
+              accountId,
+              name: dto.name,
+              threshold: dto.threshold,
+              memberCount: memberIds.size,
+            },
+          });
+        }
+      }
+      this.logger.log(`Notifications created for ${teamMembers.length} team members`);
+    } catch (error) {
+      this.logger.error('Failed to create notifications for multisig account creation', error);
+      // Don't throw - notification failure should not block account creation
+    }
+
+    return account;
+  }
+
+  /**
+   * Get a multisig account by ID
+   */
+  async getAccount(accountId: string): Promise<MultisigAccountResponseDto> {
+    const account = await this.prisma.multisigAccount.findUnique({
+      where: { accountId },
+      include: {
+        teamMembers: true,
+      },
+    });
+
+    if (!account) {
+      throw new NotFoundException(
+        `Multisig account ${accountId} not found`,
+      );
+    }
+
+    return account;
+  }
+
+  /**
+   * List multisig accounts for a company, filtered to only accounts
+   * where the requesting user is a signer (via MultisigAccountMember).
+   * This prevents balance inconsistency when different team members
+   * have access to different multisig accounts.
+   */
+  async listAccountsByCompany(
+    companyId: number,
+    userId: number,
+  ): Promise<MultisigAccountResponseDto[]> {
+    return this.prisma.multisigAccount.findMany({
+      where: {
+        companyId,
+        teamMembers: {
+          some: {
+            teamMember: {
+              userId,
+            },
+          },
+        },
+      },
+      include: {
+        teamMembers: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * List all team members associated with a multisig account (by accountId)
+   */
+  async listAccountMembers(accountId: string): Promise<any[]> {
+    // Verify account exists (using external accountId)
+    const account = await this.prisma.multisigAccount.findUnique({
+      where: { accountId },
+    });
+
+    if (!account) {
+      throw new NotFoundException(`Multisig account ${accountId} not found`);
+    }
+
+    // Fetch account members by joining on multisig.accountId and include team member + user relations
+    const members = await this.prisma.multisigAccountMember.findMany({
+      where: { multisigAccount: { accountId } },
+      include: {
+        teamMember: {
+          include: {
+            user: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // Map to a simple response shape for the API
+    return members.map((m) => ({
+      id: m.teamMember.id,
+      uuid: m.teamMember.uuid,
+      name: `${m.teamMember.firstName || ''} ${m.teamMember.lastName || ''}`.trim(),
+      firstName: m.teamMember.firstName,
+      lastName: m.teamMember.lastName,
+      email: m.teamMember.user?.email,
+      role: m.teamMember.role,
+      position: m.teamMember.position,
+      publicKey: m.teamMember.user?.publicKey,
+      commitment: (m.teamMember.user as any)?.commitment,
+      joinedAt: m.createdAt,
+      profilePicture: m.teamMember.profilePicture,
+    }));
+  }
+
+  /**
+   * Create a consume notes proposal
+   */
+  async createConsumeProposal(
+    dto: CreateConsumeProposalDto,
+  ): Promise<MultisigProposalResponseDto> {
+    this.logger.log(
+      `Creating consume proposal for account ${dto.accountId}`,
+    );
+
+    // Verify account exists
+    const account = await this.getAccount(dto.accountId);
+
+    // Validate tokens provided
+    if (!dto.tokens || dto.tokens.length === 0) {
+      throw new BadRequestException('tokens are required for consume proposals');
+    }
+
+    if (!dto.summaryCommitment || !dto.summaryBytesHex) {
+      throw new BadRequestException(
+        'summaryCommitment and summaryBytesHex are required (proposal must be created via PSM on the frontend)',
+      );
+    }
+
+    const summaryCommitment = dto.summaryCommitment;
+    const summaryBytesHex = dto.summaryBytesHex;
+    const requestBytesHex = dto.requestBytesHex || '';
+
+    // Store proposal in database
+    const proposal = await this.prisma.multisigProposal.create({
+      data: {
+        accountId: dto.accountId,
+        description: dto.description,
+        proposalType: 'CONSUME',
+        psmProposalId: dto.psmProposalId || null,
+        summaryCommitment,
+        summaryBytesHex,
+        requestBytesHex,
+        noteIds: dto.noteIds,
+        tokens: dto.tokens as unknown as any,
+        status: 'PENDING',
+      },
+      include: {
+        signatures: true,
+      },
+    });
+
+    this.logger.log(`Consume proposal created: ${proposal.uuid}`);
+
+    // Notify all team members of the multisig account
+    try {
+      const accountWithMembers = await this.prisma.multisigAccount.findUnique({
+        where: { accountId: dto.accountId },
+        include: {
+          teamMembers: {
+            include: {
+              teamMember: {
+                include: {
+                  user: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (accountWithMembers) {
+        for (const member of accountWithMembers.teamMembers) {
+          if (member.teamMember.user) {
+            await this.notificationService.createNotification({
+              title: 'New Proposal Created',
+              message: `A new consume proposal "${dto.description}" has been created for multisig account "${accountWithMembers.name}". ${dto.noteIds.length} notes will be consumed.`,
+              type: NotificationsTypeEnum.MULTISIG_PROPOSAL_CREATED,
+              userId: member.teamMember.user.id,
+              metadata: {
+                proposalId: proposal.id,
+                proposalUuid:proposal.uuid,
+                accountId: dto.accountId,
+                proposalType: 'CONSUME',
+                noteIds: dto.noteIds,
+              },
+            });
+          }
+        }
+        this.logger.log(`Notifications sent for proposal ${proposal.uuid}`);
+      }
+    } catch (error) {
+      this.logger.error('Failed to create notifications for consume proposal', error);
+      // Don't throw - notification failure should not block proposal creation
+    }
+
+    return this.mapProposalToDto(proposal, account.threshold);
+  }
+
+  /**
+   * Create a send funds proposal
+   */
+  async createSendProposal(
+    dto: CreateSendProposalDto,
+  ): Promise<MultisigProposalResponseDto> {
+    this.logger.log(`Creating send proposal for account ${dto.accountId}`);
+
+    // Verify account exists
+    const account = await this.getAccount(dto.accountId);
+
+    // Validate tokens provided and that faucetId is included
+    if (!dto.tokens || dto.tokens.length === 0) {
+      throw new BadRequestException('tokens are required for send proposals');
+    }
+    const sendTokenAddrs = new Set(dto.tokens.map((t) => t.address.toLowerCase()));
+    if (!sendTokenAddrs.has((dto.faucetId || '').toLowerCase())) {
+      throw new BadRequestException('faucetId must be included in tokens');
+    }
+
+    if (!dto.summaryCommitment || !dto.summaryBytesHex) {
+      throw new BadRequestException(
+        'summaryCommitment and summaryBytesHex are required (proposal must be created via PSM on the frontend)',
+      );
+    }
+
+    // Store proposal in database
+    const proposal = await this.prisma.multisigProposal.create({
+      data: {
+        accountId: dto.accountId,
+        description: dto.description,
+        proposalType: 'SEND',
+        psmProposalId: dto.psmProposalId || null,
+        summaryCommitment: dto.summaryCommitment,
+        summaryBytesHex: dto.summaryBytesHex,
+        requestBytesHex: dto.requestBytesHex || '',
+        noteIds: [],
+        tokens: dto.tokens as unknown as any,
+        status: 'PENDING',
+      },
+      include: {
+        signatures: true,
+      },
+    });
+
+    this.logger.log(`Send proposal created: ${proposal.uuid}`);
+
+    // Notify all team members of the multisig account
+    try {
+      const accountWithMembers = await this.prisma.multisigAccount.findUnique({
+        where: { accountId: dto.accountId },
+        include: {
+          teamMembers: {
+            include: {
+              teamMember: {
+                include: {
+                  user: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (accountWithMembers) {
+        for (const member of accountWithMembers.teamMembers) {
+          if (member.teamMember.user) {
+            await this.notificationService.createNotification({
+              title: 'New Proposal Created',
+              message: `A new send proposal "${dto.description}" has been created for multisig account "${accountWithMembers.name}". Funds will be sent to ${dto.recipientId}.`,
+              type: NotificationsTypeEnum.MULTISIG_PROPOSAL_CREATED,
+              userId: member.teamMember.user.id,
+              metadata: {
+                proposalId: proposal.id,
+                proposalUuid: proposal.uuid,
+                accountId: dto.accountId,
+                proposalType: 'SEND',
+                recipientId: dto.recipientId,
+                amount: dto.amount,
+                faucetId: dto.faucetId,
+              },
+            });
+          }
+        }
+        this.logger.log(`Notifications sent for proposal ${proposal.uuid}`);
+      }
+    } catch (error) {
+      this.logger.error('Failed to create notifications for send proposal', error);
+      // Don't throw - notification failure should not block proposal creation
+    }
+
+    return this.mapProposalToDto(proposal, account.threshold);
+  }
+
+  /**
+   * Create a batch send funds proposal with multiple recipients
+   */
+  async createBatchSendProposal(
+    dto: CreateBatchSendProposalDto,
+  ): Promise<MultisigProposalResponseDto> {
+    this.logger.log(
+      `Creating batch send proposal for account ${dto.accountId} with ${dto.payments.length} payments`,
+    );
+
+    // Verify account exists
+    const account = await this.getAccount(dto.accountId);
+
+    // Validate batch has at least one payment
+    if (!dto.payments || dto.payments.length === 0) {
+      throw new BadRequestException(
+        'Batch send proposal must have at least one payment',
+      );
+    }
+
+    // Validate batch doesn't exceed UI limit (50 recipients)
+    if (dto.payments.length > 50) {
+      throw new BadRequestException(
+        'Batch send proposal cannot exceed 50 recipients per proposal. Please split into multiple proposals.',
+      );
+    }
+
+    // Validate tokens provided and cover all faucets in payments
+    if (!dto.tokens || dto.tokens.length === 0) {
+      throw new BadRequestException('tokens are required for batch send proposals');
+    }
+    const batchTokenAddrs = new Set(dto.tokens.map((t) => t.address.toLowerCase()));
+    for (const p of dto.payments) {
+      if (!batchTokenAddrs.has((p.faucetId || '').toLowerCase())) {
+        throw new BadRequestException(`Payment faucet ${p.faucetId} is not included in tokens`);
+      }
+    }
+
+    if (!dto.summaryCommitment || !dto.summaryBytesHex) {
+      throw new BadRequestException(
+        'summaryCommitment and summaryBytesHex are required (proposal must be created via PSM on the frontend)',
+      );
+    }
+
+    // Store proposal in database with payments stored as JSON
+    const proposal = await this.prisma.multisigProposal.create({
+      data: {
+        accountId: dto.accountId,
+        description: dto.description,
+        proposalType: 'SEND',
+        psmProposalId: dto.psmProposalId || null,
+        summaryCommitment: dto.summaryCommitment,
+        summaryBytesHex: dto.summaryBytesHex,
+        requestBytesHex: dto.requestBytesHex || '',
+        noteIds: [],
+        tokens: dto.tokens as unknown as any,
+        status: 'PENDING',
+        metadata: {
+          payments: dto.payments as unknown as any[],
+        },
+      },
+      include: {
+        signatures: true,
+      },
+    });
+
+    this.logger.log(
+      `Batch send proposal created with ${dto.payments.length} payments: ${proposal.uuid}`,
+    );
+
+    // Notify all team members of the multisig account
+    try {
+      const accountWithMembers = await this.prisma.multisigAccount.findUnique({
+        where: { accountId: dto.accountId },
+        include: {
+          teamMembers: {
+            include: {
+              teamMember: {
+                include: {
+                  user: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (accountWithMembers) {
+        for (const member of accountWithMembers.teamMembers) {
+          if (member.teamMember.user) {
+            await this.notificationService.createNotification({
+              title: 'New Batch Proposal Created',
+              message: `A new batch send proposal "${dto.description}" has been created for multisig account "${accountWithMembers.name}". ${dto.payments.length} payments will be sent.`,
+              type: NotificationsTypeEnum.MULTISIG_PROPOSAL_CREATED,
+              userId: member.teamMember.user.id,
+              metadata: {
+                proposalId: proposal.id,
+                proposalUuid: proposal.uuid,
+                accountId: dto.accountId,
+                proposalType: 'SEND',
+                paymentCount: dto.payments.length,
+              },
+            });
+          }
+        }
+        this.logger.log(`Notifications sent for batch proposal ${proposal.uuid}`);
+      }
+    } catch (error) {
+      this.logger.error('Failed to create notifications for batch send proposal', error);
+      // Don't throw - notification failure should not block proposal creation
+    }
+
+    return this.mapProposalToDto(proposal, account.threshold);
+  }
+
+  /**
+   * Create a proposal from bills (for multi-signature bill payments)
+   */
+  async createProposalFromBills(
+    dto: CreateProposalFromBillsDto,
+    user: UserWithCompany,
+  ): Promise<MultisigProposalResponseDto> {
+    this.logger.log(
+      `Creating proposal from ${dto.billUUIDs.length} bills for account ${dto.accountId}`,
+    );
+
+    // Verify account exists and belongs to user's company
+    const account = await this.prisma.multisigAccount.findUnique({
+      where: { accountId: dto.accountId },
+    });
+
+    if (!account) {
+      throw new NotFoundException(`Multisig account ${dto.accountId} not found`);
+    }
+
+    if (account.companyId !== user.company.id) {
+      throw new BadRequestException(
+        'Cannot create proposal for a multisig account from a different company',
+      );
+    }
+
+    // Fetch bills with their invoices
+    this.logger.debug(`Searching for bills with UUIDs: ${dto.billUUIDs.join(', ')} in company ${user.company.id}`);
+    
+    const bills = await this.prisma.bill.findMany({
+      where: {
+        uuid: { in: dto.billUUIDs },
+        companyId: user.company.id,
+      },
+      include: {
+        invoice: {
+          include: {
+            employee: true,
+            items: true,
+          },
+        },
+      },
+    });
+
+    if (bills.length === 0) {
+      this.logger.error(`No bills found with UUIDs: ${dto.billUUIDs.join(', ')} in company ${user.company.id}. Available bills in this company:`, 
+        await this.prisma.bill.findMany({ where: { companyId: user.company.id }, select: { uuid: true } }));
+      throw new NotFoundException('No valid bills found for the provided UUIDs');
+    }
+
+    this.logger.debug(`Found ${bills.length} bills out of ${dto.billUUIDs.length} requested`);
+
+    // Validate all bills are in payable status (PENDING or OVERDUE)
+    const invalidBills = bills.filter(
+      (b) => b.status !== BillStatusEnum.PENDING && b.status !== BillStatusEnum.OVERDUE,
+    );
+    if (invalidBills.length > 0) {
+      throw new BadRequestException(
+        `Bills with status other than PENDING or OVERDUE cannot be paid: ${invalidBills.map((b) => b.uuid).join(', ')}`,
+      );
+    }
+
+    // Check that bills are not already linked to another proposal
+    const linkedBills = bills.filter((b) => b.multisigProposalId !== null);
+    if (linkedBills.length > 0) {
+      throw new BadRequestException(
+        `Bills are already linked to another proposal: ${linkedBills.map((b) => b.uuid).join(', ')}`,
+      );
+    }
+
+    // Ensure tokens provided and cover invoice payment tokens
+    if (!dto.tokens || dto.tokens.length === 0) {
+      throw new BadRequestException('tokens are required for proposals from bills');
+    }
+    const billTokenAddrs = new Set(dto.tokens.map((t) => t.address.toLowerCase()));
+    for (const b of bills) {
+      const pt = (b.invoice as any)?.paymentToken;
+      const addr = pt?.address || pt?.faucetId || pt?.token_address;
+      if (addr && !billTokenAddrs.has((addr || '').toLowerCase())) {
+        throw new BadRequestException(`Bill ${b.uuid} payment token ${addr} is not included in tokens`);
+      }
+    }
+
+    // Use provided payments to create the proposal
+    const proposal = await this.prisma.$transaction(async (tx) => {
+      let summaryCommitment: string;
+      let summaryBytesHex: string;
+      let requestBytesHex: string;
+
+      if (!dto.summaryCommitment || !dto.summaryBytesHex) {
+        throw new BadRequestException(
+          'summaryCommitment and summaryBytesHex are required (proposal must be created via PSM on the frontend)',
+        );
+      }
+
+      summaryCommitment = dto.summaryCommitment;
+      summaryBytesHex = dto.summaryBytesHex;
+      requestBytesHex = dto.requestBytesHex || '';
+
+      // Create the proposal
+      const newProposal = await tx.multisigProposal.create({
+        data: {
+          accountId: dto.accountId,
+          description: dto.description,
+          proposalType: 'SEND',
+          psmProposalId: dto.psmProposalId || null,
+          summaryCommitment,
+          summaryBytesHex,
+          requestBytesHex,
+          noteIds: [],
+          tokens: dto.tokens as unknown as any,
+          status: 'PENDING',
+          metadata: {
+            billUUIDs: dto.billUUIDs,
+            totalBills: bills.length,
+            payments: dto.payments || null,
+          },
+        },
+        include: {
+          signatures: true,
+        },
+      });
+
+      // Link bills to the proposal
+      await tx.bill.updateMany({
+        where: {
+          uuid: { in: dto.billUUIDs },
+        },
+        data: {
+          multisigProposalId: newProposal.id,
+        },
+      });
+
+      // Update bills status to PROPOSED
+      await this.billService.updateBillsStatusToProposed(
+        dto.billUUIDs,
+        newProposal.id,
+        tx,
+      );
+
+      // Re-fetch the proposal including linked bills and signatures so callers receive updated relations
+      const proposalWithBills = await tx.multisigProposal.findUnique({
+        where: { id: newProposal.id },
+        include: {
+          signatures: true,
+          bills: {
+            include: {
+              invoice: true,
+            },
+          },
+        },
+      });
+
+      return proposalWithBills!;
+    });
+
+    // Get team member for activity log
+    const teamMember = await this.prisma.teamMember.findUnique({
+      where: { userId: user.internalUserId },
+    });
+
+    // Log activity
+    if (teamMember) {
+      await this.activityLogService.logActivity({
+        companyId: user.company.id,
+        teamMemberId: teamMember.id,
+        action: ActivityActionEnum.CREATE,
+        entityType: ActivityEntityTypeEnum.MULTISIG_PROPOSAL,
+        entityId: proposal.id,
+        entityUuid: proposal.uuid,
+        description: `Created payment proposal for ${bills.length} bills`,
+        metadata: {
+          accountId: dto.accountId,
+          billUUIDs: dto.billUUIDs,
+          billCount: bills.length,
+        },
+      });
+    }
+
+    this.logger.log(`Proposal created from bills: ${proposal.uuid}`);
+
+    // Notify all team members of the multisig account
+    try {
+      const accountWithMembers = await this.prisma.multisigAccount.findUnique({
+        where: { accountId: dto.accountId },
+        include: {
+          teamMembers: {
+            include: {
+              teamMember: {
+                include: {
+                  user: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (accountWithMembers) {
+        for (const member of accountWithMembers.teamMembers) {
+          if (member.teamMember.user) {
+            await this.notificationService.createNotification({
+              title: 'New Payment Proposal Created',
+              message: `A new payment proposal "${proposal.description}" has been created for multisig account "${accountWithMembers.name}". ${bills.length} bills are included.`,
+              type: NotificationsTypeEnum.MULTISIG_PROPOSAL_CREATED,
+              userId: member.teamMember.user.id,
+              metadata: {
+                proposalId: proposal.id,
+                proposalUuid: proposal.uuid,
+                accountId: dto.accountId,
+                billCount: bills.length,
+                billUUIDs: dto.billUUIDs,
+              },
+            });
+          }
+        }
+        this.logger.log(`Notifications sent for proposal ${proposal.uuid}`);
+      }
+    } catch (error) {
+      this.logger.error('Failed to create notifications for bills proposal', error);
+      // Don't throw - notification failure should not block proposal creation
+    }
+
+    return this.mapProposalToDto(proposal, account.threshold);
+  }
+
+  /**
+   * Cancel a proposal (deletes signatures, unlinks bills, sets status to CANCELLED, clears noteIds, records rejection)
+   * Uses optimistic locking via status validation
+   */
+  async cancelProposal(
+    proposalUuid: string,
+    user: UserWithCompany,
+  ): Promise<MultisigProposalResponseDto> {
+    this.logger.log(`Cancelling proposal ${proposalUuid}`);
+
+    // Get proposal with all data
+    const proposal = await this.prisma.multisigProposal.findUnique({
+      where: { uuid: proposalUuid },
+      include: {
+        account: true,
+        signatures: true,
+        bills: true,
+      },
+    });
+
+    if (!proposal) {
+      throw new NotFoundException(`Proposal ${proposalUuid} not found`);
+    }
+
+    // Verify company ownership
+    if (proposal.account.companyId !== user.company.id) {
+      throw new BadRequestException(
+        'Cannot cancel a proposal from a different company',
+      );
+    }
+
+    // Validate status - only allow cancellation of PENDING or READY proposals
+    if (proposal.status !== 'PENDING' && proposal.status !== 'READY') {
+      throw new ConflictException(
+        `Cannot cancel proposal with status ${proposal.status}. Only PENDING or READY proposals can be cancelled.`,
+      );
+    }
+
+    // Get team member for rejection record and activity log
+    const teamMember = await this.prisma.teamMember.findUnique({
+      where: { userId: user.internalUserId },
+    });
+
+    if (!teamMember) {
+      throw new NotFoundException(`Team member not found for user ${user.email}`);
+    }
+
+    // Use transaction for atomic operation with optimistic locking
+    const updatedProposal = await this.prisma.$transaction(async (tx) => {
+      // Re-check status to prevent race conditions (optimistic locking)
+      const currentProposal = await tx.multisigProposal.findUnique({
+        where: { uuid: proposalUuid },
+        select: { status: true },
+      });
+
+      if (currentProposal?.status !== 'PENDING' && currentProposal?.status !== 'READY') {
+        throw new ConflictException(
+          `Proposal status changed to ${currentProposal?.status}. Cannot cancel.`,
+        );
+      }
+
+      // Delete all signatures
+      await tx.multisigSignature.deleteMany({
+        where: { proposalId: proposal.id },
+      });
+
+      // Create rejection record for the person who cancelled
+      await tx.multisigRejection.create({
+        data: {
+          proposalId: proposal.id,
+          teamMemberId: teamMember.id,
+          reason: 'Proposal cancelled',
+        },
+      });
+
+      // Unlink bills and reset their status to PENDING
+      if (proposal.bills.length > 0) {
+        await tx.bill.updateMany({
+          where: { multisigProposalId: proposal.id },
+          data: {
+            multisigProposalId: null,
+            status: BillStatusEnum.PENDING,
+          },
+        });
+
+        // Log via BillService for consistency
+        await this.billService.revertBillsFromProposed(proposal.id, tx);
+      }
+
+      // Update proposal status to CANCELLED and clear noteIds
+      return tx.multisigProposal.update({
+        where: { uuid: proposalUuid },
+        data: { 
+          status: 'CANCELLED',
+          noteIds: [], // Clear noteIds so notes can be claimed again
+        },
+        include: {
+          account: true,
+          signatures: true,
+          bills: true,
+          rejections: {
+            include: {
+              teamMember: true,
+            },
+          },
+        },
+      });
+    });
+
+    // Log activity
+    await this.activityLogService.logActivity({
+      companyId: user.company.id,
+      teamMemberId: teamMember.id,
+      action: ActivityActionEnum.CANCEL,
+      entityType: ActivityEntityTypeEnum.MULTISIG_PROPOSAL,
+      entityId: proposal.id,
+      entityUuid: proposal.uuid,
+      description: `Cancelled payment proposal (${proposal.bills.length} bills unlinked, ${proposal.signatures.length} signatures deleted)`,
+      metadata: {
+        accountId: proposal.accountId,
+        billUUIDs: proposal.bills.map((b) => b.uuid),
+        signaturesDeleted: proposal.signatures.length,
+        cancelledBy: `${teamMember.firstName} ${teamMember.lastName}`,
+      },
+    });
+
+    this.logger.log(
+      `Proposal ${proposalUuid} cancelled: ${proposal.bills.length} bills unlinked, ${proposal.signatures.length} signatures deleted, noteIds cleared`,
+    );
+
+    // Notify all team members of the multisig account
+    try {
+      const accountWithMembers = await this.prisma.multisigAccount.findUnique({
+        where: { accountId: proposal.accountId },
+        include: {
+          teamMembers: {
+            include: {
+              teamMember: {
+                include: {
+                  user: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (accountWithMembers) {
+        for (const member of accountWithMembers.teamMembers) {
+          if (member.teamMember.user) {
+            await this.notificationService.createNotification({
+              title: 'Proposal Cancelled',
+              message: `Proposal "${proposal.description}" for multisig account "${accountWithMembers.name}" has been cancelled by ${teamMember.firstName} ${teamMember.lastName}.`,
+              type: NotificationsTypeEnum.MULTISIG_PROPOSAL_REJECTED,
+              userId: member.teamMember.user.id,
+              metadata: {
+                proposalId: proposal.id,
+                proposalUuid: proposal.uuid,
+                accountId: proposal.accountId,
+                cancelledBy: { id: teamMember.id, name: `${teamMember.firstName} ${teamMember.lastName}` },
+              },
+            });
+          }
+        }
+        this.logger.log(`Notifications sent for cancelled proposal ${proposalUuid}`);
+      }
+    } catch (error) {
+      this.logger.error('Failed to create notifications for cancelled proposal', error);
+      // Don't throw - notification failure should not block cancellation
+    }
+
+    return this.mapProposalToDto(updatedProposal, updatedProposal.account.threshold);
+  }
+
+  /**
+   * List all proposals for a company (across all multisig accounts)
+   */
+  async listProposalsByCompany(
+    companyId: number,
+    userId: number,
+  ): Promise<MultisigProposalResponseDto[]> {
+    const proposals = await this.prisma.multisigProposal.findMany({
+      where: {
+        account: {
+          companyId,
+          teamMembers: {
+            some: {
+              teamMember: {
+                userId,
+              },
+            },
+          },
+        },
+      },
+      include: {
+        account: {
+          include: {
+            teamMembers: {
+              include: { teamMember: { include: { user: true } } },
+              orderBy: { createdAt: 'asc' },
+            },
+          },
+        },
+        signatures: true,
+        rejections: {
+          include: {
+            teamMember: { include: { user: true } },
+          },
+        },
+        bills: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return proposals.map((p) => this.mapProposalToDto(p, p.account.threshold));
+  }
+
+  /**
+   * Get a proposal by ID
+   */
+  async getProposal(proposalId: number): Promise<MultisigProposalResponseDto> {
+    const proposal = await this.prisma.multisigProposal.findUnique({
+      where: { id: proposalId },
+      include: {
+        account: {
+          include: {
+            teamMembers: {
+              include: {
+                teamMember: { include: { user: true } },
+              },
+              orderBy: { createdAt: 'asc' },
+            },
+          },
+        },
+        signatures: true,
+        rejections: {
+          include: {
+            teamMember: { include: { user: true } },
+          },
+        },
+        bills: {
+          include: {
+            invoice: {
+              include: {
+                employee: { include: { group: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!proposal) {
+      throw new NotFoundException(`Proposal ${proposalId} not found`);
+    }
+
+    return this.mapProposalToDto(proposal, proposal.account.threshold);
+  }
+
+  /**
+   * List all proposals for an account
+   */
+  async listProposals(
+    accountId: string,
+  ): Promise<MultisigProposalResponseDto[]> {
+    const account = await this.getAccount(accountId);
+
+    const proposals = await this.prisma.multisigProposal.findMany({
+      where: { accountId },
+      include: {
+        account: {
+          include: {
+            teamMembers: {
+              include: {
+                teamMember: { include: { user: true } },
+              },
+              orderBy: { createdAt: 'asc' },
+            },
+          },
+        },
+        signatures: true,
+        rejections: {
+          include: {
+            teamMember: { include: { user: true } },
+          },
+        },
+        bills: {
+          include: {
+            invoice: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return proposals.map((p) => this.mapProposalToDto(p, account.threshold));
+  }
+
+  /**
+   * Submit a signature for a proposal
+   */
+  async submitSignature(
+    proposalId: number,
+    dto: SubmitSignatureDto,
+  ): Promise<MultisigProposalResponseDto> {
+    this.logger.log(`Submitting signature for proposal ${proposalId}`);
+
+    // Get proposal and account
+    const proposal = await this.prisma.multisigProposal.findUnique({
+      where: { id: proposalId },
+      include: {
+        account: true,
+        signatures: true,
+        bills: {
+          include: {
+            invoice: true,
+          },
+        },
+      },
+    });
+
+    if (!proposal) {
+      throw new NotFoundException(`Proposal ${proposalId} not found`);
+    }
+
+    if (proposal.status !== 'PENDING' && proposal.status !== 'READY') {
+      throw new BadRequestException(
+        `Cannot add signature to proposal with status ${proposal.status}`,
+      );
+    }
+
+    // Verify approver index is valid
+    if (dto.approverIndex >= proposal.account.publicKeys.length) {
+      throw new BadRequestException(
+        `Invalid approver index ${dto.approverIndex}`,
+      );
+    }
+
+    // Verify public key matches
+    const expectedKey = proposal.account.publicKeys[dto.approverIndex];
+    const normalizeKey = (key: string) =>
+      key.toLowerCase().replace(/^0x/, '');
+
+    if (normalizeKey(expectedKey) !== normalizeKey(dto.approverPublicKey)) {
+      throw new BadRequestException(
+        `Public key mismatch for approver ${dto.approverIndex}`,
+      );
+    }
+
+    // Store signature (upsert to handle re-signing)
+    await this.prisma.multisigSignature.upsert({
+      where: {
+        proposalId_approverIndex: {
+          proposalId,
+          approverIndex: dto.approverIndex,
+        },
+      },
+      create: {
+        proposalId,
+        approverIndex: dto.approverIndex,
+        approverPublicKey: dto.approverPublicKey,
+        signatureHex: dto.signatureHex,
+      },
+      update: {
+        signatureHex: dto.signatureHex,
+      },
+    });
+
+    // Count signatures
+    const signatureCount = await this.prisma.multisigSignature.count({
+      where: { proposalId },
+    });
+
+    // Update proposal status if threshold met
+    let updatedStatus = proposal.status;
+    if (signatureCount >= proposal.account.threshold) {
+      await this.prisma.multisigProposal.update({
+        where: { id: proposalId },
+        data: { status: 'READY' },
+      });
+      updatedStatus = 'READY';
+      this.logger.log(`Proposal ${proposalId} is ready for execution`);
+
+      // Notify all team members that proposal is ready
+      try {
+        const accountWithMembers = await this.prisma.multisigAccount.findUnique({
+          where: { accountId: proposal.accountId },
+          include: {
+            teamMembers: {
+              include: {
+                teamMember: {
+                  include: {
+                    user: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        if (accountWithMembers) {
+          for (const member of accountWithMembers.teamMembers) {
+            if (member.teamMember.user) {
+              await this.notificationService.createNotification({
+                title: 'Proposal Ready for Execution',
+                message: `Proposal "${proposal.description}" for multisig account "${accountWithMembers.name}" has reached the signature threshold (${signatureCount}/${proposal.account.threshold}) and is ready to execute.`,
+                type: NotificationsTypeEnum.MULTISIG_PROPOSAL_READY,
+                userId: member.teamMember.user.id,
+                metadata: {
+                  proposalId,
+                  proposalUuid: proposal.uuid,
+                  accountId: proposal.accountId,
+                  signatureCount,
+                  threshold: proposal.account.threshold,
+                },
+              });
+            }
+          }
+          this.logger.log(`Notifications sent for ready proposal ${proposalId}`);
+        }
+      } catch (error) {
+        this.logger.error('Failed to create notifications for ready proposal', error);
+        // Don't throw - notification failure should not block proposal status update
+      }
+    }
+
+    // Return updated proposal
+    const updatedProposal = await this.getProposal(proposalId);
+    return updatedProposal;
+  }
+
+  /**
+   * Submit a rejection for a proposal
+   * Auto-transitions to REJECTED if rejection count >= (threshold + 1)
+   */
+  async submitRejection(
+    proposalId: number,
+    user: UserWithCompany,
+    dto: SubmitRejectionDto,
+  ): Promise<MultisigProposalResponseDto> {
+    this.logger.log(`Submitting rejection for proposal ${proposalId} by user ${user.email}`);
+
+    // Get team member for this user
+    const teamMember = await this.prisma.teamMember.findUnique({
+      where: { userId: user.internalUserId },
+    });
+
+    if (!teamMember) {
+      throw new NotFoundException(`Team member not found for user ${user.email}`);
+    }
+
+    // Get proposal and account
+    const proposal = await this.prisma.multisigProposal.findUnique({
+      where: { id: proposalId },
+      include: {
+        account: {
+          include: {
+            teamMembers: true,
+          },
+        },
+        rejections: true,
+        bills: {
+          include: {
+            invoice: true,
+          },
+        },
+      },
+    });
+
+    if (!proposal) {
+      throw new NotFoundException(`Proposal ${proposalId} not found`);
+    }
+
+    if (proposal.status !== 'PENDING' && proposal.status !== 'READY') {
+      throw new BadRequestException(
+        `Cannot reject proposal with status ${proposal.status}`,
+      );
+    }
+
+    // Check if team member is in account
+    const isMemberOfAccount = proposal.account.teamMembers.some(
+      (am) => am.teamMemberId === teamMember.id,
+    );
+
+    if (!isMemberOfAccount) {
+      throw new BadRequestException(
+        `Team member is not a member of this multisig account`,
+      );
+    }
+
+    // Verify team member has correct role (Owner, Admin, or Approver)
+    const validRoles = ['OWNER', 'ADMIN', 'APPROVER'];
+    if (!validRoles.includes(teamMember.role)) {
+      throw new BadRequestException(
+        `Team member with role ${teamMember.role} cannot reject proposals`,
+      );
+    }
+
+    // Store rejection (upsert to allow re-rejection with new reason)
+    await this.prisma.multisigRejection.upsert({
+      where: {
+        proposalId_teamMemberId: {
+          proposalId,
+          teamMemberId: teamMember.id,
+        },
+      },
+      create: {
+        proposalId,
+        teamMemberId: teamMember.id,
+        reason: dto.reason,
+      },
+      update: {
+        reason: dto.reason,
+      },
+    });
+
+    // Count rejections
+    const rejectionCount = await this.prisma.multisigRejection.count({
+      where: { proposalId },
+    });
+
+    // Auto-transition to REJECTED if rejection count >= (threshold + 1)
+    const rejectionThreshold = proposal.account.threshold + 1;
+    let updatedStatus: string = proposal.status;
+
+    if (rejectionCount >= rejectionThreshold) {
+      this.logger.log(
+        `Rejection threshold reached (${rejectionCount} >= ${rejectionThreshold}) for proposal ${proposalId}`,
+      );
+
+      // Atomic transaction: update status, delete signatures, unlink bills, clear noteIds
+      await this.prisma.$transaction(async (tx) => {
+        // Update proposal status to REJECTED and clear noteIds
+        await tx.multisigProposal.update({
+          where: { id: proposalId },
+          data: { 
+            status: 'REJECTED',
+            noteIds: [], // Clear noteIds so notes can be claimed again
+          },
+        });
+
+        // Delete all signatures (no longer valid if rejected)
+        await tx.multisigSignature.deleteMany({
+          where: { proposalId },
+        });
+
+        // Unlink bills and reset their status to PENDING
+        const billIds = proposal.bills.map((b) => b.id);
+        if (billIds.length > 0) {
+          await tx.bill.updateMany({
+            where: { id: { in: billIds } },
+            data: {
+              multisigProposalId: null,
+              status: BillStatusEnum.PENDING,
+            },
+          });
+        }
+      });
+
+      updatedStatus = 'REJECTED';
+
+      // Log activity
+      await this.activityLogService.logActivity({
+        companyId: proposal.account.companyId,
+        teamMemberId: teamMember.id,
+        action: ActivityActionEnum.UPDATE,
+        entityType: ActivityEntityTypeEnum.MULTISIG_PROPOSAL,
+        entityId: proposal.id,
+        entityUuid: proposal.uuid,
+        description: `Proposal "${proposal.description}" rejected by team member (threshold triggered: ${rejectionCount}/${rejectionThreshold})`,
+        metadata: {
+          proposalId,
+          proposalUuid: proposal.uuid,
+          rejectionCount,
+          rejectionThreshold,
+          rejectionReason: dto.reason,
+          billCount: proposal.bills.length,
+        },
+      });
+
+      // Notify all team members that proposal was rejected
+      try {
+        const accountWithMembers = await this.prisma.multisigAccount.findUnique({
+          where: { accountId: proposal.accountId },
+          include: {
+            teamMembers: {
+              include: {
+                teamMember: {
+                  include: {
+                    user: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        if (accountWithMembers) {
+          for (const member of accountWithMembers.teamMembers) {
+            if (member.teamMember.user) {
+              await this.notificationService.createNotification({
+                title: 'Proposal Rejected',
+                message: `Proposal "${proposal.description}" for multisig account "${accountWithMembers.name}" has been rejected. Rejection threshold reached: ${rejectionCount}/${rejectionThreshold}.`,
+                type: NotificationsTypeEnum.MULTISIG_PROPOSAL_REJECTED,
+                userId: member.teamMember.user.id,
+                metadata: {
+                  proposalId,
+                  proposalUuid: proposal.uuid,
+                  accountId: proposal.accountId,
+                  rejectionCount,
+                  rejectionThreshold,
+                },
+              });
+            }
+          }
+          this.logger.log(`Notifications sent for rejected proposal ${proposalId}`);
+        }
+      } catch (error) {
+        this.logger.error('Failed to create notifications for rejected proposal', error);
+        // Don't throw - notification failure should not block rejection
+      }
+    }
+
+    // Return updated proposal
+    const updatedProposal = await this.getProposal(proposalId);
+    return updatedProposal;
+  }
+
+  /**
+   * Mark a proposal as executed (called after frontend executes via PSM).
+   * Updates proposal status + linked bills without calling the Rust server.
+   */
+  async markProposalExecuted(
+    proposalId: number,
+    transactionId?: string,
+  ): Promise<ExecuteTransactionResponseDto> {
+    this.logger.log(`Marking proposal ${proposalId} as executed via PSM`);
+
+    const proposal = await this.prisma.multisigProposal.findUnique({
+      where: { id: proposalId },
+      include: {
+        account: true,
+        bills: { include: { invoice: true } },
+      },
+    });
+
+    if (!proposal) {
+      throw new NotFoundException(`Proposal ${proposalId} not found`);
+    }
+
+    if (proposal.status === 'EXECUTED') {
+      return { success: true, transactionId: proposal.transactionId || undefined };
+    }
+
+    const now = new Date();
+    const validBills = proposal.bills.filter(
+      (b) =>
+        b.invoice !== null &&
+        (b.status === BillStatusEnum.PROPOSED ||
+          b.status === BillStatusEnum.PENDING ||
+          b.status === BillStatusEnum.OVERDUE),
+    );
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.multisigProposal.update({
+        where: { id: proposalId },
+        data: {
+          status: 'EXECUTED',
+          transactionId: transactionId || null,
+        },
+      });
+
+      if (validBills.length > 0) {
+        await tx.bill.updateMany({
+          where: { id: { in: validBills.map((b) => b.id) } },
+          data: {
+            status: BillStatusEnum.PAID,
+            paidAt: now,
+            transactionHash: transactionId || null,
+          },
+        });
+
+        const invoiceIds = validBills
+          .map((b) => b.invoice?.id)
+          .filter((id): id is number => id !== undefined);
+
+        if (invoiceIds.length > 0) {
+          await tx.invoice.updateMany({
+            where: { id: { in: invoiceIds } },
+            data: { status: 'PAID', paidAt: now },
+          });
+        }
+      }
+    });
+
+    this.logger.log(
+      `Proposal ${proposalId} marked as executed via PSM. ${validBills.length} bills paid.`,
+    );
+
+    // Notify all team members of successful execution
+    try {
+      const accountWithMembers = await this.prisma.multisigAccount.findUnique({
+        where: { accountId: proposal.accountId },
+        include: {
+          teamMembers: {
+            include: {
+              teamMember: {
+                include: {
+                  user: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (accountWithMembers) {
+        for (const member of accountWithMembers.teamMembers) {
+          if (member.teamMember.user) {
+            await this.notificationService.createNotification({
+              title: 'Proposal Executed Successfully',
+              message: `Proposal "${proposal.description}" for multisig account "${accountWithMembers.name}" has been executed successfully. Transaction ID: ${transactionId}`,
+              type: NotificationsTypeEnum.MULTISIG_PROPOSAL_EXECUTED,
+              userId: member.teamMember.user.id,
+              metadata: {
+                proposalId,
+                proposalUuid: proposal.uuid,
+                accountId: proposal.accountId,
+                transactionId,
+                billsPaid: validBills.length,
+              },
+            });
+          }
+        }
+        this.logger.log(`Notifications sent for executed proposal ${proposalId}`);
+      }
+    } catch (error) {
+      this.logger.error('Failed to create notifications for executed proposal', error);
+      // Don't throw - notification failure should not block execution result
+    }
+
+    // Send payslip emails for employee invoices (payroll)
+    if (validBills.length > 0) {
+      try {
+        const billIds = validBills.map((b) => b.id);
+        const billsWithFullRelations = await this.prisma.bill.findMany({
+          where: { id: { in: billIds } },
+          include: {
+            invoice: {
+              include: {
+                employee: { include: { group: true } },
+                payroll: { include: { company: true } },
+                items: true,
+              },
+            },
+          },
+        });
+        await this.billService.sendPayslipEmails(billsWithFullRelations as any);
+      } catch (error) {
+        this.logger.error('Failed to send payslip emails after proposal execution', error);
+        // Don't throw - email failure should not block execution result
+      }
+    }
+
+    return { success: true, transactionId };
+  }
+
+  /**
+   * Map proposal entity to DTO
+   */
+  private mapProposalToDto(
+    proposal: any,
+    threshold: number,
+  ): MultisigProposalResponseDto {
+    // Build normalized signature lookup by approverPublicKey (lowercase, no 0x)
+    const normalize = (k?: string) => (k ? k.toLowerCase().replace(/^0x/, '') : '');
+    const signatureByKey: Record<string, any> = {};
+    (proposal.signatures || []).forEach((s: any) => {
+      signatureByKey[normalize(s.approverPublicKey)] = s;
+    });
+
+    // Build approvers list from account.teamMembers (if present)
+    const approvers = (proposal.account?.teamMembers || []).map((am: any, idx: number) => {
+      const tm = am.teamMember;
+      const pubKey = tm?.user?.publicKey;
+      const commitment = tm?.user?.commitment;
+      // Match by raw publicKey OR by ECDSA commitment (PSM signs with commitment as approverPublicKey)
+      const sig = signatureByKey[normalize(pubKey)] || signatureByKey[normalize(commitment)];
+      return {
+        id: tm?.id,
+        uuid: tm?.uuid,
+        firstName: tm?.firstName,
+        lastName: tm?.lastName,
+        email: tm?.user?.email,
+        publicKey: pubKey,
+        joinedAt: am.createdAt,
+        signed: !!sig,
+        signature: sig
+          ? {
+              id: sig.id,
+              uuid: sig.uuid,
+              approverIndex: sig.approverIndex,
+              signatureHex: sig.signatureHex,
+              createdAt: sig.createdAt,
+            }
+          : undefined,
+      };
+    });
+
+    return {
+      id: proposal.id,
+      uuid: proposal.uuid,
+      accountId: proposal.accountId,
+      description: proposal.description,
+      proposalType: proposal.proposalType,
+      psmProposalId: proposal.psmProposalId || undefined,
+      summaryCommitment: proposal.summaryCommitment,
+      summaryBytesHex: proposal.summaryBytesHex,
+      requestBytesHex: proposal.requestBytesHex,
+      status: proposal.status,
+      transactionId: proposal.transactionId,
+      signaturesCount: proposal.signatures?.length || 0,
+      rejectionCount: proposal.rejections?.length || 0,
+      threshold,
+      noteIds: proposal.noteIds || [],
+      tokens: proposal.tokens || [],
+      recipientId: proposal.recipientId,
+      faucetId: proposal.faucetId,
+      amount: proposal.amount,
+      payments: (proposal.metadata as any)?.payments || undefined,
+      signatures: proposal.signatures?.map((sig: any) => ({
+        id: sig.id,
+        uuid: sig.uuid,
+        approverIndex: sig.approverIndex,
+        approverPublicKey: sig.approverPublicKey,
+        signatureHex: sig.signatureHex,
+        createdAt: sig.createdAt,
+        teamMember: sig.teamMember
+          ? {
+              uuid: sig.teamMember.uuid,
+              firstName: sig.teamMember.firstName,
+              lastName: sig.teamMember.lastName,
+            }
+          : undefined,
+      })) || [],
+      rejections: proposal.rejections?.map((rej: any) => ({
+        id: rej.id,
+        uuid: rej.uuid,
+        teamMemberId: rej.teamMemberId,
+        teamMember: rej.teamMember
+          ? {
+              id: rej.teamMember.id,
+              uuid: rej.teamMember.uuid,
+              firstName: rej.teamMember.firstName,
+              lastName: rej.teamMember.lastName,
+              email: rej.teamMember.user?.email,
+            }
+          : undefined,
+        reason: rej.reason,
+        createdAt: rej.createdAt,
+      })) || [],
+      approvers,
+      bills: proposal.bills?.map((bill: any) => ({
+        uuid: bill.uuid,
+        invoiceUuid: bill.invoice?.uuid,
+        invoiceNumber: bill.invoice?.invoiceNumber,
+        invoiceType: bill.invoice?.invoiceType,
+        amount: bill.invoice?.total,
+        status: bill.status,
+        recipientName: bill.invoice?.employee?.name || bill.invoice?.toCompanyName || bill.invoice?.fromDetails?.name,
+        recipientAddress: bill.invoice?.paymentWalletAddress,
+        paymentToken: bill.invoice?.paymentToken || null,
+        group: bill.invoice?.employee?.group
+          ? {
+              name: bill.invoice.employee.group.name,
+              color: bill.invoice.employee.group.color,
+              shape: bill.invoice.employee.group.shape,
+            }
+          : bill.invoice?.invoiceType === 'B2B'
+            ? { name: 'Client', color: '#35ADE9', shape: 'CIRCLE' }
+            : undefined,
+      })) || [],
+      createdAt: proposal.createdAt,
+      updatedAt: proposal.updatedAt,
+    };
+  }
+
+  /**
+   * Create a test company for development/testing
+   * WARNING: This should be disabled in production
+   */
+  async createTestCompany() {
+    this.logger.warn('Creating test company - this should only be used in development!');
+
+    // Check if company with ID 1 already exists
+    const existingCompany = await this.prisma.company.findUnique({
+      where: { id: 1 },
+    });
+
+    if (existingCompany) {
+      return {
+        message: 'Test company already exists',
+        company: {
+          id: existingCompany.id,
+          companyName: existingCompany.companyName,
+        },
+      };
+    }
+
+    // Create a test company with dummy data
+    const company = await this.prisma.company.create({
+      data: {
+        companyName: 'Test Company for Multisig',
+        registrationNumber: `TEST-${Date.now()}`,
+        companyType: 'PRIVATE_LIMITED_COMPANY',
+        notificationEmail: 'test@example.com',
+        ccNotifications: [],
+        country: 'Singapore',
+        address1: '123 Test Street',
+        city: 'Singapore',
+        postalCode: '123456',
+      },
+    });
+
+    this.logger.log(`Created test company with ID ${company.id}`);
+
+    return {
+      message: 'Test company created successfully',
+      company: {
+        id: company.id,
+        companyName: company.companyName,
+      },
+    };
+  }
+}

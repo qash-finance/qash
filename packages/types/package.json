@@ -1,0 +1,39 @@
+{
+  "name": "@qash/types",
+  "version": "0.0.1",
+  "description": "Shared TypeScript types for Qash monorepo",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./dto/*": {
+      "types": "./dist/dto/*.d.ts",
+      "default": "./dist/dto/*.js"
+    },
+    "./enums": {
+      "types": "./dist/enums/index.d.ts",
+      "default": "./dist/enums/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  },
+  "typesVersions": {
+    "*": {
+      "dto/*": ["dist/dto/*.d.ts"],
+      "enums": ["dist/enums/index.d.ts"]
+    }
+  },
+  "files": [
+    "dist"
+  ]
+}

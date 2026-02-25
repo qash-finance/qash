@@ -7,6 +7,7 @@ import {
   Patch,
   Delete,
   Param,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -30,6 +31,8 @@ import {
   CurrentUser,
   UserWithCompany,
 } from '../auth/decorators/current-user.decorator';
+import { AdminOnly } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
 
 @ApiTags('Payment Link')
 @ApiBearerAuth()
@@ -88,6 +91,8 @@ export class PaymentLinkController {
   // *************************************************
 
   @Post()
+  @UseGuards(RolesGuard)
+  @AdminOnly()
   @ApiOperation({ summary: 'Create a new payment link' })
   @ApiResponse({ status: 201, description: 'Payment link created' })
   @ApiResponse({ status: 400, description: 'Bad Request - Validation failed' })
@@ -121,6 +126,8 @@ export class PaymentLinkController {
   // *************************************************
 
   @Put(':code')
+  @UseGuards(RolesGuard)
+  @AdminOnly()
   @ApiOperation({ summary: 'Update a payment link' })
   @ApiResponse({ status: 200, description: 'Payment link updated' })
   @ApiResponse({ status: 400, description: 'Bad Request - Validation failed' })
@@ -144,6 +151,8 @@ export class PaymentLinkController {
   }
 
   @Put(':code/deactivate')
+  @UseGuards(RolesGuard)
+  @AdminOnly()
   @ApiOperation({ summary: 'Deactivate a payment link' })
   @ApiResponse({ status: 200, description: 'Payment link deactivated' })
   @ApiResponse({
@@ -164,6 +173,8 @@ export class PaymentLinkController {
   }
 
   @Put(':code/activate')
+  @UseGuards(RolesGuard)
+  @AdminOnly()
   @ApiOperation({ summary: 'Activate a payment link' })
   @ApiResponse({ status: 200, description: 'Payment link activated' })
   @ApiResponse({ status: 400, description: 'Bad Request - Already active' })
@@ -181,6 +192,8 @@ export class PaymentLinkController {
   }
 
   @Put('payment/:paymentId/txid')
+  @UseGuards(RolesGuard)
+  @AdminOnly()
   @ApiOperation({ summary: 'Update payment record with transaction ID' })
   @ApiResponse({ status: 200, description: 'Payment updated' })
   @ApiResponse({ status: 404, description: 'Payment record not found' })
@@ -217,6 +230,8 @@ export class PaymentLinkController {
   // *************************************************
 
   @Patch('update-order')
+  @UseGuards(RolesGuard)
+  @AdminOnly()
   @ApiOperation({
     summary: 'Update order of payment links',
     description: 'Update the display order of payment links',
@@ -241,6 +256,8 @@ export class PaymentLinkController {
   // **************** DELETE METHODS ****************
   // *************************************************
   @Delete()
+  @UseGuards(RolesGuard)
+  @AdminOnly()
   @ApiOperation({
     summary: 'Delete payment links',
     description:

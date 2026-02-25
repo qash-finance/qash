@@ -7,6 +7,7 @@ import {
   Prisma,
   PrismaClient,
   TeamMemberRoleEnum,
+  TeamMemberStatusEnum,
 } from '../../database/generated/client';
 import {
   BaseRepository,
@@ -15,13 +16,13 @@ import {
 
 export interface CreateCompanyData {
   companyName: string;
-  registrationNumber: string;
-  companyType: CompanyTypeEnum;
-  country: string;
-  address1: string;
+  registrationNumber?: string;
+  companyType?: CompanyTypeEnum;
+  country?: string;
+  address1?: string;
   address2?: string;
-  city: string;
-  postalCode: string;
+  city?: string;
+  postalCode?: string;
   metadata?: any;
 }
 
@@ -115,7 +116,7 @@ export class CompanyRepository extends BaseRepository<
       where: { id },
       include: {
         teamMembers: {
-          where: { isActive: true },
+          where: { status: TeamMemberStatusEnum.ACTIVE },
           orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
           select: {
             id: true,
@@ -124,7 +125,7 @@ export class CompanyRepository extends BaseRepository<
             position: true,
             profilePicture: true,
             role: true,
-            isActive: true,
+            status: true,
             joinedAt: true,
             createdAt: true,
           },
@@ -146,7 +147,7 @@ export class CompanyRepository extends BaseRepository<
         some: {
           userId,
           role: TeamMemberRoleEnum.OWNER,
-          isActive: true,
+          status: TeamMemberStatusEnum.ACTIVE,
         },
       },
     };
@@ -205,7 +206,7 @@ export class CompanyRepository extends BaseRepository<
         companyId,
         userId,
         role: TeamMemberRoleEnum.OWNER,
-        isActive: true,
+        status: TeamMemberStatusEnum.ACTIVE,
       },
     });
     return !!teamMember;
@@ -223,7 +224,7 @@ export class CompanyRepository extends BaseRepository<
             some: {
               userId,
               role: TeamMemberRoleEnum.OWNER,
-              isActive: true,
+              status: TeamMemberStatusEnum.ACTIVE,
             },
           },
         }

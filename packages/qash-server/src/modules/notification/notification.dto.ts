@@ -6,103 +6,217 @@ import {
   IsString,
   IsObject,
   IsUrl,
+  IsPositive,
+  IsNumber,
+  Min,
+  Max,
 } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   NotificationsStatusEnum,
   NotificationsTypeEnum,
-} from 'src/database/generated/enums';
+} from '@qash/types/enums';
+import type * as SharedTypes from '@qash/types/dto/notification';
 
-export class CreateNotificationDto {
-  @ApiProperty()
+export class CreateNotificationDto implements SharedTypes.CreateNotificationDto {
+  @ApiProperty({
+    description: 'Notification title',
+    example: 'Invoice Approved',
+  })
   @IsString()
   @IsNotEmpty()
-  public title: string;
+  title: string;
 
-  @ApiProperty()
+  @ApiProperty({
+    description: 'Notification message content',
+    example: 'Your invoice #12345 has been approved.',
+  })
   @IsString()
   @IsNotEmpty()
-  public message: string;
+  message: string;
 
-  @ApiProperty({ enum: NotificationsTypeEnum })
+  @ApiProperty({
+    description: 'Type of notification',
+    enum: NotificationsTypeEnum,
+    example: NotificationsTypeEnum.NOP,
+  })
   @IsEnum(NotificationsTypeEnum)
-  public type: NotificationsTypeEnum;
+  type: NotificationsTypeEnum;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description: 'Additional metadata as JSON',
+    example: { invoiceId: '12345', amount: 1000 },
+  })
   @IsObject()
   @IsOptional()
-  public metadata?: Record<string, any> | null;
+  metadata?: Record<string, any> | null;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description: 'URL for notification action',
+    example: 'https://app.qash.com/invoices/12345',
+  })
   @IsUrl()
   @IsOptional()
-  public actionUrl?: string | null;
+  actionUrl?: string | null;
 
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  public walletAddress: string;
+  @ApiProperty({
+    description: 'User ID who will receive the notification',
+    example: 1,
+  })
+  @IsNumber()
+  @IsPositive()
+  userId: number;
 }
 
-export class UpdateNotificationStatusDto {
-  @ApiProperty({ enum: NotificationsStatusEnum })
+export class UpdateNotificationStatusDto implements SharedTypes.UpdateNotificationStatusDto {
+  @ApiProperty({
+    description: 'New notification status',
+    enum: NotificationsStatusEnum,
+    example: NotificationsStatusEnum.READ,
+  })
   @IsEnum(NotificationsStatusEnum)
-  public status: NotificationsStatusEnum;
+  status: NotificationsStatusEnum;
 }
 
-export class NotificationQueryDto {
-  @ApiPropertyOptional()
+export class NotificationQueryDto implements SharedTypes.NotificationQueryDto {
+  @ApiPropertyOptional({
+    description: 'Page number for pagination',
+    example: 1,
+    minimum: 1,
+  })
   @IsOptional()
-  @Transform(({ value }) => parseInt(value))
-  public page?: number = 1;
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  page?: number = 1;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description: 'Number of items per page',
+    example: 10,
+    minimum: 1,
+    maximum: 100,
+  })
   @IsOptional()
-  @Transform(({ value }) => parseInt(value))
-  public limit?: number = 10;
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  @Max(100)
+  limit?: number = 10;
 
-  @ApiPropertyOptional({ enum: NotificationsTypeEnum })
+  @ApiPropertyOptional({
+    description: 'Filter by notification type',
+    enum: NotificationsTypeEnum,
+  })
   @IsEnum(NotificationsTypeEnum)
   @IsOptional()
-  public type?: NotificationsTypeEnum;
+  type?: NotificationsTypeEnum;
 
-  @ApiPropertyOptional({ enum: NotificationsStatusEnum })
+  @ApiPropertyOptional({
+    description: 'Filter by notification status',
+    enum: NotificationsStatusEnum,
+  })
   @IsEnum(NotificationsStatusEnum)
   @IsOptional()
-  public status?: NotificationsStatusEnum;
+  status?: NotificationsStatusEnum;
 }
 
-export class NotificationResponseDto {
-  @ApiProperty()
-  public id: number;
+export class NotificationResponseDto implements SharedTypes.NotificationResponseDto {
+  @ApiProperty({
+    description: 'Notification ID',
+    example: 1,
+  })
+  id: number;
 
-  @ApiProperty()
-  public title: string;
+  @ApiProperty({
+    description: 'Notification title',
+    example: 'Invoice Approved',
+  })
+  title: string;
 
-  @ApiProperty()
-  public message: string;
+  @ApiProperty({
+    description: 'Notification message',
+    example: 'Your invoice #12345 has been approved.',
+    nullable: true,
+  })
+  message: string | null;
 
-  @ApiProperty({ enum: NotificationsTypeEnum })
-  public type: NotificationsTypeEnum;
+  @ApiProperty({
+    description: 'Notification type',
+    enum: NotificationsTypeEnum,
+  })
+  type: NotificationsTypeEnum;
 
-  @ApiProperty({ enum: NotificationsStatusEnum })
-  public status: NotificationsStatusEnum;
+  @ApiProperty({
+    description: 'Notification status',
+    enum: NotificationsStatusEnum,
+  })
+  status: NotificationsStatusEnum;
 
-  @ApiPropertyOptional()
-  public metadata: Record<string, any> | null;
+  @ApiPropertyOptional({
+    description: 'Additional metadata',
+    nullable: true,
+  })
+  metadata: Record<string, any> | null;
 
-  @ApiPropertyOptional()
-  public actionUrl: string | null;
+  @ApiPropertyOptional({
+    description: 'Action URL',
+    nullable: true,
+  })
+  actionUrl: string | null;
 
-  @ApiProperty()
-  public walletAddress: string;
+  @ApiProperty({
+    description: 'User ID who owns this notification',
+    example: 1,
+  })
+  userId: number;
 
-  @ApiProperty()
-  public createdAt: Date;
+  @ApiProperty({
+    description: 'Creation timestamp',
+  })
+  createdAt: Date;
 
-  @ApiProperty()
-  public updatedAt: Date;
+  @ApiProperty({
+    description: 'Last update timestamp',
+  })
+  updatedAt: Date;
 
-  @ApiPropertyOptional()
-  public readAt: Date | null;
+  @ApiPropertyOptional({
+    description: 'When notification was read',
+    nullable: true,
+  })
+  readAt: Date | null;
+}
+
+export class NotificationWithPaginationDto implements SharedTypes.NotificationWithPaginationDto {
+  @ApiProperty({
+    description: 'Array of notifications',
+    type: [NotificationResponseDto],
+  })
+  notifications: NotificationResponseDto[];
+
+  @ApiProperty({
+    description: 'Pagination metadata',
+  })
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export class UnreadCountResponseDto implements SharedTypes.UnreadCountResponseDto {
+  @ApiProperty({
+    description: 'Count of unread notifications',
+    example: 5,
+  })
+  count: number;
+}
+
+export class MarkAllReadResponseDto implements SharedTypes.MarkAllReadResponseDto {
+  @ApiProperty({
+    description: 'Number of notifications marked as read',
+    example: 10,
+  })
+  updatedCount: number;
 }

@@ -10,6 +10,7 @@ import {
   ParseIntPipe,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -35,6 +36,8 @@ import {
 import { CompanyAuth } from '../auth/decorators/company-auth.decorator';
 import { EmployeeGroupService } from './services/employee-group.service';
 import { EmployeeService } from './services/employee.service';
+import { AdminOnly } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
 
 @ApiTags('Employee')
 @CompanyAuth()
@@ -368,6 +371,8 @@ export class EmployeeController {
   // **************** POST METHODS *******************
   // *************************************************
   @Post('group')
+  @UseGuards(RolesGuard)
+  @AdminOnly()
   @ApiOperation({
     summary: 'Create new group',
     description: 'Create a new group for organizing address book entries',
@@ -389,6 +394,8 @@ export class EmployeeController {
   }
 
   @Post('employee')
+  @UseGuards(RolesGuard)
+  @AdminOnly()
   @ApiOperation({
     summary: 'Create new employee for a company',
     description:
@@ -417,6 +424,8 @@ export class EmployeeController {
   // *************************************************
 
   @Put(':id')
+  @UseGuards(RolesGuard)
+  @AdminOnly()
   @ApiOperation({
     summary: 'Update employee',
     description: 'Update an existing employee within the company',
@@ -449,6 +458,8 @@ export class EmployeeController {
   }
 
   @Put('order/bulk')
+  @UseGuards(RolesGuard)
+  @AdminOnly()
   @ApiOperation({
     summary: 'Update order of multiple employees',
     description:
@@ -486,6 +497,8 @@ export class EmployeeController {
   // **************** DELETE METHODS *****************
   // *************************************************
   @Delete('bulk')
+  @UseGuards(RolesGuard)
+  @AdminOnly()
   @ApiOperation({
     summary: 'Bulk delete employees',
     description: 'Delete multiple employees at once within the company',
@@ -511,6 +524,8 @@ export class EmployeeController {
   }
 
   @Delete(':id')
+  @UseGuards(RolesGuard)
+  @AdminOnly()
   @ApiOperation({
     summary: 'Delete employee',
     description: 'Delete a employee by ID within the company',

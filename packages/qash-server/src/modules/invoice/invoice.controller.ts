@@ -10,6 +10,7 @@ import {
   ParseIntPipe,
   HttpStatus,
   Res,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -35,6 +36,8 @@ import {
 } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from 'src/common/interfaces/para-jwt-payload';
 import { Auth } from '../auth/decorators/auth.decorator';
+import { AdminOnly } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
 
 @ApiTags('Invoice')
 @ApiBearerAuth()
@@ -146,6 +149,8 @@ export class InvoiceController {
   // *************************************************
   @Post()
   @CompanyAuth()
+  @UseGuards(RolesGuard)
+  @AdminOnly()
   @ApiOperation({ summary: 'Create a new payroll invoice manually' })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -163,6 +168,8 @@ export class InvoiceController {
 
   @Post('generate/:payrollId')
   @CompanyAuth()
+  @UseGuards(RolesGuard)
+  @AdminOnly()
   @ApiOperation({ summary: 'Generate invoice from payroll (manual)' })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -217,6 +224,8 @@ export class InvoiceController {
   // *************************************************
   @Patch(':invoiceUUID/send')
   @CompanyAuth()
+  @UseGuards(RolesGuard)
+  @AdminOnly()
   @ApiOperation({ summary: 'Send invoice to employee' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -255,6 +264,8 @@ export class InvoiceController {
 
   @Patch(':invoiceUUID/cancel')
   @CompanyAuth()
+  @UseGuards(RolesGuard)
+  @AdminOnly()
   @ApiOperation({ summary: 'Cancel invoice' })
   @ApiResponse({
     status: HttpStatus.OK,

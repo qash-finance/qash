@@ -11,6 +11,7 @@ import {
   databaseConfig,
   othersConfig,
   serverConfig,
+  s3Config,
 } from './modules/shared/config/registration';
 import { EmployeeModule } from './modules/employee/employee.module';
 import { AppConfigServiceModule } from './modules/shared/config/config.module';
@@ -26,6 +27,9 @@ import { PayrollModule } from './modules/payroll/payroll.module';
 import { InvoiceModule } from './modules/invoice/invoice.module';
 import { BillModule } from './modules/bill/bill.module';
 import { ClientModule } from './modules/client/client.module';
+import { ActivityLogModule } from './modules/activity-log/activity-log.module';
+import { MultisigModule } from './modules/multisig/multisig.module';
+import { UploadModule } from './modules/upload/upload.module';
 import { envValidator } from './common/validators/env.validation';
 import { HttpValidationPipe } from './modules/shared/pipes/http-validation';
 
@@ -42,6 +46,7 @@ import { HttpValidationPipe } from './modules/shared/pipes/http-validation';
         authConfig,
         othersConfig,
         serverConfig,
+        s3Config,
       ],
       isGlobal: true,
     }),
@@ -61,6 +66,9 @@ import { HttpValidationPipe } from './modules/shared/pipes/http-validation';
     InvoiceModule,
     BillModule,
     ClientModule,
+    ActivityLogModule,
+    MultisigModule,
+    UploadModule,
   ],
   controllers: [AppController],
   providers: [

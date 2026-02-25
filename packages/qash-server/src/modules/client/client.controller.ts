@@ -10,6 +10,7 @@ import {
   Post,
   Put,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiOperation,
@@ -23,6 +24,8 @@ import {
   UserWithCompany,
 } from '../auth/decorators/current-user.decorator';
 import { CompanyAuth } from '../auth/decorators/company-auth.decorator';
+import { AdminOnly } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import {
   CreateClientDto,
   PaginatedClientsResponseDto,
@@ -99,6 +102,8 @@ export class ClientController {
   }
 
   @Post()
+  @UseGuards(RolesGuard)
+  @AdminOnly()
   @ApiOperation({
     summary: 'Create a new client',
   })
@@ -115,6 +120,8 @@ export class ClientController {
   }
 
   @Put(':uuid')
+  @UseGuards(RolesGuard)
+  @AdminOnly()
   @ApiOperation({
     summary: 'Update a client',
   })
@@ -137,6 +144,8 @@ export class ClientController {
   }
 
   @Delete(':uuid')
+  @UseGuards(RolesGuard)
+  @AdminOnly()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Delete a client',

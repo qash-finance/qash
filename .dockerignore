@@ -1,0 +1,12 @@
+node_modules
+**/node_modules
+.git
+.github
+.vscode
+*.swp
+.pnpm-store
+**/dist
+**/.next
+**/.docusaurus
+**/coverage
+**/.env.*

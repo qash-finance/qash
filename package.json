@@ -16,15 +16,17 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     
-    "dev": "pnpm run --parallel dev:*",
+    "dev": "pnpm run build:types && pnpm run --parallel dev:*",
     "dev:web": "pnpm --filter @qash/web dev",
     "dev:server": "pnpm --filter @qash/server start:dev",
-    "dev:docs": "pnpm --filter @qash/docs start",
+    "dev:docs": "pnpm --filter qash-doc start",
+    "dev:types": "pnpm --filter @qash/types dev",
     
-    "build": "pnpm run -r build",
+    "build": "pnpm run build:types && pnpm run -r build",
+    "build:types": "pnpm --filter @qash/types build",
     "build:web": "pnpm --filter @qash/web build",
     "build:server": "pnpm --filter @qash/server build",
-    "build:docs": "pnpm --filter @qash/docs build",
+    "build:docs": "pnpm --filter qash-doc build",
     
     "lint": "pnpm run -r lint",
     "lint:web": "pnpm --filter @qash/web lint",
@@ -39,6 +41,8 @@
     "prisma:generate": "pnpm --filter @qash/server prisma:generate",
     "prisma:migrate": "pnpm --filter @qash/server prisma:migrate:dev",
     "prisma:studio": "pnpm --filter @qash/server prisma:studio",
+    "prisma:studio:headless": "pnpm --filter @qash/server prisma:studio:headless",
+    "start:dev": "pnpm --filter @qash/server start:dev",
     
     "clean": "pnpm run -r clean && rm -rf node_modules",
     "clean:modules": "find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +"
@@ -47,6 +51,11 @@
     "husky": "^9.0.11",
     "lint-staged": "^15.2.0",
     "prettier": "^3.2.5"
+  },
+  "pnpm": {
+    "overrides": {
+      "@getpara/user-management-client": "2.12.0"
+    }
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [

@@ -18,9 +18,12 @@ model User {
   role      UserRoleEnum @default(USER)
   isActive  Boolean      @default(true) @map("is_active")
   lastLogin DateTime?    @map("last_login") @db.Timestamp(6)
+  publicKey  String?      @map("public_key") @db.Text
+  commitment String?      @map("commitment") @db.Text
 
   teamMembership TeamMember? // 1:1 relationship, each user is a company team member
-  invitedMembers TeamMember[] @relation("TeamMemberInviter")
+  invitedMembers TeamMember[]    @relation("TeamMemberInviter")
+  notifications  Notifications[]
 
   @@index([email])
   @@index([role])
@@ -35,12 +38,16 @@ model TeamMember {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
 
   firstName      String  @map("first_name") @db.VarChar(100)
-  lastName       String  @map("last_name") @db.VarChar(100)
+  lastName       String? @map("last_name") @db.VarChar(100)
   position       String? @db.VarChar(100)
   profilePicture String? @map("profile_picture") @db.Text
 
-  role     TeamMemberRoleEnum
-  isActive Boolean            @default(true) @map("is_active")
+  role   TeamMemberRoleEnum
+  status TeamMemberStatusEnum @default(PENDING)
+
+  // Invitation fields
+  invitationToken     String?   @unique @map("invitation_token") @db.VarChar(255)
+  invitationExpiresAt DateTime? @map("invitation_expires_at") @db.Timestamp(6)
 
   companyId Int     @map("company_id")
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -55,9 +62,28 @@ model TeamMember {
 
   metadata Json? @db.Json
 
+  // Audit trail - created entities
+  createdEmployees    Employee[]              @relation("EmployeeCreatedBy")
+  updatedEmployees    Employee[]              @relation("EmployeeUpdatedBy")
+  createdClients      Client[]                @relation("ClientCreatedBy")
+  updatedClients      Client[]                @relation("ClientUpdatedBy")
+  createdPayrolls     Payroll[]               @relation("PayrollCreatedBy")
+  updatedPayrolls     Payroll[]               @relation("PayrollUpdatedBy")
+  createdInvoices     Invoice[]               @relation("InvoiceCreatedBy")
+  updatedInvoices     Invoice[]               @relation("InvoiceUpdatedBy")
+  createdBills        Bill[]                  @relation("BillCreatedBy")
+  updatedBills        Bill[]                  @relation("BillUpdatedBy")
+  createdPaymentLinks PaymentLink[]           @relation("PaymentLinkCreatedBy")
+  updatedPaymentLinks PaymentLink[]           @relation("PaymentLinkUpdatedBy")
+  activityLogs        ActivityLog[]
+  multisigAccounts    MultisigAccountMember[]
+  multisigRejections  MultisigRejection[]
+
   @@index([companyId])
   @@index([role])
+  @@index([status])
   @@index([userId])
+  @@index([invitationToken])
   @@map("team_members")
 }
 
@@ -68,18 +94,19 @@ model Company {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
 
-  companyName        String          @map("company_name") @db.VarChar(255)
-  registrationNumber String          @unique @map("registration_number") @db.VarChar(100)
-  companyType        CompanyTypeEnum @map("company_type")
-  taxId              String?         @map("tax_id") @db.VarChar(100)
-  notificationEmail  String?         @map("notification_email") @db.VarChar(255)
-  ccNotifications    String[]        @map("cc_notifications") @db.VarChar(255)
+  companyName        String           @map("company_name") @db.VarChar(255)
+  registrationNumber String?          @unique @map("registration_number") @db.VarChar(100)
+  companyType        CompanyTypeEnum? @map("company_type")
+  taxId              String?          @map("tax_id") @db.VarChar(100)
+  notificationEmail  String?          @map("notification_email") @db.VarChar(255)
+  ccNotifications    String[]         @map("cc_notifications") @db.VarChar(255)
+  logo               String?          @db.Text
 
-  country    String  @db.VarChar(100)
-  address1   String  @map("address_1") @db.VarChar(255)
+  country    String? @db.VarChar(100)
+  address1   String? @map("address_1") @db.VarChar(255)
   address2   String? @map("address_2") @db.VarChar(255)
-  city       String  @db.VarChar(100)
-  postalCode String  @map("postal_code") @db.VarChar(20)
+  city       String? @db.VarChar(100)
+  postalCode String? @map("postal_code") @db.VarChar(20)
 
   verificationStatus CompanyVerificationStatusEnum @default(PENDING) @map("verification_status")
   isActive           Boolean                       @default(true) @map("is_active")
@@ -96,6 +123,8 @@ model Company {
   invoicesTo       Invoice[]         @relation("InvoiceToCompany") // B2B invoices where this company is the recipient
   paymentLinks     PaymentLink[]
   invoiceSchedules InvoiceSchedule[]
+  activityLogs     ActivityLog[]
+  multisigAccounts MultisigAccount[] // Miden multisig accounts owned by this company
 
   @@index([registrationNumber])
   @@index([companyName])
@@ -134,11 +163,19 @@ model Employee {
   payrolls Payroll[]
   invoices Invoice[] @relation("InvoiceEmployee")
 
+  // Audit fields
+  createdByTeamMemberId Int?        @map("created_by_team_member_id")
+  createdByTeamMember   TeamMember? @relation("EmployeeCreatedBy", fields: [createdByTeamMemberId], references: [id], onDelete: SetNull)
+  updatedByTeamMemberId Int?        @map("updated_by_team_member_id")
+  updatedByTeamMember   TeamMember? @relation("EmployeeUpdatedBy", fields: [updatedByTeamMemberId], references: [id], onDelete: SetNull)
+
   metadata Json? @db.Json
 
   @@index([companyId])
   @@index([groupId])
   @@index([email])
+  @@index([createdByTeamMemberId])
+  @@index([updatedByTeamMemberId])
   @@map("employees")
 }
 
@@ -168,9 +205,17 @@ model Client {
 
   invoiceSchedules InvoiceSchedule[]
 
+  // Audit fields
+  createdByTeamMemberId Int?        @map("created_by_team_member_id")
+  createdByTeamMember   TeamMember? @relation("ClientCreatedBy", fields: [createdByTeamMemberId], references: [id], onDelete: SetNull)
+  updatedByTeamMemberId Int?        @map("updated_by_team_member_id")
+  updatedByTeamMember   TeamMember? @relation("ClientUpdatedBy", fields: [updatedByTeamMemberId], references: [id], onDelete: SetNull)
+
   @@unique([companyId, email])
   @@index([companyId])
   @@index([email])
+  @@index([createdByTeamMemberId])
+  @@index([updatedByTeamMemberId])
   @@map("clients")
 }
 
@@ -229,11 +274,19 @@ model Payroll {
   invoices         Invoice[]
   invoiceSchedules InvoiceSchedule[]
 
+  // Audit fields
+  createdByTeamMemberId Int?        @map("created_by_team_member_id")
+  createdByTeamMember   TeamMember? @relation("PayrollCreatedBy", fields: [createdByTeamMemberId], references: [id], onDelete: SetNull)
+  updatedByTeamMemberId Int?        @map("updated_by_team_member_id")
+  updatedByTeamMember   TeamMember? @relation("PayrollUpdatedBy", fields: [updatedByTeamMemberId], references: [id], onDelete: SetNull)
+
   @@index([companyId])
   @@index([employeeId])
   @@index([status])
   @@index([payStartDate])
   @@index([payEndDate])
+  @@index([createdByTeamMemberId])
+  @@index([updatedByTeamMemberId])
   @@map("payrolls")
 }
 
@@ -321,6 +374,12 @@ model Invoice {
   footer   Json? @map("footer") @db.Json
   terms    Json? @map("terms") @db.Json // Payment terms, conditions, etc.
 
+  // Audit fields
+  createdByTeamMemberId Int?        @map("created_by_team_member_id")
+  createdByTeamMember   TeamMember? @relation("InvoiceCreatedBy", fields: [createdByTeamMemberId], references: [id], onDelete: SetNull)
+  updatedByTeamMemberId Int?        @map("updated_by_team_member_id")
+  updatedByTeamMember   TeamMember? @relation("InvoiceUpdatedBy", fields: [updatedByTeamMemberId], references: [id], onDelete: SetNull)
+
   @@index([payrollId])
   @@index([employeeId])
   @@index([fromCompanyId])
@@ -332,6 +391,8 @@ model Invoice {
   @@index([isAutoGenerated])
   @@index([autoGenerateFromPayrollId])
   @@index([nextAutoGenerateDate])
+  @@index([createdByTeamMemberId])
+  @@index([updatedByTeamMemberId])
   @@map("invoices")
 }
 
@@ -429,11 +490,24 @@ model Bill {
   paidAt          DateTime? @map("paid_at") @db.Timestamp(6)
   transactionHash String?   @map("transaction_hash") @db.VarChar(100)
 
+  // Link to multisig proposal (for multi-signature payments)
+  multisigProposalId Int?              @map("multisig_proposal_id")
+  multisigProposal   MultisigProposal? @relation(fields: [multisigProposalId], references: [id], onDelete: SetNull)
+
   metadata Json? @db.Json
+
+  // Audit fields
+  createdByTeamMemberId Int?        @map("created_by_team_member_id")
+  createdByTeamMember   TeamMember? @relation("BillCreatedBy", fields: [createdByTeamMemberId], references: [id], onDelete: SetNull)
+  updatedByTeamMemberId Int?        @map("updated_by_team_member_id")
+  updatedByTeamMember   TeamMember? @relation("BillUpdatedBy", fields: [updatedByTeamMemberId], references: [id], onDelete: SetNull)
 
   @@index([companyId])
   @@index([status])
   @@index([invoiceId])
+  @@index([multisigProposalId])
+  @@index([createdByTeamMemberId])
+  @@index([updatedByTeamMemberId])
   @@map("bills")
 }
 
@@ -455,9 +529,17 @@ model PaymentLink {
   acceptedTokens       Json                  @map("accepted_tokens")
   acceptedChains       Json?                 @map("accepted_chains")
 
+  // Audit fields
+  createdByTeamMemberId Int?        @map("created_by_team_member_id")
+  createdByTeamMember   TeamMember? @relation("PaymentLinkCreatedBy", fields: [createdByTeamMemberId], references: [id], onDelete: SetNull)
+  updatedByTeamMemberId Int?        @map("updated_by_team_member_id")
+  updatedByTeamMember   TeamMember? @relation("PaymentLinkUpdatedBy", fields: [updatedByTeamMemberId], references: [id], onDelete: SetNull)
+
   @@index([code])
   @@index([companyId])
   @@index([order])
+  @@index([createdByTeamMemberId])
+  @@index([updatedByTeamMemberId])
   @@map("payment_link")
 }
 
@@ -477,24 +559,95 @@ model PaymentLinkRecord {
 }
 
 model Notifications {
-  id            Int                     @id() @default(autoincrement())
-  createdAt     DateTime                @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt     DateTime                @default(now()) @map("updated_at") @db.Timestamp(6)
-  title         String
-  message       String?
-  type          NotificationsTypeEnum
-  status        NotificationsStatusEnum @default(UNREAD)
-  metadata      Json?
-  actionUrl     String?                 @map("action_url") @db.VarChar
-  walletAddress String                  @map("wallet_address") @db.VarChar
-  readAt        DateTime?               @map("read_at") @db.Timestamp(6)
+  id        Int                     @id() @default(autoincrement())
+  createdAt DateTime                @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime                @default(now()) @map("updated_at") @db.Timestamp(6)
+  title     String
+  message   String?
+  type      NotificationsTypeEnum
+  status    NotificationsStatusEnum @default(UNREAD)
+  metadata  Json?
+  actionUrl String?                 @map("action_url") @db.VarChar
+  readAt    DateTime?               @map("read_at") @db.Timestamp(6)
+
+  userId Int  @map("user_id")
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@index([type])
-  @@index([walletAddress])
-  @@index([walletAddress, createdAt])
-  @@index([walletAddress, status])
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([userId, status])
   @@map("notifications")
+}
+
+model ActivityLog {
+  id   Int    @id @default(autoincrement())
+  uuid String @unique @default(cuid()) @map("uuid")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  companyId Int     @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  teamMemberId Int        @map("team_member_id")
+  teamMember   TeamMember @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
+
+  action     ActivityActionEnum
+  entityType ActivityEntityTypeEnum @map("entity_type")
+  entityId   Int                    @map("entity_id")
+  entityUuid String?                @map("entity_uuid") @db.VarChar(255)
+
+  // Store previous and new values for audit trail
+  previousValues Json? @map("previous_values") @db.Json
+  newValues      Json? @map("new_values") @db.Json
+
+  // Additional context
+  description String? @db.Text
+  ipAddress   String? @map("ip_address") @db.VarChar(45)
+  userAgent   String? @map("user_agent") @db.Text
+  metadata    Json?   @db.Json
+
+  @@index([companyId])
+  @@index([teamMemberId])
+  @@index([action])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([createdAt])
+  @@index([companyId, createdAt])
+  @@index([companyId, entityType])
+  @@map("activity_logs")
+}
+
+enum ActivityActionEnum {
+  CREATE
+  UPDATE
+  DELETE
+  INVITE
+  ACCEPT_INVITATION
+  REJECT_INVITATION
+  CHANGE_ROLE
+  SUSPEND
+  ACTIVATE
+  SEND
+  APPROVE
+  REJECT
+  PAY
+  CANCEL
+}
+
+enum ActivityEntityTypeEnum {
+  TEAM_MEMBER
+  EMPLOYEE
+  CLIENT
+  PAYROLL
+  INVOICE
+  BILL
+  PAYMENT_LINK
+  EMPLOYEE_GROUP
+  COMPANY
+  MULTISIG_ACCOUNT
+  MULTISIG_PROPOSAL
 }
 
 enum ContractTermEnum {
@@ -528,9 +681,11 @@ enum InvoiceStatusEnum {
 
 enum BillStatusEnum {
   PENDING
+  PROPOSED
   PAID
   OVERDUE
   CANCELLED
+  FAILED
 }
 
 enum CategoryShapeEnum {
@@ -546,6 +701,53 @@ enum NotificationsStatusEnum {
 }
 
 enum NotificationsTypeEnum {
+  // Account & Wallet Operations
+  MULTISIG_ACCOUNT_CREATED
+  MULTISIG_PROPOSAL_CREATED
+  MULTISIG_PROPOSAL_READY
+  MULTISIG_PROPOSAL_EXECUTED
+  MULTISIG_PROPOSAL_REJECTED
+  MULTISIG_PROPOSAL_FAILED
+
+  // Payment Operations
+  PAYMENT_RECEIVED
+  PAYMENT_SENT
+  PAYMENT_LINK_CREATED
+  PAYMENT_LINK_ACTIVATED
+  PAYMENT_LINK_DEACTIVATED
+
+  // Invoice & Bill Operations
+  INVOICE_CREATED
+  INVOICE_SENT
+  INVOICE_REVIEWED
+  INVOICE_CONFIRMED
+  INVOICE_PAID
+  INVOICE_OVERDUE
+  INVOICE_SCHEDULED
+  BILL_CREATED
+  BILL_PENDING
+  BILL_PROPOSED
+  BILL_PAID
+
+  // Payroll Operations
+  PAYROLL_CREATED
+  PAYROLL_ACTIVE
+  PAYROLL_PAUSED
+  PAYROLL_COMPLETED
+
+  // Employee & Team Operations
+  EMPLOYEE_ADDED
+  EMPLOYEE_UPDATED
+  EMPLOYEE_REMOVED
+  TEAM_MEMBER_INVITED
+  TEAM_MEMBER_JOINED
+  TEAM_MEMBER_ROLE_CHANGED
+
+  // Company Operations
+  COMPANY_VERIFIED
+  COMPANY_VERIFICATION_REJECTED
+
+  // System
   NOP
 }
 
@@ -577,7 +779,14 @@ enum CompanyVerificationStatusEnum {
 enum TeamMemberRoleEnum {
   OWNER
   ADMIN
+  REVIEWER
   VIEWER
+}
+
+enum TeamMemberStatusEnum {
+  PENDING
+  ACTIVE
+  SUSPENDED
 }
 
 enum UserRoleEnum {
@@ -590,4 +799,185 @@ enum GenderEnum {
   FEMALE
   PREFER_NOT_TO_SAY
   OTHER
+}
+
+// ============================================================================
+// Multisig Models (for Miden integration)
+// ============================================================================
+
+model MultisigAccount {
+  id   Int    @id @default(autoincrement())
+  uuid String @unique @default(cuid()) @map("uuid")
+
+  name        String  @db.VarChar(255)
+  description String? @db.Text
+  logo        String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  // The Miden account ID (bech32 format from Rust server)
+  accountId String @unique @map("account_id") @db.VarChar(255)
+
+  // Approver public keys (hex-encoded, uncompressed format)
+  publicKeys String[] @map("public_keys") @db.VarChar(255)
+
+  // Number of signatures required
+  threshold Int
+
+  // Link to company that owns this multisig account
+  companyId Int     @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Additional metadata
+  metadata Json? @db.Json
+
+  // Relations
+  proposals   MultisigProposal[]
+  teamMembers MultisigAccountMember[]
+
+  @@index([companyId])
+  @@index([accountId])
+  @@map("multisig_accounts")
+}
+
+model MultisigProposal {
+  id   Int    @id @default(autoincrement())
+  uuid String @unique @default(cuid()) @map("uuid")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  // Link to multisig account
+  accountId String          @map("account_id") @db.VarChar(255)
+  account   MultisigAccount @relation(fields: [accountId], references: [accountId], onDelete: Cascade)
+
+  // Proposal details
+  description  String                   @db.Text
+  proposalType MultisigProposalTypeEnum @default(CONSUME) @map("proposal_type")
+
+  // Tokens associated with this proposal (array of TokenDto JSON objects)
+  tokens Json @db.Json
+
+  // PSM proposal identifier (from MultisigClient)
+  psmProposalId String? @map("psm_proposal_id") @db.VarChar(255)
+
+  // Transaction data from Miden (hex-encoded)
+  summaryCommitment String @map("summary_commitment") @db.VarChar(255)
+  summaryBytesHex   String @map("summary_bytes_hex") @db.Text
+  requestBytesHex   String @map("request_bytes_hex") @db.Text
+
+  // For CONSUME proposals: note IDs being consumed
+  noteIds String[] @map("note_ids") @db.VarChar(255)
+
+  // Proposal status
+  status MultisigProposalStatusEnum @default(PENDING)
+
+  // Transaction ID after execution
+  transactionId String? @map("transaction_id") @db.VarChar(255)
+
+  // Signatures collected
+  signatures MultisigSignature[]
+
+  // Rejections collected
+  rejections MultisigRejection[]
+
+  // Bills linked to this proposal (many-to-one)
+  bills Bill[]
+
+  // Additional metadata
+  metadata Json? @db.Json
+
+  @@index([accountId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("multisig_proposals")
+}
+
+model MultisigSignature {
+  id   Int    @id @default(autoincrement())
+  uuid String @unique @default(cuid()) @map("uuid")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  // Link to proposal
+  proposalId Int              @map("proposal_id")
+  proposal   MultisigProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  // Approver information
+  approverIndex     Int    @map("approver_index")
+  approverPublicKey String @map("approver_public_key") @db.VarChar(255)
+
+  // Signature (hex-encoded, from Para wallet)
+  signatureHex String @map("signature_hex") @db.Text
+
+  // Additional metadata
+  metadata Json? @db.Json
+
+  @@unique([proposalId, approverIndex])
+  @@index([proposalId])
+  @@map("multisig_signatures")
+}
+
+model MultisigRejection {
+  id   Int    @id @default(autoincrement())
+  uuid String @unique @default(cuid()) @map("uuid")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  // Link to proposal
+  proposalId Int              @map("proposal_id")
+  proposal   MultisigProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  // Team member who rejected
+  teamMemberId Int        @map("team_member_id")
+  teamMember   TeamMember @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
+
+  // Optional reason for rejection
+  reason String? @db.Text
+
+  @@unique([proposalId, teamMemberId])
+  @@index([proposalId])
+  @@index([teamMemberId])
+  @@map("multisig_rejections")
+}
+
+model MultisigAccountMember {
+  id   Int    @id @default(autoincrement())
+  uuid String @unique @default(cuid()) @map("uuid")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  // Link to multisig account
+  multisigAccountId Int             @map("multisig_account_id")
+  multisigAccount   MultisigAccount @relation(fields: [multisigAccountId], references: [id], onDelete: Cascade)
+
+  // Link to team member
+  teamMemberId Int        @map("team_member_id")
+  teamMember   TeamMember @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
+
+  // Additional metadata (e.g., role, permissions, joined date)
+  metadata Json? @db.Json
+
+  @@unique([multisigAccountId, teamMemberId])
+  @@index([multisigAccountId])
+  @@index([teamMemberId])
+  @@map("multisig_account_members")
+}
+
+enum MultisigProposalTypeEnum {
+  CONSUME // Consume incoming notes
+  SEND // Send funds to another account
+}
+
+enum MultisigProposalStatusEnum {
+  PENDING // Waiting for signatures
+  READY // Has enough signatures, ready to execute
+  EXECUTED // Transaction executed successfully
+  FAILED // Transaction failed
+  CANCELLED // Proposal cancelled by user
+  REJECTED // Proposal rejected via threshold rejections
 }

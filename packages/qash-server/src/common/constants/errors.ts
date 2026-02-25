@@ -148,11 +148,24 @@ export enum ErrorPaymentLink {
 export enum ErrorTeamMember {
   NotFound = 'Team member not found',
   EmailAlreadyExists = 'Email already exists in this company',
-  InsufficientPermissions = 'Insufficient permissions to add team members',
+  InsufficientPermissions = 'Insufficient permissions to perform this action',
   InsufficientPermissionsToInvite = 'Insufficient permissions to invite team members',
   UserAlreadyJoined = 'User already joined this company',
   InvitationNotActive = 'Invitation is no longer active',
   EmailAlreadyInvited = 'Email already invited to this company',
   AccessDenied = 'Access denied to this company',
   CannotRemoveLastOwner = 'Cannot remove the last owner of the company',
+  CannotRemoveOwner = 'Cannot remove the owner of the company',
+  OnlyOwnerCanRemoveAdmin = 'Only the owner can remove admin members',
+  CannotAssignOwnerRole = 'Cannot assign owner role - there can only be one owner per company',
+  InvalidInvitationToken = 'Invalid or expired invitation token',
+  InvitationExpired = 'Invitation has expired, please request a new one',
+  NotPendingInvitation = 'This invitation is not in pending status',
+  NotSuspended = 'Team member is not suspended',
+}
+
+export enum ErrorNotification {
+  NotFound = 'Notification not found',
+  AccessDenied = 'Access denied to notification',
+  InvalidStatus = 'Invalid notification status',
 }

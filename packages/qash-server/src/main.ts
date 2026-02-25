@@ -31,42 +31,43 @@ async function bootstrap() {
       return callback(null, true);
     }
 
-    // Always allow localhost origins (for local development/testing)
-    if (
-      origin.startsWith('http://localhost:') ||
-      origin.startsWith('https://localhost:') ||
-      origin.startsWith('http://127.0.0.1:') ||
-      origin.startsWith('https://127.0.0.1:')
-    ) {
-      return callback(null, origin); // Return specific origin, not true
-    }
-    return callback(null, origin); // Return specific origin
-
-    // In production, check allowed domains
-    if (appConfigService.nodeEnv === 'production') {
-      const allowedDomains = appConfigService.otherConfig.allowedDomains;
-
-      // If no allowedDomains configured, log warning but allow (for easier debugging)
-      if (!allowedDomains) {
-        console.warn(
-          `⚠️  CORS: NODE_ENV is production but ALLOWED_DOMAINS is not set. ` +
-            `Allowing origin: ${origin}. Please set ALLOWED_DOMAINS for security.`,
-        );
-        return callback(null, origin); // Return specific origin
+    // Development: Allow all localhost and 127.0.0.1 origins on any port
+    if (appConfigService.nodeEnv !== 'production') {
+      if (
+        origin.startsWith('http://localhost:') ||
+        origin.startsWith('https://localhost:') ||
+        origin.startsWith('http://127.0.0.1:') ||
+        origin.startsWith('https://127.0.0.1:')
+      ) {
+        console.log(`✅ CORS: Allowing development origin: ${origin}`);
+        return callback(null, origin);
       }
-
-      const allowedList = allowedDomains.split(',').map((d) => d.trim());
-
-      if (allowedList.includes(origin)) {
-        return callback(null, origin); // Return specific origin
-      } else {
-        return callback(new Error('Not allowed by CORS'));
-      }
+      // In dev mode, allow all origins for easier testing
+      console.log(`✅ CORS: Allowing development origin: ${origin}`);
+      return callback(null, origin);
     }
 
-    // Development mode: allow all origins but return the specific origin
-    // This is required when credentials: true is set
-    return callback(null, origin);
+    // Production: Check allowed domains
+    const allowedDomains = appConfigService.otherConfig.allowedDomains;
+
+    // If no allowedDomains configured, log warning but allow (for easier debugging)
+    if (!allowedDomains) {
+      console.warn(
+        `⚠️  CORS: NODE_ENV is production but ALLOWED_DOMAINS is not set. ` +
+          `Allowing origin: ${origin}. Please set ALLOWED_DOMAINS for security.`,
+      );
+      return callback(null, origin);
+    }
+
+    const allowedList = allowedDomains.split(',').map((d) => d.trim());
+
+    if (allowedList.includes(origin)) {
+      console.log(`✅ CORS: Allowing production origin: ${origin}`);
+      return callback(null, origin);
+    } else {
+      console.error(`❌ CORS: Blocking origin: ${origin}`);
+      return callback(new Error('Not allowed by CORS'));
+    }
   };
 
   app.enableCors({
@@ -89,7 +90,9 @@ async function bootstrap() {
       resave: false,
       saveUninitialized: false,
       cookie: {
-        secure: false,
+        secure: appConfigService.nodeEnv === 'production', // HTTPS only in production
+        httpOnly: true,
+        sameSite: appConfigService.nodeEnv === 'production' ? 'strict' : 'lax', // Relaxed for dev
         maxAge: 1000 * 60 * 60 * 24, // 1 day
       },
     }),
@@ -144,6 +147,15 @@ async function bootstrap() {
   const port = appConfigService.serverConfig.port;
 
   app.use(helmet());
+
+  // Graceful shutdown — release port before watch-mode restart
+  const shutdown = async (signal: string) => {
+    console.info(`\n${signal} received — closing server…`);
+    await app.close();
+    process.exit(0);
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 
   await app.listen(port, host, async () => {
     console.info(`API server is running on http://${host}:${port}`);

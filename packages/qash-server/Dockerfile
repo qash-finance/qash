@@ -1,53 +1,63 @@
 FROM node:20-alpine AS builder
+RUN apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
 
-# Copy package files
-COPY package*.json pnpm-lock.yaml ./
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
-# Install pnpm and dependencies
-RUN npm install -g pnpm
-RUN pnpm install
+# Copy workspace root config
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
 
-# Copy source code
-COPY . .
+# Copy all package.json files for workspace resolution
+COPY packages/types/package.json ./packages/types/package.json
+COPY packages/qash-server/package.json ./packages/qash-server/package.json
 
-# Rebuild native dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy types source and build it first
+COPY packages/types ./packages/types
+RUN pnpm --filter @qash/types build
+
+# Copy server source and build
+COPY packages/qash-server ./packages/qash-server
+
+WORKDIR /app/packages/qash-server
 RUN pnpm rebuild bcrypt
-
-# Generate Prisma client with v7 config
 RUN pnpm run prisma:generate
-
-# Build the application
 RUN pnpm run build
 
-FROM node:20-alpine
+FROM node:20-alpine AS runner
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
-# Copy package files
-COPY --from=builder /app/package*.json /app/pnpm-lock.yaml ./
+# Copy workspace root config
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages/types/package.json ./packages/types/package.json
+COPY packages/qash-server/package.json ./packages/qash-server/package.json
 
-# Install production dependencies
-RUN pnpm install --prod --frozen-lockfile
+RUN pnpm install --prod --frozen-lockfile --ignore-scripts
 
-# Copy built application
-COPY --from=builder /app/dist ./dist
+# Copy built types
+COPY --from=builder /app/packages/types/dist ./packages/types/dist
 
-# Copy Prisma files (schema and config)
-COPY --from=builder /app/src/database/prisma ./src/database/prisma
+# Copy built server
+COPY --from=builder /app/packages/qash-server/dist ./packages/qash-server/dist
 
-# Copy generated Prisma client
-COPY --from=builder /app/src/database/generated ./src/database/generated
+# Copy Prisma schema, config, and generated client
+COPY --from=builder /app/packages/qash-server/src/database/prisma ./packages/qash-server/src/database/prisma
+COPY --from=builder /app/packages/qash-server/src/database/generated ./packages/qash-server/src/database/generated
 
-# Rebuild native dependencies for production
-RUN pnpm rebuild bcrypt
+RUN cd packages/qash-server && pnpm rebuild bcrypt
+
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nestjs
+USER nestjs
 
 ARG PORT=3001
 ENV NODE_ENV=production
 ENV PORT=$PORT
-ENV GENERATE_SOURCEMAP=false
 EXPOSE $PORT
 
+WORKDIR /app/packages/qash-server
 CMD ["node", "dist/main"]

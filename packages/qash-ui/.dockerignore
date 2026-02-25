@@ -1,23 +1,21 @@
 node_modules
-packages/nextjs/node_modules
-packages/foundry/node_modules
-packages/docs/node_modules
 npm-debug.log
 Dockerfile*
 docker-compose*
 .dockerignore
 .git
 .gitignore
-.gitmodules
 .lintstagedrc.js
 TODO.md
 README.md
 CONTRIBUTING.md
 LICENSE
+LICENCE
 .vscode
 .next
 .github
 *.swp
-/scripts
+.env.*
+!.env
 # pnpm
 .pnpm-store

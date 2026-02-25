@@ -1,61 +1,48 @@
 FROM node:20-alpine AS base
-RUN apk add --no-cache libc6-compat python3 make g++ 
+RUN apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
-
-FROM base AS deps
-WORKDIR /app
-# Install corepack and enable pnpm
-RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
-# Copy pnpm configuration
-COPY .npmrc* pnpm-workspace.yaml* ./
-# Copy package files
-COPY package.json pnpm-lock.yaml* ./
-COPY packages/nextjs/package.json ./packages/nextjs/package.json
-COPY .env ./packages/nextjs/.env
-# Install dependencies
-RUN pnpm install --frozen-lockfile
-
-# Dependencies stage for docs app
-FROM base AS docs-deps
-WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
-# Copy workspace configuration
-COPY .npmrc* pnpm-workspace.yaml* ./
-COPY package.json pnpm-lock.yaml* ./
-COPY packages/docs/package.json ./packages/docs/package.json
-COPY packages/docs/.env.example ./packages/docs/.env.example
-RUN pnpm install --frozen-lockfile
-# Copy docs source and build within workspace
-COPY packages/docs/ ./packages/docs
-RUN pnpm --filter @qash/docs build
-WORKDIR /app/packages/docs
 
 FROM base AS builder
 WORKDIR /app
-COPY --from=deps /app ./
-WORKDIR /app/packages/nextjs
-COPY packages/nextjs .
-RUN pnpm --filter @qash/web build
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
-FROM base AS runner
+# Copy workspace root config
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
+
+# Copy package.json files for workspace resolution (cached layer)
+COPY packages/types/package.json ./packages/types/package.json
+COPY packages/qash-ui/package.json ./packages/qash-ui/package.json
+
+RUN pnpm install --frozen-lockfile
+
+# Copy types source and build
+COPY packages/types ./packages/types
+RUN pnpm --filter @qash/types build
+
+# Copy UI source
+COPY packages/qash-ui ./packages/qash-ui
+
+# NEXT_PUBLIC_ vars are read from .env at build time.
+COPY packages/qash-ui/.env ./packages/qash-ui/.env
+
+WORKDIR /app/packages/qash-ui
+RUN pnpm build
+
+FROM node:20-alpine AS runner
 WORKDIR /app
-COPY --from=builder /app/packages/nextjs/public ./packages/nextjs/public
-COPY --from=builder /app/packages/nextjs/.next/standalone/packages/nextjs ./packages/nextjs
-COPY --from=builder /app/packages/nextjs/.next/static ./packages/nextjs/.next/static
 
-# Copy docs app
-COPY --from=docs-deps /app/packages/docs/build ./docs/build
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
 
-# Create a simple start script
-RUN printf '#!/bin/sh\n\
-cd /app/docs && npx serve -s build -l 3001 --single &\n\
-cd /app/packages/nextjs && node server.js\n' > /app/start.sh
-RUN chmod +x /app/start.sh
+COPY --from=builder /app/packages/qash-ui/public ./packages/qash-ui/public
+COPY --from=builder --chown=nextjs:nodejs /app/packages/qash-ui/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/packages/qash-ui/.next/static ./packages/qash-ui/.next/static
+
+USER nextjs
 
 ARG PORT=3000
 ENV NODE_ENV=production
 ENV PORT=$PORT
-ENV GENERATE_SOURCEMAP=false
 EXPOSE $PORT
 
-CMD ["/app/start.sh"]
+CMD ["node", "packages/qash-ui/server.js"]

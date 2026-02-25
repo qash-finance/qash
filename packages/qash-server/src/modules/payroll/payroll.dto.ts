@@ -14,88 +14,10 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ContractTermEnum } from 'src/database/generated/client';
+import type * as SharedTypes from '@qash/types/dto/payroll';
+import { NetworkDto, TokenDto } from '../shared/shared.dto';
 
-export class NetworkDto {
-  @ApiProperty({
-    description: 'The name of the network',
-    example: 'Ethereum',
-  })
-  @IsString()
-  @IsNotEmpty()
-  name: string;
-
-  @ApiProperty({
-    description: 'The description of the network',
-    example: 'Ethereum Mainnet',
-  })
-  @IsString()
-  @IsNotEmpty()
-  description: string;
-
-  @ApiProperty({
-    description: 'The chain ID of the network',
-    example: 1,
-  })
-  @IsNumber()
-  @IsNotEmpty()
-  chainId: number;
-
-  @ApiPropertyOptional({
-    description: 'Additional network metadata',
-    example: {
-      rpcUrl: 'https://mainnet.infura.io/v3/...',
-      explorer: 'https://etherscan.io',
-    },
-  })
-  @IsOptional()
-  @IsObject()
-  metadata?: Record<string, any>;
-}
-
-export class TokenDto {
-  @ApiProperty({
-    description: 'The address of the token contract',
-    example: '0xA0b86a33E6441c8C06DD2F23c9C5C5c8C5C5C5C5',
-  })
-  @IsString()
-  @IsNotEmpty()
-  address: string;
-
-  @ApiProperty({
-    description: 'The symbol of the token',
-    example: 'USDC',
-  })
-  @IsString()
-  @IsNotEmpty()
-  symbol: string;
-
-  @ApiProperty({
-    description: 'The decimals of the token',
-    example: 18,
-  })
-  @IsNumber()
-  @Min(0)
-  @Max(18)
-  decimals: number;
-
-  @ApiProperty({
-    description: 'The name of the token',
-    example: 'USD Coin',
-  })
-  @IsString()
-  @IsNotEmpty()
-  name: string;
-
-  @ApiPropertyOptional({
-    description: 'Additional token metadata',
-    example: { logoUrl: 'https://...', coingeckoId: 'usd-coin' },
-  })
-  @IsOptional()
-  @IsObject()
-  metadata?: Record<string, any>;
-}
-
-export class CreatePayrollDto {
+export class CreatePayrollDto implements SharedTypes.CreatePayrollDto {
   @ApiProperty({
     description: 'The ID of the employee (company contact)',
     example: 1,
@@ -208,7 +130,7 @@ export class CreatePayrollDto {
   generateDaysBefore?: number;
 }
 
-export class CreatePayroll {
+export class CreatePayroll implements SharedTypes.CreatePayroll {
   @ApiProperty({
     description: 'The ID of the employee (company contact)',
     example: 1,
@@ -328,7 +250,7 @@ export class CreatePayroll {
   generateDaysBefore?: number;
 }
 
-export class UpdatePayrollDto {
+export class UpdatePayrollDto implements SharedTypes.UpdatePayrollDto {
   @ApiPropertyOptional({
     description: 'Payment network details',
     type: NetworkDto,
@@ -416,7 +338,7 @@ export class UpdatePayrollDto {
   metadata?: Record<string, any>;
 }
 
-export class PayrollQueryDto {
+export class PayrollQueryDto implements SharedTypes.PayrollQueryDto {
   @ApiPropertyOptional({
     description: 'Page number for pagination',
     example: 1,
@@ -465,7 +387,7 @@ export class PayrollQueryDto {
   search?: string;
 }
 
-export class PayrollStatsDto {
+export class PayrollStatsDto implements SharedTypes.PayrollStatsDto {
   @ApiProperty({
     description: 'Total number of active payrolls',
     example: 25,
@@ -495,9 +417,22 @@ export class PayrollStatsDto {
     example: 20,
   })
   dueThisMonth: number;
+
+  @ApiProperty({
+    description: 'ISO date string of the nearest upcoming pay date, or null if none',
+    example: '2026-03-01T00:00:00.000Z',
+    nullable: true,
+  })
+  nextPayDate: string | null;
+
+  @ApiProperty({
+    description: 'Total number of active payees (employees with active payrolls)',
+    example: 15,
+  })
+  totalPayees: number;
 }
 
-export class PendingInvoiceReviewsDto {
+export class PendingInvoiceReviewsDto implements SharedTypes.PendingInvoiceReviewsDto {
   @ApiProperty({
     description: 'Whether the payroll has pending invoice reviews',
     example: true,

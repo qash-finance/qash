@@ -14,9 +14,10 @@ import {
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import { PaymentLinkStatusEnum } from 'src/database/generated/enums';
-import { NetworkDto, TokenDto } from '../employee/employee.dto';
+import { NetworkDto, TokenDto } from '../shared/shared.dto';
+import type * as SharedTypes from '@qash/types/dto/payment-link';
 
-export class CreatePaymentLinkDto {
+export class CreatePaymentLinkDto implements SharedTypes.CreatePaymentLinkDto {
   @ApiProperty({
     description: 'The title of the payment link',
     example: 'Payment for services',
@@ -54,9 +55,9 @@ export class CreatePaymentLinkDto {
   })
   @IsNotEmpty()
   @IsString()
-  @Matches(/^mtst1[a-z0-9_]+$/i, {
+  @Matches(/^(mtst1[a-z0-9_]+|0x[a-f0-9]+)$/i, {
     message:
-      "Address must start with 'mtst1' and contain only letters, numbers, and underscores",
+      "Address must start with 'mtst1' (bech32) or '0x' (hex)",
   })
   @MinLength(3, { message: 'paymentWalletAddress is too short' })
   paymentWalletAddress: string;
@@ -84,7 +85,7 @@ export class CreatePaymentLinkDto {
   acceptedChains?: NetworkDto[];
 }
 
-export class UpdatePaymentLinkDto {
+export class UpdatePaymentLinkDto implements SharedTypes.UpdatePaymentLinkDto {
   @ApiProperty({
     description: 'The title of the payment link',
     example: 'Payment for services',
@@ -151,7 +152,7 @@ export class UpdatePaymentLinkDto {
   acceptedChains?: NetworkDto[];
 }
 
-export class PaymentLinkRecordDto {
+export class PaymentLinkRecordDto implements SharedTypes.PaymentRecordDto {
   @ApiProperty({
     description: 'The address of the payer',
     example: 'mtst1qzxh4e7uwlu5xyrnms9d5tfm7v2y7u6a',
@@ -193,7 +194,7 @@ export class PaymentLinkRecordDto {
   chain?: NetworkDto;
 }
 
-export class PaymentLinkOrderDto {
+export class PaymentLinkOrderDto implements SharedTypes.PaymentLinkOrderDto {
   @ApiProperty({
     description: 'Array of payment link IDs in the desired order',
     example: [1, 3, 2, 4],
@@ -205,7 +206,7 @@ export class PaymentLinkOrderDto {
   linkIds: number[];
 }
 
-export class DeletePaymentLinksDto {
+export class DeletePaymentLinksDto implements SharedTypes.DeletePaymentLinksDto {
   @ApiProperty({
     description:
       'Array of payment link codes to delete (use single item array for single deletion)',

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PayrollRepository, PayrollWithInvoices } from './payroll.repository';
 import { EmployeeRepository } from '../employee/repositories/employee.repository';
+import { NotificationService } from '../notification/notification.service';
 import {
   CreatePayrollDto,
   UpdatePayrollDto,
@@ -24,6 +25,8 @@ import {
   InvoiceStatusEnum,
   Payroll,
   PayrollStatusEnum,
+  NotificationsTypeEnum,
+  TeamMemberRoleEnum,
 } from 'src/database/generated/client';
 import { handleError } from 'src/common/utils/errors';
 import { PrismaService } from 'src/database/prisma.service';
@@ -42,6 +45,7 @@ export class PayrollService {
     private readonly payrollRepository: PayrollRepository,
     private readonly employeeRepository: EmployeeRepository,
     private readonly prisma: PrismaService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   //#region GET METHODS
@@ -263,8 +267,10 @@ export class PayrollService {
     dto: CreatePayrollDto,
     options?: { scheduleFrequency?: string },
   ): Promise<PayrollModel> {
+    let payroll: PayrollModel | undefined;
+
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      payroll = await this.prisma.$transaction(async (tx) => {
         const scheduleFrequency = options?.scheduleFrequency ?? 'MONTHLY';
         // Make sure employee exists and belongs to company
         const employee = await this.employeeRepository.findOne(
@@ -374,6 +380,15 @@ export class PayrollService {
       this.logger.error('Error creating payroll:', error);
       handleError(error, this.logger);
     }
+
+    // Send notification asynchronously after transaction completes
+    if (payroll) {
+      setTimeout(() => {
+        this.notifyPayrollCreated(companyId, payroll!);
+      }, 0);
+    }
+
+    return payroll;
   }
 
   /**
@@ -395,7 +410,6 @@ export class PayrollService {
       employeeId,
       network: {
         name: 'Miden Testnet',
-        description: 'Miden Testnet',
         chainId: 1,
       },
       token: {
@@ -533,7 +547,22 @@ export class PayrollService {
    */
   async pausePayroll(id: number, companyId: number): Promise<PayrollModel> {
     try {
-      return this.updatePayrollStatus(id, companyId, PayrollStatusEnum.PAUSED);
+      const updatedPayroll = await this.updatePayrollStatus(
+        id,
+        companyId,
+        PayrollStatusEnum.PAUSED,
+      );
+
+      // Send notification asynchronously
+      setTimeout(() => {
+        this.notifyPayrollStatusChanged(
+          companyId,
+          updatedPayroll,
+          NotificationsTypeEnum.PAYROLL_PAUSED,
+        );
+      }, 0);
+
+      return updatedPayroll;
     } catch (error) {
       this.logger.error('Error pausing payroll:', error);
       handleError(error, this.logger);
@@ -545,7 +574,22 @@ export class PayrollService {
    */
   async resumePayroll(id: number, companyId: number): Promise<PayrollModel> {
     try {
-      return this.updatePayrollStatus(id, companyId, PayrollStatusEnum.ACTIVE);
+      const updatedPayroll = await this.updatePayrollStatus(
+        id,
+        companyId,
+        PayrollStatusEnum.ACTIVE,
+      );
+
+      // Send notification asynchronously
+      setTimeout(() => {
+        this.notifyPayrollStatusChanged(
+          companyId,
+          updatedPayroll,
+          NotificationsTypeEnum.PAYROLL_ACTIVE,
+        );
+      }, 0);
+
+      return updatedPayroll;
     } catch (error) {
       this.logger.error('Error resuming payroll:', error);
       handleError(error, this.logger);
@@ -641,6 +685,93 @@ export class PayrollService {
 
       return updatedPayroll;
     });
+  }
+
+  /**
+   * Helper to send payroll created notification
+   */
+  private async notifyPayrollCreated(
+    companyId: number,
+    payroll: PayrollModel,
+  ): Promise<void> {
+    try {
+      const teamMembers = await this.prisma.teamMember.findMany({
+        where: {
+          companyId,
+          role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+        },
+        include: { user: true },
+      });
+
+      for (const member of teamMembers) {
+        if (member.user) {
+          await this.notificationService.createNotification({
+            title: 'Payroll Created',
+            message: `A new payroll has been created for employee ${payroll.employeeId}.`,
+            type: NotificationsTypeEnum.PAYROLL_CREATED,
+            userId: member.user.id,
+            metadata: {
+              companyId,
+              payrollId: payroll.id,
+              employeeId: payroll.employeeId,
+              amount: payroll.amount,
+              status: payroll.status,
+            },
+          });
+        }
+      }
+    } catch (error) {
+      this.logger.error('Error sending payroll creation notification:', error);
+    }
+  }
+
+  /**
+   * Helper to send payroll notification
+   */
+  private async notifyPayrollStatusChanged(
+    companyId: number,
+    payroll: PayrollModel,
+    type: NotificationsTypeEnum,
+  ): Promise<void> {
+    try {
+      const statusLabel =
+        type === NotificationsTypeEnum.PAYROLL_ACTIVE
+          ? 'Resumed'
+          : type === NotificationsTypeEnum.PAYROLL_PAUSED
+            ? 'Paused'
+            : 'Created';
+
+      const teamMembers = await this.prisma.teamMember.findMany({
+        where: {
+          companyId,
+          role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+        },
+        include: { user: true },
+      });
+
+      for (const member of teamMembers) {
+        if (member.user) {
+          await this.notificationService.createNotification({
+            title: `Payroll ${statusLabel}`,
+            message: `Payroll ${statusLabel.toLowerCase()} for employee ${payroll.employeeId}.`,
+            type,
+            userId: member.user.id,
+            metadata: {
+              companyId,
+              payrollId: payroll.id,
+              employeeId: payroll.employeeId,
+              amount: payroll.amount,
+              status: payroll.status,
+            },
+          });
+        }
+      }
+    } catch (error) {
+      this.logger.error(
+        'Error sending payroll status change notification:',
+        error,
+      );
+    }
   }
 
   /**
