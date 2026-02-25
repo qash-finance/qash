@@ -22,7 +22,7 @@ export const QASH_TOKEN_MAX_SUPPLY = 1000000000000000000;
 
 // **************** MIDEN NETWORK *******************
 export const BLOCK_TIME = 5; // seconds
-export const NODE_ENDPOINT = "https://rpc.testnet.miden.io";
+export const NODE_ENDPOINT = process.env.NEXT_PUBLIC_NODE_ENDPOINT || "https://rpc.testnet.miden.io";
 export const REFETCH_DELAY = 6000;
 export const SYNC_STATE_INTERVAL = 3000;
 export const MIDEN_EXPLORER_URL = "https://testnet.midenscan.com";
