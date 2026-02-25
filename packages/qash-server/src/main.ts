@@ -92,7 +92,7 @@ async function bootstrap() {
       cookie: {
         secure: appConfigService.nodeEnv === 'production', // HTTPS only in production
         httpOnly: true,
-        sameSite: appConfigService.nodeEnv === 'production' ? 'strict' : 'lax', // Relaxed for dev
+        sameSite: appConfigService.nodeEnv === 'production' ? 'none' : 'lax', // 'none' required for cross-origin cookies (app.qash.finance → api.qash.finance)
         maxAge: 1000 * 60 * 60 * 24, // 1 day
       },
     }),

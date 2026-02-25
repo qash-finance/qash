@@ -72,7 +72,7 @@ const TestnetBanner = () => (
 );
 
 const paraClientConfig = {
-  env: Environment.BETA,
+  env: Environment.PROD,
   apiKey: process.env.NEXT_PUBLIC_PARA_API_KEY || "",
 };
 
@@ -133,93 +133,93 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
           <ParaProvider paraClientConfig={paraClientConfig} config={paraConfig} paraModalConfig={paraModalConfig}>
             <MidenProvider>
               <PSMProvider>
-            <Toaster
-              position="top-right"
-              toastOptions={{
-                style: {
-                  padding: "6px",
-                  background: "var(--toast-background) !important",
-                  border: "4px solid var(--toast-border) !important",
-                  width: "full",
-                  maxWidth: "900px",
-                  borderRadius: "9999px",
-                },
-                success: {
-                  icon: <img src="/toast/success.svg" alt="success" />,
-                },
-                error: {
-                  icon: <img src="/toast/error.svg" alt="error" />,
-                },
-                loading: {
-                  icon: <img src="/toast/loading.gif" alt="loading" className="w-10.5" />,
-                },
-              }}
-              children={t => (
-                <ToastBar
-                  toast={t}
-                  style={{
-                    ...t.style,
+                <Toaster
+                  position="top-right"
+                  toastOptions={{
+                    style: {
+                      padding: "6px",
+                      background: "var(--toast-background) !important",
+                      border: "4px solid var(--toast-border) !important",
+                      width: "full",
+                      maxWidth: "900px",
+                      borderRadius: "9999px",
+                    },
+                    success: {
+                      icon: <img src="/toast/success.svg" alt="success" />,
+                    },
+                    error: {
+                      icon: <img src="/toast/error.svg" alt="error" />,
+                    },
+                    loading: {
+                      icon: <img src="/toast/loading.gif" alt="loading" className="w-10.5" />,
+                    },
                   }}
-                >
-                  {({ icon, message }) => (
-                    <div className="flex items-center justify-between gap-8 pr-3">
-                      <div className="flex items-center">
-                        {icon}
-                        <span className="text-toast-text leading-none">{message}</span>
-                      </div>
-                      <img
-                        src="/toast/close-icon.svg"
-                        alt="close"
-                        className="w-5 cursor-pointer"
-                        onClick={() => toast.dismiss(t.id)}
-                      />
-                    </div>
+                  children={t => (
+                    <ToastBar
+                      toast={t}
+                      style={{
+                        ...t.style,
+                      }}
+                    >
+                      {({ icon, message }) => (
+                        <div className="flex items-center justify-between gap-8 pr-3">
+                          <div className="flex items-center">
+                            {icon}
+                            <span className="text-toast-text leading-none">{message}</span>
+                          </div>
+                          <img
+                            src="/toast/close-icon.svg"
+                            alt="close"
+                            className="w-5 cursor-pointer"
+                            onClick={() => toast.dismiss(t.id)}
+                          />
+                        </div>
+                      )}
+                    </ToastBar>
                   )}
-                </ToastBar>
-              )}
-            />
-            <AppReadyGate>
-              <TourProviderWrapper>
-                <SocketProvider>
-                  <ModalProvider>
-                    <AuthProvider>
-                      <PostHogProvider>
-                        <ProtectedContent>
-                          <AccountProvider>
-                            <TransactionProviderC>
-                              <TitleProvider>
-                                {/* <ConnectWalletButton /> */}
-                                <ModalManager />
-                                {isFullscreen ? (
-                                  <div className="h-screen w-screen">{children}</div>
-                                ) : (
-                                  <div className="flex flex-col h-screen overflow-hidden">
-                                    <TestnetBanner />
-                                    <div className="flex flex-row gap-2">
-                                      <div className={`top-0 ${SIDEBAR_WIDTH_CLASSES}`}>
-                                        <Sidebar />
-                                      </div>
-                                      {/* {pathname.includes("dashboard") && <DashboardMenu />} */}
-                                      <div className="flex-1 h-screen flex flex-col overflow-hidden gap-2">
-                                        <Title />
-                                        <div className="mx-[8px] mb-[24px] rounded-[12px] flex justify-center items-center flex-1 overflow-auto relative bg-background">
-                                          {children}
+                />
+                <AppReadyGate>
+                  <TourProviderWrapper>
+                    <SocketProvider>
+                      <ModalProvider>
+                        <AuthProvider>
+                          <PostHogProvider>
+                            <ProtectedContent>
+                              <AccountProvider>
+                                <TransactionProviderC>
+                                  <TitleProvider>
+                                    {/* <ConnectWalletButton /> */}
+                                    <ModalManager />
+                                    {isFullscreen ? (
+                                      <div className="h-screen w-screen">{children}</div>
+                                    ) : (
+                                      <div className="flex flex-col h-screen overflow-hidden">
+                                        <TestnetBanner />
+                                        <div className="flex flex-row gap-2">
+                                          <div className={`top-0 ${SIDEBAR_WIDTH_CLASSES}`}>
+                                            <Sidebar />
+                                          </div>
+                                          {/* {pathname.includes("dashboard") && <DashboardMenu />} */}
+                                          <div className="flex-1 h-screen flex flex-col overflow-hidden gap-2">
+                                            <Title />
+                                            <div className="mx-[8px] mb-[24px] rounded-[12px] flex justify-center items-center flex-1 overflow-auto relative bg-background">
+                                              {children}
+                                            </div>
+                                          </div>
                                         </div>
                                       </div>
-                                    </div>
-                                  </div>
-                                )}
-                                {!isFullscreen && <FloatingActionButton imgSrc="/token/qash.svg" />}
-                              </TitleProvider>
-                            </TransactionProviderC>
-                          </AccountProvider>
-                        </ProtectedContent>
-                      </PostHogProvider>
-                    </AuthProvider>
-                  </ModalProvider>
-                </SocketProvider>
-              </TourProviderWrapper>
-            </AppReadyGate>
+                                    )}
+                                    {!isFullscreen && <FloatingActionButton imgSrc="/token/qash.svg" />}
+                                  </TitleProvider>
+                                </TransactionProviderC>
+                              </AccountProvider>
+                            </ProtectedContent>
+                          </PostHogProvider>
+                        </AuthProvider>
+                      </ModalProvider>
+                    </SocketProvider>
+                  </TourProviderWrapper>
+                </AppReadyGate>
               </PSMProvider>
             </MidenProvider>
           </ParaProvider>
