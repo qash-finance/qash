@@ -1,27 +1,37 @@
-# Base stage
-FROM node:18-alpine AS base
+# Docs uses npm for Docker builds (no lock file, independent of monorepo)
+FROM node:20-alpine AS base
 RUN apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
 
-# Dependencies stage
 FROM base AS deps
 WORKDIR /app
-COPY package.json yarn.lock .env.example ./
-RUN yarn install --frozen-lockfile
+COPY packages/qash-doc/package.json ./
+RUN npm install --ignore-scripts
 
-# Builder stage
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-RUN yarn build
+COPY packages/qash-doc .
+# Use the docker-specific docusaurus config if available
+RUN if [ -f docusaurus.config.docker.js ]; then \
+      cp docusaurus.config.docker.js docusaurus.config.js; \
+    fi
+RUN npx docusaurus build
 
-# Runner stage
-FROM node:18-alpine AS runner
+FROM node:20-alpine AS runner
+RUN npm install -g serve
 WORKDIR /app
+
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 docuser
+
+COPY --from=builder --chown=docuser:nodejs /app/build ./build
+
+USER docuser
+
 ARG PORT=3000
-ENV NODE_ENV production
+ENV NODE_ENV=production
 ENV PORT=$PORT
-COPY --from=builder /app/build ./build
 EXPOSE $PORT
-CMD npx serve -s build -l ${PORT}
+
+CMD ["serve", "-s", "build", "-l", "3000"]

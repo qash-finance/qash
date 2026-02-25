@@ -2,32 +2,47 @@ FROM node:20-alpine AS base
 RUN apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
 
-FROM base AS deps
-WORKDIR /app
-# Install corepack and enable pnpm
-RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
-# Copy package files
-COPY package.json pnpm-lock.yaml* ./
-COPY .env .env
-# Install dependencies
-RUN pnpm install --frozen-lockfile
-
 FROM base AS builder
 WORKDIR /app
-COPY --from=deps /app ./
-COPY . .
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
+
+# Copy workspace root config
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
+
+# Copy package.json files for workspace resolution (cached layer)
+COPY packages/types/package.json ./packages/types/package.json
+COPY packages/qash-ui/package.json ./packages/qash-ui/package.json
+
+RUN pnpm install --frozen-lockfile
+
+# Copy types source and build
+COPY packages/types ./packages/types
+RUN pnpm --filter @qash/types build
+
+# Copy UI source
+COPY packages/qash-ui ./packages/qash-ui
+
+# NEXT_PUBLIC_ vars are read from .env at build time.
+COPY packages/qash-ui/.env ./packages/qash-ui/.env
+
+WORKDIR /app/packages/qash-ui
 RUN pnpm build
 
-FROM base AS runner
+FROM node:20-alpine AS runner
 WORKDIR /app
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+
+COPY --from=builder /app/packages/qash-ui/public ./packages/qash-ui/public
+COPY --from=builder --chown=nextjs:nodejs /app/packages/qash-ui/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/packages/qash-ui/.next/static ./packages/qash-ui/.next/static
+
+USER nextjs
 
 ARG PORT=3000
 ENV NODE_ENV=production
 ENV PORT=$PORT
-ENV GENERATE_SOURCEMAP=false
 EXPOSE $PORT
 
-CMD ["node", "server.js"]
+CMD ["node", "packages/qash-ui/server.js"]

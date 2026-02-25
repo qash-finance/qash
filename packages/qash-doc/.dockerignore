@@ -10,3 +10,5 @@ README.md
 yarn-error.log
 .idea
 .docusaurus
+.env
+.env.*

@@ -15,5 +15,7 @@ LICENCE
 .next
 .github
 *.swp
+.env.*
+!.env
 # pnpm
 .pnpm-store

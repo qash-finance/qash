@@ -5,7 +5,11 @@ import { InvoiceService } from './invoice.service';
 import { PrismaService } from '../../../database/prisma.service';
 import { NotificationService } from '../../notification/notification.service';
 import { InvoiceScheduleModel } from 'src/database/generated/models/InvoiceSchedule';
-import { NotificationsTypeEnum, PayrollStatusEnum, TeamMemberRoleEnum } from 'src/database/generated/enums';
+import {
+  NotificationsTypeEnum,
+  PayrollStatusEnum,
+  TeamMemberRoleEnum,
+} from 'src/database/generated/enums';
 import { MailService } from 'src/modules/mail/mail.service';
 import { TokenDto } from 'src/modules/shared/shared.dto';
 
@@ -24,7 +28,7 @@ export class InvoiceSchedulerService {
   /**
    * Run every hour to check for invoices that need to be generated
    */
-  @Cron(CronExpression.EVERY_10_SECONDS)
+  @Cron(CronExpression.EVERY_10_MINUTES)
   async generateScheduledInvoices() {
     try {
       const now = new Date();
@@ -55,7 +59,7 @@ export class InvoiceSchedulerService {
    * Run daily to mark invoices as overdue
    * Checks invoices that are past their due date and marks them as OVERDUE
    */
-  @Cron(CronExpression.EVERY_10_SECONDS)
+  @Cron(CronExpression.EVERY_10_MINUTES)
   async markOverdueInvoices() {
     try {
       const now = new Date();
@@ -198,7 +202,10 @@ export class InvoiceSchedulerService {
             }
           }
         } catch (error) {
-          this.logger.error('Error sending scheduled invoice notifications:', error);
+          this.logger.error(
+            'Error sending scheduled invoice notifications:',
+            error,
+          );
         }
       }, 0);
 
@@ -267,7 +274,9 @@ export class InvoiceSchedulerService {
                 const teamMembers = await this.prisma.teamMember.findMany({
                   where: {
                     companyId: payroll.companyId,
-                    role: { in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN] },
+                    role: {
+                      in: [TeamMemberRoleEnum.OWNER, TeamMemberRoleEnum.ADMIN],
+                    },
                   },
                   include: { user: true },
                 });
