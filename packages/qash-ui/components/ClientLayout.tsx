@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useEffect, useMemo } from "react";
+import { ReactNode, useEffect, useMemo, useState } from "react";
 import toast, { ToastBar, Toaster } from "react-hot-toast";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Sidebar } from "./Sidebar/Sidebar";
@@ -92,12 +92,42 @@ function ProtectedContent({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+// Pages where the heavy Miden/PSM infrastructure is NOT required.
+// These pages must render immediately (login, onboarding, public payment pages).
+const GATE_BYPASS_PREFIXES = ["/login", "/onboarding", "/payment/", "/invoice-review", "/team-invite"];
+
 // Gate that shows FullScreenLoading until core infrastructure is ready:
 // 1. Para SDK initialized (isLoading === false)
 // 2. If connected: WebClient created + PSM connected
+// Bypassed on login/public pages so AuthProvider can mount and set cookies.
+// Falls through after timeout so the app is never stuck if Miden/PSM fails.
+const GATE_TIMEOUT_MS = 10_000;
+
 function AppReadyGate({ children }: { children: ReactNode }) {
   const { isLoading, isConnected, client } = useMidenProvider();
   const { psmStatus } = usePSMProvider();
+  const pathname = usePathname();
+  const [timedOut, setTimedOut] = useState(false);
+
+  // Timeout: never block forever if Miden/PSM fails to initialize
+  useEffect(() => {
+    const timer = setTimeout(() => setTimedOut(true), GATE_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Never block login or other public pages — they don't need Miden/PSM
+  const shouldBypass = GATE_BYPASS_PREFIXES.some(
+    p => pathname === p || pathname?.startsWith(p.endsWith("/") ? p : `${p}/`),
+  );
+  if (shouldBypass) return <>{children}</>;
+
+  // If timed out, let through anyway (Miden features may be degraded)
+  if (timedOut) {
+    if (isConnected && !client) {
+      console.warn("[AppReadyGate] Timed out waiting for Miden WebClient — rendering without it");
+    }
+    return <>{children}</>;
+  }
 
   // Para SDK still initializing
   if (isLoading) return <FullScreenLoading />;
@@ -178,13 +208,13 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
                     </ToastBar>
                   )}
                 />
-                <AppReadyGate>
-                  <TourProviderWrapper>
-                    <SocketProvider>
-                      <ModalProvider>
-                        <AuthProvider>
-                          <PostHogProvider>
-                            <ProtectedContent>
+                <AuthProvider>
+                  <PostHogProvider>
+                    <ProtectedContent>
+                      <AppReadyGate>
+                        <TourProviderWrapper>
+                          <SocketProvider>
+                            <ModalProvider>
                               <AccountProvider>
                                 <TransactionProviderC>
                                   <TitleProvider>
@@ -213,13 +243,13 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
                                   </TitleProvider>
                                 </TransactionProviderC>
                               </AccountProvider>
-                            </ProtectedContent>
-                          </PostHogProvider>
-                        </AuthProvider>
-                      </ModalProvider>
-                    </SocketProvider>
-                  </TourProviderWrapper>
-                </AppReadyGate>
+                            </ModalProvider>
+                          </SocketProvider>
+                        </TourProviderWrapper>
+                      </AppReadyGate>
+                    </ProtectedContent>
+                  </PostHogProvider>
+                </AuthProvider>
               </PSMProvider>
             </MidenProvider>
           </ParaProvider>
