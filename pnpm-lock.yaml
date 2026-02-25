@@ -147,9 +147,6 @@ importers:
       cookie-parser:
         specifier: ^1.4.6
         version: 1.4.7
-      dotenv:
-        specifier: ^16.4.7
-        version: 16.6.1
       express-session:
         specifier: ^1.18.2
         version: 1.19.0
