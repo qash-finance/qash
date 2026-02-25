@@ -23,7 +23,8 @@ RUN pnpm --filter @qash/types build
 COPY packages/qash-ui ./packages/qash-ui
 
 # NEXT_PUBLIC_ vars are read from .env at build time.
-COPY packages/qash-ui/.env ./packages/qash-ui/.env
+# The build workflow creates .env at the repo root from ENV_PROD secret.
+COPY .env ./packages/qash-ui/.env
 
 WORKDIR /app/packages/qash-ui
 RUN pnpm build
