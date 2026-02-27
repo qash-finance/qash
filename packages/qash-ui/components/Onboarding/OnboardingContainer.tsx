@@ -58,7 +58,7 @@ export default function OnboardingContainer() {
   const [selectedCountry, setSelectedCountry] = useState<string>("");
   const [showAdditionalDetails, setShowAdditionalDetails] = useState<boolean>(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
@@ -80,6 +80,13 @@ export default function OnboardingContainer() {
       registrationNumber: "",
     },
   });
+
+  // Cleanup object URL on unmount or when preview changes
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   // Redirect authenticated users away from onboarding
   useEffect(() => {
@@ -112,16 +119,27 @@ export default function OnboardingContainer() {
       return;
     }
 
-    setLogoFile(file);
+    // Revoke old preview URL to prevent memory leaks (re-upload case)
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+
+    // Show optimistic preview immediately
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewUrl(objectUrl);
 
     try {
       const result = await uploadLogoMutation.mutateAsync(file);
       setLogoUrl(result.url);
       toast.success("Logo uploaded successfully");
     } catch (error) {
+      // Revert preview on failure
+      URL.revokeObjectURL(objectUrl);
+      setPreviewUrl(null);
+      setLogoUrl(null);
       toast.error("Failed to upload logo");
-      setLogoFile(null);
     }
+
+    // Reset input so re-uploading the same file triggers onChange
+    e.target.value = "";
   };
 
   const onSubmit = async (data: OnboardingFormData) => {
@@ -168,8 +186,15 @@ export default function OnboardingContainer() {
             {/* Company Logo Upload */}
             <div className="flex gap-4 items-start w-full">
               <label className="bg-[#ebf4ff] border border-primary-blue border-dashed rounded-full shrink-0 w-[86px] h-[86px] flex items-center justify-center relative overflow-hidden cursor-pointer hover:bg-blue-50 transition-colors">
-                {logoUrl ? (
-                  <img src={logoUrl} alt="Company logo" className="w-full h-full object-cover" />
+                {previewUrl ? (
+                  <>
+                    <img src={previewUrl} alt="Company logo" className="w-full h-full object-cover" />
+                    {uploadLogoMutation.isPending && (
+                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                        <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <img src="/misc/blue-upload-icon.svg" alt="Upload" className="w-6 h-6" />
                 )}
@@ -197,7 +222,7 @@ export default function OnboardingContainer() {
                     opacity: uploadLogoMutation.isPending ? 0.5 : 1,
                   }}
                 >
-                  {uploadLogoMutation.isPending ? "Uploading..." : "Upload photo"}
+                  {uploadLogoMutation.isPending ? "Uploading..." : previewUrl ? "Change photo" : "Upload photo"}
                   <input
                     type="file"
                     accept="image/jpeg,image/png"
@@ -280,12 +305,7 @@ export default function OnboardingContainer() {
                 />
 
                 {/* City */}
-                <InputOutlined
-                  label="City"
-                  placeholder="Enter city"
-                  size="compact"
-                  {...register("city")}
-                />
+                <InputOutlined label="City" placeholder="Enter city" size="compact" {...register("city")} />
 
                 {/* Address 1 */}
                 <InputOutlined
@@ -294,9 +314,7 @@ export default function OnboardingContainer() {
                   size="compact"
                   error={!!errors.address1}
                   errorMessage={
-                    errors.address1?.type === "minLength"
-                      ? "Address must be at least 5 characters"
-                      : undefined
+                    errors.address1?.type === "minLength" ? "Address must be at least 5 characters" : undefined
                   }
                   {...register("address1", {
                     minLength: {
@@ -323,9 +341,7 @@ export default function OnboardingContainer() {
                       size="compact"
                       error={!!errors.postalCode}
                       errorMessage={
-                        errors.postalCode?.type === "minLength"
-                          ? "Must be at least 3 characters"
-                          : undefined
+                        errors.postalCode?.type === "minLength" ? "Must be at least 3 characters" : undefined
                       }
                       {...register("postalCode", {
                         minLength: {
@@ -342,9 +358,7 @@ export default function OnboardingContainer() {
                       size="compact"
                       error={!!errors.registrationNumber}
                       errorMessage={
-                        errors.registrationNumber?.type === "minLength"
-                          ? "Must be at least 5 characters"
-                          : undefined
+                        errors.registrationNumber?.type === "minLength" ? "Must be at least 5 characters" : undefined
                       }
                       {...register("registrationNumber", {
                         minLength: {

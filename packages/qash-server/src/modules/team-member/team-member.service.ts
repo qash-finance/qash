@@ -84,7 +84,20 @@ export class TeamMemberService {
           throw new ConflictException(ErrorTeamMember.EmailAlreadyExists);
         }
 
-        // Create user first (required for 1:1 relationship)
+        // Check if user with this email already exists globally
+        const existingUser = await this.userRepository.findByEmail(
+          createTeamMemberDto.email,
+          tx,
+        );
+
+        if (existingUser) {
+          // User exists and belongs to another company (1:1 relationship)
+          throw new ConflictException(
+            ErrorTeamMember.EmailBelongsToAnotherCompany,
+          );
+        }
+
+        // Create user (required for 1:1 relationship)
         const user = await this.userRepository.create(
           {
             email: createTeamMemberDto.email,
@@ -166,7 +179,20 @@ export class TeamMemberService {
         const invitationExpiresAt = new Date();
         invitationExpiresAt.setDate(invitationExpiresAt.getDate() + 7);
 
-        // Create user first (required for 1:1 relationship)
+        // Check if user with this email already exists globally
+        const existingUser = await this.userRepository.findByEmail(
+          inviteDto.email,
+          tx,
+        );
+
+        if (existingUser) {
+          // User exists and belongs to another company (1:1 relationship)
+          throw new ConflictException(
+            ErrorTeamMember.EmailBelongsToAnotherCompany,
+          );
+        }
+
+        // Create user (required for 1:1 relationship)
         const user = await this.userRepository.create(
           {
             email: inviteDto.email,

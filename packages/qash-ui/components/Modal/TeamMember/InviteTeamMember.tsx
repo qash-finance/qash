@@ -177,8 +177,10 @@ export function InviteTeamMember({ isOpen, onClose, zIndex }: ModalProp<Validati
       }
       reset();
       refetchTeamMembers();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to invite team members:", error);
+      const message = error?.userMessage || "Failed to send invitation. Please try again.";
+      toast.error(message);
     }
   };
 
@@ -315,8 +317,10 @@ export function InviteTeamMember({ isOpen, onClose, zIndex }: ModalProp<Validati
                         reset();
                         refetchTeamMembers();
                       })
-                      .catch(error => {
+                      .catch((error: any) => {
                         console.error("Failed to invite team member:", error);
+                        const message = error?.userMessage || "Failed to send invitation. Please try again.";
+                        toast.error(message);
                       });
                   } else {
                     // Already have invited emails, add this one to the list

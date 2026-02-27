@@ -153,6 +153,7 @@ export enum ErrorTeamMember {
   UserAlreadyJoined = 'User already joined this company',
   InvitationNotActive = 'Invitation is no longer active',
   EmailAlreadyInvited = 'Email already invited to this company',
+  EmailBelongsToAnotherCompany = 'This email is already a member of another company',
   AccessDenied = 'Access denied to this company',
   CannotRemoveLastOwner = 'Cannot remove the last owner of the company',
   CannotRemoveOwner = 'Cannot remove the owner of the company',
