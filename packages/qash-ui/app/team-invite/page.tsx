@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { PrimaryButton } from "@/components/Common/PrimaryButton";
 import { useAcceptInvitationByToken } from "@/services/api/team-member";
 import { useAuth } from "@/services/auth/context";
-import { useModal, useWallet } from "@getpara/react-sdk-lite";
+import { useModal, useWallet, useLogout } from "@getpara/react-sdk-lite";
 import toast from "react-hot-toast";
 import { useAccount as useParaAccount } from "@getpara/react-sdk-lite";
 import { useParaMiden } from "@miden-sdk/use-miden-para-react";
@@ -29,8 +29,9 @@ interface TeamInvitePageProps {
 export default function TeamInvitePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, loginWithPara, refreshUser, isAuthenticated, isLoading } = useAuth();
+  const { user, loginWithPara, logout, refreshUser, isAuthenticated, isLoading } = useAuth();
   const { openModal } = useModal();
+  const { logoutAsync: paraLogout } = useLogout();
   const [isAccepted, setIsAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { isConnected } = useParaAccount();
@@ -63,15 +64,28 @@ export default function TeamInvitePage() {
         throw new Error("Failed to get JWT token from Para");
       }
 
-      // Extract wallet public key
-      const publicKey = wallet?.publicKey;
+      // Extract wallet public key from JWT payload (same as LoginContainer)
+      const jwtPayload = JSON.parse(window.atob(jwtResult.token.split(".")[1]));
+      const connectedWallets = jwtPayload.data?.connectedWallets || [];
+      const evmWallet = connectedWallets.find((w: any) => w.type === "EVM");
+      const publicKey = evmWallet?.publicKey || wallet?.publicKey;
 
       if (!publicKey) {
         console.error("Wallet public key is missing");
         return;
       }
 
-      await loginWithPara(jwtResult.token, publicKey);
+      // Derive ECDSA commitment from wallet public key for multisig support
+      let commitment: string | undefined;
+      try {
+        const { tryComputeEcdsaCommitmentHex, EcdsaFormat } = await import("@openzeppelin/miden-multisig-client");
+        const compressedPk = EcdsaFormat.compressPublicKey(publicKey);
+        commitment = tryComputeEcdsaCommitmentHex(compressedPk) ?? undefined;
+      } catch (err) {
+        console.warn("Failed to derive ECDSA commitment:", err);
+      }
+
+      await loginWithPara(jwtResult.token, publicKey, commitment);
       toast.success("Successfully authenticated");
       await refreshUser();
     } catch (error) {
@@ -80,7 +94,7 @@ export default function TeamInvitePage() {
     } finally {
       setAuthenticatingWithPara(false);
     }
-  }, [isConnected, para, authenticatingWithPara, loginWithPara, refreshUser]);
+  }, [isConnected, para, authenticatingWithPara, loginWithPara, refreshUser, wallet?.publicKey]);
 
   // Auto-authenticate once when wallet is connected
   useEffect(() => {
@@ -183,11 +197,19 @@ export default function TeamInvitePage() {
       <div className="flex items-center justify-center h-screen bg-background">
         <div className="bg-app-background px-10 py-8 rounded-[24px] w-[510px]">
           {/* Team Icon */}
-          <img
-            src={companyLogo ? companyLogo : "/logo/qash-icon-dark.svg"}
-            alt="Team Icon"
-            className="w-30 mb-6 mx-auto"
-          />
+          {companyLogo ? (
+            <img
+              src={companyLogo}
+              alt="Team Icon"
+              className="w-30 mb-6 mx-auto"
+            />
+          ) : (
+            <div className="w-20 h-20 rounded-full bg-linear-to-br from-primary-blue to-blue-600 flex items-center justify-center mb-6 mx-auto">
+              <span className="text-3xl font-bold text-white">
+                {companyName?.charAt(0).toUpperCase() || "?"}
+              </span>
+            </div>
+          )}
 
           {/* Content */}
           <div className="space-y-3">
@@ -248,11 +270,19 @@ export default function TeamInvitePage() {
     <div className="flex items-center justify-center h-screen bg-background">
       <div className="bg-app-background px-10 py-8 rounded-[24px] w-[510px]">
         {/* Team Icon */}
-        <img
-          src={companyLogo ? companyLogo : "/logo/qash-icon-dark.svg"}
-          alt="Team Icon"
-          className="w-30 mb-6 mx-auto"
-        />
+        {companyLogo ? (
+          <img
+            src={companyLogo}
+            alt="Team Icon"
+            className="w-30 mb-6 mx-auto"
+          />
+        ) : (
+          <div className="w-20 h-20 rounded-full bg-linear-to-br from-primary-blue to-blue-600 flex items-center justify-center mb-6 mx-auto">
+            <span className="text-3xl font-bold text-white">
+              {companyName?.charAt(0).toUpperCase() || "?"}
+            </span>
+          </div>
+        )}
 
         {/* Content */}
         <div className="space-y-3">
@@ -290,10 +320,20 @@ export default function TeamInvitePage() {
           {isIntendedUser ? (
             <PrimaryButton text="Join team" onClick={handleAcceptInvite} loading={isPending} />
           ) : (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-center">
-              <p className="text-red-700 text-sm">
-                This invitation was sent to {intendedEmail}. Please sign in with that account to accept.
-              </p>
+            <div className="flex flex-col gap-3">
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-center">
+                <p className="text-red-700 text-sm">
+                  This invitation was sent to {intendedEmail}. Please sign in with that account to accept.
+                </p>
+              </div>
+              <PrimaryButton
+                text="Sign in with a different account"
+                onClick={async () => {
+                  authAttemptedRef.current = false;
+                  await logout();
+                  await paraLogout();
+                }}
+              />
             </div>
           )}
         </div>

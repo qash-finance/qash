@@ -65,7 +65,6 @@ export function PSMProvider({ children }: { children: ReactNode }) {
   const loadedMultisigsRef = useRef<Map<string, Multisig>>(new Map());
   const loadedSetRef = useRef<Set<string>>(new Set());
 
-  /** Enrich vault balances with token metadata and cache the SyncResult */
   const enrichAndCache = useCallback(
     async (accountId: string, syncResult: SyncResult) => {
       const { AccountId, Address, NetworkId } = await import("@miden-sdk/miden-sdk");
@@ -75,7 +74,6 @@ export function PSMProvider({ children }: { children: ReactNode }) {
         const faucetAccountId = AccountId.fromHex(vb.faucetId);
         const faucetBech32 = Address.fromAccountId(faucetAccountId).toBech32(NetworkId.testnet());
 
-        // Try static lookup first (supportedTokens uses bech32 with optional _suffix)
         const knownToken = supportedTokens.find(t => faucetBech32.startsWith(t.faucetId.split("_")[0]));
         if (knownToken) {
           enrichedBalances.push({
@@ -86,7 +84,6 @@ export function PSMProvider({ children }: { children: ReactNode }) {
             decimals: knownToken.decimals,
           });
         } else {
-          // Fallback: resolve via WebClient (getFaucetMetadata has promise cache)
           let symbol = "UNKNOWN";
           let decimals = 8;
           if (webClient) {
@@ -256,8 +253,10 @@ export function PSMProvider({ children }: { children: ReactNode }) {
           const multisig = await multisigClient.load(normalizedId, signer);
           if (psmPublicKey) multisig.setPsmPublicKey(psmPublicKey);
 
-          // Sync proposals, state, and consumable notes (reference: ms.syncAll())
+          console.log("LoadAccounts before multisig syncAll");
+
           const syncResult = await multisig.syncAll();
+          console.log("LoadAccounts after multisig syncAll", syncResult);
 
           console.log("[PSMProvider] loadAllAccounts result:", {
             accountId: normalizedId,
@@ -289,7 +288,16 @@ export function PSMProvider({ children }: { children: ReactNode }) {
     } finally {
       loadingRef.current = false;
     }
-  }, [webClient, multisigClient, psmPublicKey, psmStatus, signerReady, multisigAccounts, createSigner, registerMultisig]);
+  }, [
+    webClient,
+    multisigClient,
+    psmPublicKey,
+    psmStatus,
+    signerReady,
+    multisigAccounts,
+    createSigner,
+    registerMultisig,
+  ]);
 
   // Auto-load accounts when PSM is connected and signer + account data are available
   useEffect(() => {

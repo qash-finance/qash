@@ -43,16 +43,21 @@ export async function mintTokensViaClient(
   // Parse faucet address
   const faucetId = Address.fromBech32(faucetAddress);
 
-  // Import faucet account from chain (latest state, no keys)
-  const faucetExists = await client.getAccount(faucetId.accountId()).catch(() => null);
-  if (!faucetExists) {
-    try {
-      console.log("[mint] Importing faucet account from chain...");
-      await client.importAccountById(faucetId.accountId());
-      console.log("[mint] Faucet account imported from chain");
-    } catch (importErr) {
-      console.warn("[mint] Could not import faucet account:", importErr);
-    }
+  // Always (re-)import the faucet account from chain so we have the latest
+  // on-chain state. A stale local entry would cause "account data wasn't found"
+  // when executing the transaction.
+  try {
+    console.log("[mint] Importing faucet account from chain...");
+    await client.importAccountById(faucetId.accountId());
+    console.log("[mint] Faucet account imported from chain");
+  } catch (importErr) {
+    console.warn("[mint] Could not import faucet account:", importErr);
+  }
+
+  // Verify the faucet account data is actually available
+  const faucetAccount = await client.getAccount(faucetId.accountId()).catch(() => null);
+  if (!faucetAccount) {
+    throw new Error(`Faucet account data not found for ${faucetAddress}. The faucet may no longer exist on-chain.`);
   }
 
   // Inject the faucet's auth secret key so we can sign mint transactions

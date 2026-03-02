@@ -22,14 +22,23 @@ function isQashHexAddress(hexId: string): boolean {
   return hexId.toLowerCase().replace(/^0x/, "") === QASH_TOKEN_HEX_ADDRESS.toLowerCase().replace(/^0x/, "");
 }
 
+// Helper to check if a bech32 faucet address matches the QASH token (compare first part before "_")
+function isQashBech32Address(bech32: string): boolean {
+  if (!bech32) return false;
+  const base = bech32.split("_")[0];
+  const qashBase = QASH_TOKEN_ADDRESS.split("_")[0];
+  return base === qashBase;
+}
+
+// Helper to check if a faucet matches the QASH token by any identifier
+function isQashToken(faucetBech32: string, faucetHex: string, symbol: string): boolean {
+  return isQashHexAddress(faucetHex) || isQashBech32Address(faucetBech32) || symbol.toUpperCase() === "QASH";
+}
+
 // Helper to get a token logo path by bech32 faucet ID, hex faucet ID, or symbol
 function getTokenLogo(faucetBech32: string, faucetHex: string, symbol: string): string {
-  // Match QASH token by hex address
-  if (faucetHex && isQashHexAddress(faucetHex)) {
-    return "/token/qash.svg";
-  }
-  // Match QASH token by bech32 (may have a _suffix like _qruqqypuyph)
-  if (faucetBech32 && QASH_TOKEN_ADDRESS.startsWith(faucetBech32.split("_")[0])) {
+  // Match QASH token
+  if (isQashToken(faucetBech32, faucetHex, symbol)) {
     return "/token/qash.svg";
   }
   // Check other supported tokens
@@ -41,8 +50,6 @@ function getTokenLogo(faucetBech32: string, faucetHex: string, symbol: string): 
     const sym = known.symbol.toLowerCase();
     return `/token/${sym}.svg`;
   }
-  // Fallback by symbol
-  if (symbol.toUpperCase() === "QASH") return "/token/qash.svg";
   return "/token/any-token.svg";
 }
 
@@ -83,9 +90,9 @@ export function NoteRow({
   const firstAsset = note.assets?.[0];
   const faucetBech32 = firstAsset?.faucet_bech32 || "";
   const faucetHex = firstAsset?.faucet_id || "";
-  const isQashToken = isQashHexAddress(faucetHex) || firstAsset?.symbol?.toUpperCase() === "QASH";
-  const symbol = isQashToken ? QASH_TOKEN_SYMBOL : (firstAsset?.symbol || "");
-  const decimals = isQashToken ? QASH_TOKEN_DECIMALS : (firstAsset?.decimals ?? 8);
+  const isQash = isQashToken(faucetBech32, faucetHex, firstAsset?.symbol || "");
+  const symbol = isQash ? QASH_TOKEN_SYMBOL : (firstAsset?.symbol || "");
+  const decimals = isQash ? QASH_TOKEN_DECIMALS : (firstAsset?.decimals ?? 8);
   const displayAmount = firstAsset ? formatAmount(firstAsset.amount, decimals) : "0";
   const tokenLabel = symbol || (faucetBech32 ? formatAddress(faucetBech32) : formatAddress(faucetHex));
   const tokenLogo = firstAsset ? getTokenLogo(faucetBech32, faucetHex, symbol) : "/token/any-token.svg";
