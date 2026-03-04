@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiServerWithAuth } from "./index";
 import { QASH_TOKEN_ADDRESS, QASH_TOKEN_DECIMALS } from "../utils/constant";
@@ -6,6 +6,7 @@ import { useMidenProvider } from "@/contexts/MidenProvider";
 import { usePSMProvider } from "@/contexts/PSMProvider";
 import { useParaSigner } from "@/hooks/web3/useParaSigner";
 import { mintTokensViaClient } from "../utils/mint";
+import { supportedTokens } from "../utils/supportedToken";
 import type {
   CreateMultisigAccountDto,
   MultisigAccountResponseDto,
@@ -208,6 +209,7 @@ export function useListAccountsByCompany(companyId?: number, options?: { enabled
  */
 export function useGetConsumableNotes(accountId?: string, _options?: { enabled?: boolean }) {
   const { accountCacheMap, sync } = usePSMProvider();
+  const [enrichedNotes, setEnrichedNotes] = useState<ConsumableNote[]>([]);
 
   const key = accountId
     ? (accountId.toLowerCase().startsWith("0x") ? accountId.toLowerCase() : `0x${accountId}`.toLowerCase())
@@ -216,32 +218,81 @@ export function useGetConsumableNotes(accountId?: string, _options?: { enabled?:
   const rawNotes = cache?.syncResult.notes;
   const enrichedBalances = cache?.enrichedBalances;
 
-  const notes: ConsumableNote[] = useMemo(
-    () =>
-      (rawNotes || []).map(note => ({
-        note_id: note.id,
-        assets: note.assets.map(a => {
-          // Look up enriched metadata by hex faucet ID
-          const enriched = enrichedBalances?.find(
-            eb => eb.faucetId.toLowerCase() === a.faucetId.toLowerCase(),
-          );
-          return {
-            faucet_id: a.faucetId,
-            faucet_bech32: enriched?.faucetBech32 || "",
-            symbol: enriched?.symbol || "",
-            decimals: enriched?.decimals ?? 8,
-            amount: a.amount.toString(),
-          };
-        }),
-        sender: "",
-        note_type: "",
-      })),
-    [rawNotes, enrichedBalances],
-  );
+  // Build notes with enrichment: first from cache, then async bech32 conversion for unmatched assets
+  useEffect(() => {
+    if (!rawNotes) {
+      setEnrichedNotes([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      const { AccountId, Address, NetworkId } = await import("@miden-sdk/miden-sdk");
+
+      const notes: ConsumableNote[] = await Promise.all(
+        rawNotes.map(async note => ({
+          note_id: note.id,
+          assets: await Promise.all(
+            note.assets.map(async a => {
+              // Look up enriched metadata by hex faucet ID from vault balances
+              const enriched = enrichedBalances?.find(
+                eb => eb.faucetId.toLowerCase() === a.faucetId.toLowerCase(),
+              );
+              if (enriched) {
+                return {
+                  faucet_id: a.faucetId,
+                  faucet_bech32: enriched.faucetBech32,
+                  symbol: enriched.symbol,
+                  decimals: enriched.decimals,
+                  amount: a.amount.toString(),
+                };
+              }
+
+              // Fallback: convert hex to bech32 and match against supportedTokens
+              try {
+                const faucetAccountId = AccountId.fromHex(a.faucetId);
+                const faucetBech32 = Address.fromAccountId(faucetAccountId).toBech32(NetworkId.testnet());
+                const knownToken = supportedTokens.find(t => {
+                  const base = t.faucetId.split("_")[0];
+                  return faucetBech32.startsWith(base);
+                });
+                return {
+                  faucet_id: a.faucetId,
+                  faucet_bech32: faucetBech32,
+                  symbol: knownToken?.symbol || "",
+                  decimals: knownToken?.decimals ?? 8,
+                  amount: a.amount.toString(),
+                };
+              } catch {
+                return {
+                  faucet_id: a.faucetId,
+                  faucet_bech32: "",
+                  symbol: "",
+                  decimals: 8,
+                  amount: a.amount.toString(),
+                };
+              }
+            }),
+          ),
+          sender: "",
+          note_type: "",
+        })),
+      );
+
+      if (!cancelled) {
+        setEnrichedNotes(notes);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [rawNotes, enrichedBalances]);
 
   return useMemo(
-    () => ({ data: { notes }, isLoading: !!accountId && !cache, refetch: sync }),
-    [notes, accountId, cache, sync],
+    () => ({ data: { notes: enrichedNotes }, isLoading: !!accountId && !cache, refetch: sync }),
+    [enrichedNotes, accountId, cache, sync],
   );
 }
 
@@ -626,6 +677,7 @@ export function useListProposalsByCompany(companyId?: number, options?: { enable
 export function useSignProposal() {
   const queryClient = useQueryClient();
   const { multisigClient, psmPublicKey, registerMultisig, getMultisig, pauseSync, resumeSync } = usePSMProvider();
+  const { client: webClient } = useMidenProvider();
   const { isReady: signerReady, createSigner, commitment: signerCommitment } = useParaSigner();
 
   return useMutation<
@@ -658,7 +710,9 @@ export function useSignProposal() {
         }
 
         await new Promise(resolve => setTimeout(resolve, 300));
-        const syncResult = await multisig.syncAll();
+        const { resilientSyncAll } = await import("@/services/utils/miden/sync");
+        if (!webClient) throw new Error("WebClient not initialized");
+        const syncResult = await resilientSyncAll(multisig, webClient);
         const syncedProposals = syncResult.proposals;
 
         // 2. Check if we already signed this proposal on PSM
@@ -799,9 +853,21 @@ export function useExecuteProposal() {
         // Small delay to ensure any in-flight auto-sync requests complete
         await new Promise(resolve => setTimeout(resolve, 300));
 
+        // Sync WebClient with Miden node first so local store has all notes.
+        // Critical for consume_notes proposals: signer 2 needs the note in their
+        // local store even though signer 1 created the proposal.
+        try {
+          await webClient.syncState();
+        } catch {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          await webClient.syncState();
+        }
+
         // syncAll() ensures the WebClient has the latest account state (signerCommitments,
         // threshold, psmCommitment) from PSM, which the MASM auth verifier needs.
-        await multisig.syncAll();
+        // Use resilientSyncAll to handle "nonce too low" when executing back-to-back.
+        const { resilientSyncAll } = await import("@/services/utils/miden/sync");
+        await resilientSyncAll(multisig, webClient);
 
         // 2. Check if this is a batch proposal (multiple recipients from backend metadata)
         const isBatch = (proposal.payments?.length ?? 0) > 1;
@@ -852,7 +918,19 @@ export function useExecuteProposal() {
         }
 
         // 3. Mark as executed on backend (update status + bills)
-        return markProposalExecuted(proposalId);
+        const execResult = await markProposalExecuted(proposalId);
+
+        // 4. Sync WebClient with Miden node so the local account state reflects the
+        //    new on-chain nonce. Without this, a subsequent execute would have syncState()
+        //    overwrite the local (advanced) account with PSM's stale state, causing
+        //    "account nonce is too low to import".
+        try {
+          await webClient.syncState();
+        } catch (syncErr) {
+          console.warn("[useExecuteProposal] Post-execution node sync failed (non-fatal):", syncErr);
+        }
+
+        return execResult;
       } finally {
         resumeSync();
       }

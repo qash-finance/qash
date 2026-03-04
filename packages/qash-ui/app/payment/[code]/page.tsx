@@ -119,8 +119,8 @@ const PaymentLinkDetailPage = () => {
     // Use on-chain decimals constant for QASH token (existing payment links may have stale decimals stored)
     const tokenDecimals =
       paymentTokenAddress === QASH_TOKEN_ADDRESS
-        ? QASH_TOKEN_DECIMALS
-        : paymentLink?.acceptedTokens?.[0]?.decimals || 6;
+        ? QASH_TOKEN_DECIMALS - 2
+        : paymentLink?.acceptedTokens?.[0]?.decimals || 8;
     const recipientAddress = paymentLink?.paymentWalletAddress;
 
     if (!paymentTokenAddress || !recipientAddress) {
@@ -280,9 +280,7 @@ const PaymentLinkDetailPage = () => {
             <div className="flex flex-col gap-5 py-5 w-[80%]">
               <PaymentLinkPreview
                 recipient={paymentLink.company.companyName}
-                recipientAvatar={
-                  paymentLink.company.companyLogo ? paymentLink.company.companyLogo : "/logo/qash-icon-dark.svg"
-                }
+                recipientAvatar={paymentLink.company.companyLogo || null}
                 paymentWalletAddress={paymentLink.paymentWalletAddress}
                 amount={paymentLink.amount}
                 title={paymentLink.title}

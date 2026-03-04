@@ -18,6 +18,7 @@ import toast from "react-hot-toast";
 import { useModal } from "@/contexts/ModalManagerProvider";
 import { useMidenProvider } from "@/contexts/MidenProvider";
 import { useParaSigner } from "@/hooks/web3/useParaSigner";
+import { usePSMProvider } from "@/contexts/PSMProvider";
 import { getFaucetMetadata } from "@/services/utils/miden/faucet";
 import { supportedTokens } from "@/services/utils/supportedToken";
 import { useRouter } from "next/navigation";
@@ -44,6 +45,7 @@ export function TransactionsContainer() {
   const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
   const [isCreatingProposal, setIsCreatingProposal] = useState(false);
   const { commitment: signerCommitment } = useParaSigner();
+  const { syncWarning } = usePSMProvider();
   const { user } = useAuth();
 
   const isViewer = user?.teamMembership?.role === TeamMemberRoleEnum.VIEWER;
@@ -176,10 +178,17 @@ export function TransactionsContainer() {
       toast.success("Transaction executed successfully");
       trackEvent(PostHogEvent.PROPOSAL_EXECUTED, { proposalId: String(proposalId) });
       refetchProposals();
-    } catch (error) {
+    } catch (error: any) {
       closeModal("PROCESSING_TRANSACTION");
       console.error("Failed to execute proposal:", error);
-      toast.error("Failed to execute transaction");
+      const msg = error?.message || "";
+      if (msg.includes("still being finalized") || msg.includes("non-canonical delta pending")) {
+        toast.error("A previous transaction is still being finalized on-chain. Please wait a moment and try again.");
+      } else if (msg.includes("account state has changed")) {
+        toast.error(msg);
+      } else {
+        toast.error("Failed to execute transaction");
+      }
     } finally {
       setActionLoadingId(null);
       setActionType(null);
@@ -418,6 +427,14 @@ export function TransactionsContainer() {
       case "pending": {
         return (
           <>
+            {syncWarning && (
+              <div className="flex items-center gap-2 px-4 py-3 mb-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+                <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+                </svg>
+                <p>A previous transaction is being finalized on-chain. New transactions cannot be submitted until this completes. This usually takes a few seconds.</p>
+              </div>
+            )}
             {proposalsLoading ? (
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-blue" />
@@ -535,9 +552,7 @@ export function TransactionsContainer() {
             header={
               <div className="flex w-full justify-center items-start py-4 flex-col">
                 <span className="text-2xl">{currentAccount?.name || "Account"}</span>
-                <p className="text-xs font-medium text-text-secondary max-w-2xl">
-                  Since you are a member in this account, below are the transactions that need to be confirmed by you
-                </p>
+                <p className="text-xs font-medium text-text-secondary max-w-2xl"></p>
               </div>
             }
             childrenClassName="!bg-background"

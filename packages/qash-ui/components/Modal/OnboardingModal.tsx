@@ -8,12 +8,14 @@ import { PrimaryButton } from "../Common/PrimaryButton";
 import BaseModal from "./BaseModal";
 import toast from "react-hot-toast";
 import { useMidenProvider } from "@/contexts/MidenProvider";
+import { usePSMProvider } from "@/contexts/PSMProvider";
 import { MultisigAccountResponseDto } from "@qash/types/dto/multisig";
 import { useMintTokens } from "@/services/api/multisig";
 
 export function OnboardingModal({ isOpen, onClose, zIndex }: ModalProp<OnboardingModalProps>) {
   // **************** Custom Hooks *******************
   const { fetchBalances } = useMidenProvider();
+  const { sync } = usePSMProvider();
   const { openModal } = useModal();
   const { mutate: mint, isPending } = useMintTokens();
 
@@ -56,6 +58,7 @@ export function OnboardingModal({ isOpen, onClose, zIndex }: ModalProp<Onboardin
 
             fetchBalances();
             onClose();
+            setTimeout(() => sync(), 5000);
           },
           onError: error => {
             toast.dismiss();

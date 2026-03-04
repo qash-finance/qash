@@ -14,10 +14,10 @@ export const CURRENT_MIGRATION_VERSION = "0.11.0";
 export const MIDEN_DB_NAME = "MidenClientDB";
 
 // **************** QASH TOKEN *******************
-export const QASH_TOKEN_ADDRESS = "mtst1apaw70rclwh6sgr8e338s5dhnc3xgslp_qruqqypuyph";
+export const QASH_TOKEN_ADDRESS = "mtst1azk9t7lzrs3m5gpqhds4kuet8gdmnz37_qruqqypuyph";
 export const QASH_TOKEN_HEX_ADDRESS = "0x7aef3c78fbafa82067cc627851b79e";
 export const QASH_TOKEN_SYMBOL = "QASH";
-export const QASH_TOKEN_DECIMALS = 6;
+export const QASH_TOKEN_DECIMALS = 8;
 export const QASH_TOKEN_MAX_SUPPLY = 1000000000000000000;
 
 // **************** MIDEN NETWORK *******************
@@ -26,8 +26,8 @@ export const NODE_ENDPOINT = process.env.NEXT_PUBLIC_NODE_ENDPOINT || "https://r
 export const REFETCH_DELAY = 6000;
 export const SYNC_STATE_INTERVAL = 3000;
 export const MIDEN_EXPLORER_URL = "https://testnet.midenscan.com";
-export const PSM_ENDPOINT = "https://psm-stg.openzeppelin.com";
-export const PSM_SYNC_INTERVAL = 5000; // 5 seconds
+export const PSM_ENDPOINT = "https://psm.qash.finance";
+export const PSM_SYNC_INTERVAL = 15000; // 15 seconds
 export const MIDEN_NETWORK_ID = "mtst";
 
 // **************** AUTH *******************

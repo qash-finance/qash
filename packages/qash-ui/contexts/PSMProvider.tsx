@@ -61,11 +61,11 @@ export function PSMProvider({ children }: { children: ReactNode }) {
   const retryCountRef = useRef(0);
   const syncRef = useRef(false);
   const syncPausedRef = useRef(false);
+  const syncBackoffUntilRef = useRef(0);
   const loadingRef = useRef(false);
   const loadedMultisigsRef = useRef<Map<string, Multisig>>(new Map());
   const loadedSetRef = useRef<Set<string>>(new Set());
 
-  /** Enrich vault balances with token metadata and cache the SyncResult */
   const enrichAndCache = useCallback(
     async (accountId: string, syncResult: SyncResult) => {
       const { AccountId, Address, NetworkId } = await import("@miden-sdk/miden-sdk");
@@ -75,7 +75,6 @@ export function PSMProvider({ children }: { children: ReactNode }) {
         const faucetAccountId = AccountId.fromHex(vb.faucetId);
         const faucetBech32 = Address.fromAccountId(faucetAccountId).toBech32(NetworkId.testnet());
 
-        // Try static lookup first (supportedTokens uses bech32 with optional _suffix)
         const knownToken = supportedTokens.find(t => faucetBech32.startsWith(t.faucetId.split("_")[0]));
         if (knownToken) {
           enrichedBalances.push({
@@ -86,7 +85,6 @@ export function PSMProvider({ children }: { children: ReactNode }) {
             decimals: knownToken.decimals,
           });
         } else {
-          // Fallback: resolve via WebClient (getFaucetMetadata has promise cache)
           let symbol = "UNKNOWN";
           let decimals = 8;
           if (webClient) {
@@ -256,8 +254,8 @@ export function PSMProvider({ children }: { children: ReactNode }) {
           const multisig = await multisigClient.load(normalizedId, signer);
           if (psmPublicKey) multisig.setPsmPublicKey(psmPublicKey);
 
-          // Sync proposals, state, and consumable notes (reference: ms.syncAll())
-          const syncResult = await multisig.syncAll();
+          const { resilientSyncAll } = await import("@/services/utils/miden/sync");
+          const syncResult = await resilientSyncAll(multisig, webClient!);
 
           console.log("[PSMProvider] loadAllAccounts result:", {
             accountId: normalizedId,
@@ -289,7 +287,16 @@ export function PSMProvider({ children }: { children: ReactNode }) {
     } finally {
       loadingRef.current = false;
     }
-  }, [webClient, multisigClient, psmPublicKey, psmStatus, signerReady, multisigAccounts, createSigner, registerMultisig]);
+  }, [
+    webClient,
+    multisigClient,
+    psmPublicKey,
+    psmStatus,
+    signerReady,
+    multisigAccounts,
+    createSigner,
+    registerMultisig,
+  ]);
 
   // Auto-load accounts when PSM is connected and signer + account data are available
   useEffect(() => {
@@ -305,6 +312,8 @@ export function PSMProvider({ children }: { children: ReactNode }) {
    */
   const sync = useCallback(async () => {
     if (!webClient || syncRef.current || syncPausedRef.current) return;
+    // Respect rate-limit backoff
+    if (Date.now() < syncBackoffUntilRef.current) return;
     syncRef.current = true;
     setError(null);
     setSyncWarning(null);
@@ -319,20 +328,22 @@ export function PSMProvider({ children }: { children: ReactNode }) {
       }
 
       // Sync all registered multisig instances and capture results
+      const { resilientSyncAll } = await import("@/services/utils/miden/sync");
       for (const [accountId, multisig] of loadedMultisigsRef.current.entries()) {
         try {
-          const syncResult = await multisig.syncAll();
+          const syncResult = await resilientSyncAll(multisig, webClient);
           await enrichAndCache(accountId, syncResult);
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          if (message.includes("account nonce is too low to import")) {
-            setSyncWarning(
-              "Sync warning: local state is ahead of the on-chain state. " +
-                "This can happen right after executing a transaction. Please wait a moment and sync again.",
-            );
-          } else {
-            console.warn(`[PSMProvider] Failed to sync multisig ${accountId}:`, err);
+        } catch (err: any) {
+          const msg = err?.message || String(err);
+          // Respect PSM 429 rate limit — back off for the requested duration
+          if (msg.includes("429") || msg.includes("Rate limit")) {
+            const retryMatch = msg.match(/retry_after_secs[":]*\s*(\d+)/i);
+            const backoffSecs = retryMatch ? parseInt(retryMatch[1], 10) : 60;
+            syncBackoffUntilRef.current = Date.now() + backoffSecs * 1000;
+            console.warn(`[PSMProvider] Rate limited, backing off ${backoffSecs}s`);
+            break;
           }
+          console.warn(`[PSMProvider] Failed to sync multisig ${accountId}:`, err);
         }
       }
     } catch (err) {
