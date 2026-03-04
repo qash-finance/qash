@@ -26,8 +26,8 @@ export const NODE_ENDPOINT = process.env.NEXT_PUBLIC_NODE_ENDPOINT || "https://r
 export const REFETCH_DELAY = 6000;
 export const SYNC_STATE_INTERVAL = 3000;
 export const MIDEN_EXPLORER_URL = "https://testnet.midenscan.com";
-export const PSM_ENDPOINT = "http://localhost:4000";
-export const PSM_SYNC_INTERVAL = 5000; // 5 seconds
+export const PSM_ENDPOINT = "https://psm.qash.finance";
+export const PSM_SYNC_INTERVAL = 15000; // 15 seconds
 export const MIDEN_NETWORK_ID = "mtst";
 
 // **************** AUTH *******************

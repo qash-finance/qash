@@ -677,6 +677,7 @@ export function useListProposalsByCompany(companyId?: number, options?: { enable
 export function useSignProposal() {
   const queryClient = useQueryClient();
   const { multisigClient, psmPublicKey, registerMultisig, getMultisig, pauseSync, resumeSync } = usePSMProvider();
+  const { client: webClient } = useMidenProvider();
   const { isReady: signerReady, createSigner, commitment: signerCommitment } = useParaSigner();
 
   return useMutation<
@@ -710,7 +711,8 @@ export function useSignProposal() {
 
         await new Promise(resolve => setTimeout(resolve, 300));
         const { resilientSyncAll } = await import("@/services/utils/miden/sync");
-        const syncResult = await resilientSyncAll(multisig);
+        if (!webClient) throw new Error("WebClient not initialized");
+        const syncResult = await resilientSyncAll(multisig, webClient);
         const syncedProposals = syncResult.proposals;
 
         // 2. Check if we already signed this proposal on PSM
@@ -851,11 +853,21 @@ export function useExecuteProposal() {
         // Small delay to ensure any in-flight auto-sync requests complete
         await new Promise(resolve => setTimeout(resolve, 300));
 
+        // Sync WebClient with Miden node first so local store has all notes.
+        // Critical for consume_notes proposals: signer 2 needs the note in their
+        // local store even though signer 1 created the proposal.
+        try {
+          await webClient.syncState();
+        } catch {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          await webClient.syncState();
+        }
+
         // syncAll() ensures the WebClient has the latest account state (signerCommitments,
         // threshold, psmCommitment) from PSM, which the MASM auth verifier needs.
         // Use resilientSyncAll to handle "nonce too low" when executing back-to-back.
         const { resilientSyncAll } = await import("@/services/utils/miden/sync");
-        await resilientSyncAll(multisig);
+        await resilientSyncAll(multisig, webClient);
 
         // 2. Check if this is a batch proposal (multiple recipients from backend metadata)
         const isBatch = (proposal.payments?.length ?? 0) > 1;

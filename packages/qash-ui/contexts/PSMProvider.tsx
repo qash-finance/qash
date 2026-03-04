@@ -61,6 +61,7 @@ export function PSMProvider({ children }: { children: ReactNode }) {
   const retryCountRef = useRef(0);
   const syncRef = useRef(false);
   const syncPausedRef = useRef(false);
+  const syncBackoffUntilRef = useRef(0);
   const loadingRef = useRef(false);
   const loadedMultisigsRef = useRef<Map<string, Multisig>>(new Map());
   const loadedSetRef = useRef<Set<string>>(new Set());
@@ -253,10 +254,8 @@ export function PSMProvider({ children }: { children: ReactNode }) {
           const multisig = await multisigClient.load(normalizedId, signer);
           if (psmPublicKey) multisig.setPsmPublicKey(psmPublicKey);
 
-          console.log("LoadAccounts before multisig syncAll");
-
-          const syncResult = await multisig.syncAll();
-          console.log("LoadAccounts after multisig syncAll", syncResult);
+          const { resilientSyncAll } = await import("@/services/utils/miden/sync");
+          const syncResult = await resilientSyncAll(multisig, webClient!);
 
           console.log("[PSMProvider] loadAllAccounts result:", {
             accountId: normalizedId,
@@ -313,6 +312,8 @@ export function PSMProvider({ children }: { children: ReactNode }) {
    */
   const sync = useCallback(async () => {
     if (!webClient || syncRef.current || syncPausedRef.current) return;
+    // Respect rate-limit backoff
+    if (Date.now() < syncBackoffUntilRef.current) return;
     syncRef.current = true;
     setError(null);
     setSyncWarning(null);
@@ -327,20 +328,22 @@ export function PSMProvider({ children }: { children: ReactNode }) {
       }
 
       // Sync all registered multisig instances and capture results
+      const { resilientSyncAll } = await import("@/services/utils/miden/sync");
       for (const [accountId, multisig] of loadedMultisigsRef.current.entries()) {
         try {
-          const syncResult = await multisig.syncAll();
+          const syncResult = await resilientSyncAll(multisig, webClient);
           await enrichAndCache(accountId, syncResult);
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          if (message.includes("account nonce is too low to import")) {
-            setSyncWarning(
-              "Sync warning: local state is ahead of the on-chain state. " +
-                "This can happen right after executing a transaction. Please wait a moment and sync again.",
-            );
-          } else {
-            console.warn(`[PSMProvider] Failed to sync multisig ${accountId}:`, err);
+        } catch (err: any) {
+          const msg = err?.message || String(err);
+          // Respect PSM 429 rate limit — back off for the requested duration
+          if (msg.includes("429") || msg.includes("Rate limit")) {
+            const retryMatch = msg.match(/retry_after_secs[":]*\s*(\d+)/i);
+            const backoffSecs = retryMatch ? parseInt(retryMatch[1], 10) : 60;
+            syncBackoffUntilRef.current = Date.now() + backoffSecs * 1000;
+            console.warn(`[PSMProvider] Rate limited, backing off ${backoffSecs}s`);
+            break;
           }
+          console.warn(`[PSMProvider] Failed to sync multisig ${accountId}:`, err);
         }
       }
     } catch (err) {
