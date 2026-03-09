@@ -8,14 +8,12 @@ import { CountryDropdown } from "../Common/Dropdown/CountryDropdown";
 import { CompanyInfoDto as CompanyInfo } from "@qash/types/dto/company";
 import toast from "react-hot-toast";
 import SettingHeader from "./SettingHeader";
-import { useQueryClient } from "@tanstack/react-query";
 import { useGetMyCompany, useUpdateCompany, useDeleteCompany } from "@/services/api/company";
 import { useUploadCompanyLogo } from "@/services/api/upload";
 import { useModal } from "@/contexts/ModalManagerProvider";
 import { MODAL_IDS } from "@/types/modal";
 import { SecondaryButton } from "../Common/SecondaryButton";
 import { useRouter } from "next/navigation";
-import { useClient as useParaClient } from "@getpara/react-sdk-lite";
 
 interface CompanyFormData {
   companyName: string;
@@ -32,8 +30,6 @@ interface CompanyFormData {
 
 export default function CompanySettings() {
   const { user, logout } = useAuth();
-  const para = useParaClient();
-  const queryClient = useQueryClient();
   const router = useRouter();
   const { openModal } = useModal();
   const [selectedCompanyType, setSelectedCompanyType] = useState<string>("");
@@ -55,15 +51,7 @@ export default function CompanySettings() {
         try {
           await deleteCompanyMutation.mutateAsync();
           toast.success("Company deleted successfully");
-          // Disconnect Para session directly on the client instance
-          // to ensure the persisted session is fully cleared.
-          try {
-            await para?.logout();
-          } catch {
-            // Ignore — may already be disconnected
-          }
           await logout();
-          queryClient.clear();
           window.location.href = "/login";
         } catch (error: any) {
           toast.error(error?.message || "Failed to delete company");
