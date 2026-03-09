@@ -7,6 +7,7 @@ import { usePSMProvider } from "@/contexts/PSMProvider";
 import { useParaSigner } from "@/hooks/web3/useParaSigner";
 import { mintTokensViaClient } from "../utils/mint";
 import { supportedTokens } from "../utils/supportedToken";
+import { withTimeout, withRetry } from "../utils/async";
 import type {
   CreateMultisigAccountDto,
   MultisigAccountResponseDto,
@@ -412,12 +413,12 @@ export function useMintTokens() {
  */
 export function useCreateConsumeProposal() {
   const queryClient = useQueryClient();
-  const { multisigClient, psmPublicKey, registerMultisig, getMultisig, pauseSync, resumeSync } = usePSMProvider();
+  const { psmPublicKey, registerMultisig, getMultisig, pauseSync, resumeSync, ensureConnected } = usePSMProvider();
   const { isReady: signerReady, createSigner } = useParaSigner();
 
   return useMutation<MultisigProposalResponseDto, Error, CreateConsumeProposalDto>({
     mutationFn: async data => {
-      if (!multisigClient) throw new Error("MultisigClient not initialized");
+      const multisigClient = await ensureConnected();
       if (!signerReady) throw new Error("Para signer not ready");
 
       const normalizedId = data.accountId.startsWith("0x") ? data.accountId : `0x${data.accountId}`;
@@ -436,7 +437,13 @@ export function useCreateConsumeProposal() {
         }
 
         await new Promise(resolve => setTimeout(resolve, 300));
-        const { proposal } = await multisig.createConsumeNotesProposal(data.noteIds);
+        const { proposal } = await withRetry(
+          () => withTimeout(multisig!.createConsumeNotesProposal(data.noteIds), 30_000),
+          {
+            maxRetries: 2,
+            onRetry: (attempt) => console.warn(`[useCreateConsumeProposal] Retry ${attempt} after timeout`),
+          },
+        );
 
         // 2. Store metadata on backend (PSM stores limited data)
         return createConsumeProposal({
@@ -499,13 +506,13 @@ export function useCreateBatchSendProposal() {
  */
 export function useCreateProposalFromBills() {
   const queryClient = useQueryClient();
-  const { multisigClient, psmPublicKey, registerMultisig, getMultisig, pauseSync, resumeSync } = usePSMProvider();
+  const { psmPublicKey, registerMultisig, getMultisig, pauseSync, resumeSync, ensureConnected } = usePSMProvider();
   const { client: webClient } = useMidenProvider();
   const { isReady: signerReady, createSigner } = useParaSigner();
 
   return useMutation<MultisigProposalResponseDto, Error, CreateProposalFromBillsDto>({
     mutationFn: async data => {
-      if (!multisigClient) throw new Error("MultisigClient not initialized");
+      const multisigClient = await ensureConnected();
       if (!webClient) throw new Error("WebClient not initialized");
       if (!signerReady) throw new Error("Para signer not ready");
       if (!data.payments || data.payments.length === 0) {
@@ -545,7 +552,13 @@ export function useCreateProposalFromBills() {
         console.log("[useCreateProposalFromBills] recipientId:", p.recipientId, "faucetId:", p.faucetId);
         const recipientHex = await bech32ToHex(p.recipientId);
         const faucetHex = await bech32ToHex(p.faucetId);
-        const { proposal } = await multisig.createSendProposal(recipientHex, faucetHex, BigInt(p.amount));
+        const { proposal } = await withRetry(
+          () => withTimeout(multisig!.createSendProposal(recipientHex, faucetHex, BigInt(p.amount)), 30_000),
+          {
+            maxRetries: 2,
+            onRetry: (attempt) => console.warn(`[useCreateProposalFromBills] Send proposal retry ${attempt} after timeout`),
+          },
+        );
 
         psmProposalId = proposal.id;
         summaryCommitment = proposal.commitment;
@@ -574,14 +587,20 @@ export function useCreateProposalFromBills() {
         // Batch recipients are stored in our backend metadata for execution.
         const firstRecipient = recipients[0];
         const totalAmount = recipients.reduce((sum, r) => sum + r.amount, BigInt(0));
-        const proposal = await multisig.createProposal(Date.now(), summaryBase64, {
-          proposalType: "p2id" as const,
-          recipientId: firstRecipient.recipientHex,
-          faucetId: firstRecipient.faucetHex,
-          amount: totalAmount.toString(),
-          description: data.description || `Batch send to ${recipients.length} recipients`,
-          saltHex,
-        });
+        const proposal = await withRetry(
+          () => withTimeout(multisig!.createProposal(Date.now(), summaryBase64, {
+            proposalType: "p2id" as const,
+            recipientId: firstRecipient.recipientHex,
+            faucetId: firstRecipient.faucetHex,
+            amount: totalAmount.toString(),
+            description: data.description || `Batch send to ${recipients.length} recipients`,
+            saltHex,
+          }), 30_000),
+          {
+            maxRetries: 2,
+            onRetry: (attempt) => console.warn(`[useCreateProposalFromBills] Batch proposal retry ${attempt} after timeout`),
+          },
+        );
 
         psmProposalId = proposal.id;
         summaryCommitment = proposal.commitment;
@@ -676,7 +695,7 @@ export function useListProposalsByCompany(companyId?: number, options?: { enable
  */
 export function useSignProposal() {
   const queryClient = useQueryClient();
-  const { multisigClient, psmPublicKey, registerMultisig, getMultisig, pauseSync, resumeSync } = usePSMProvider();
+  const { psmPublicKey, registerMultisig, getMultisig, pauseSync, resumeSync, ensureConnected } = usePSMProvider();
   const { client: webClient } = useMidenProvider();
   const { isReady: signerReady, createSigner, commitment: signerCommitment } = useParaSigner();
 
@@ -686,7 +705,7 @@ export function useSignProposal() {
     { proposal: MultisigProposalResponseDto; accountPublicKeys: string[] }
   >({
     mutationFn: async ({ proposal, accountPublicKeys }) => {
-      if (!multisigClient) throw new Error("MultisigClient not initialized");
+      const multisigClient = await ensureConnected();
       if (!signerReady || !signerCommitment) throw new Error("Para signer not ready");
 
       const commitmentToSign = proposal.summaryCommitment;
@@ -712,7 +731,13 @@ export function useSignProposal() {
         await new Promise(resolve => setTimeout(resolve, 300));
         const { resilientSyncAll } = await import("@/services/utils/miden/sync");
         if (!webClient) throw new Error("WebClient not initialized");
-        const syncResult = await resilientSyncAll(multisig, webClient);
+        const syncResult = await withRetry(
+          () => withTimeout(resilientSyncAll(multisig!, webClient!), 30_000),
+          {
+            maxRetries: 2,
+            onRetry: (attempt) => console.warn(`[useSignProposal] Sync retry ${attempt} after timeout`),
+          },
+        );
         const syncedProposals = syncResult.proposals;
 
         // 2. Check if we already signed this proposal on PSM
@@ -726,7 +751,13 @@ export function useSignProposal() {
 
         if (!alreadySigned) {
           // 3a. Not yet signed — sign on PSM (ParaSigner triggers Para wallet popup)
-          const updatedProposals = await multisig.signTransactionProposal(commitmentToSign);
+          const updatedProposals = await withRetry(
+            () => withTimeout(multisig!.signTransactionProposal(commitmentToSign), 30_000),
+            {
+              maxRetries: 2,
+              onRetry: (attempt) => console.warn(`[useSignProposal] Sign retry ${attempt} after timeout`),
+            },
+          );
           signedProposal = updatedProposals.find(p => p.commitment === commitmentToSign);
         }
 
@@ -816,7 +847,7 @@ export function useSubmitRejection() {
  */
 export function useExecuteProposal() {
   const queryClient = useQueryClient();
-  const { multisigClient, psmCommitment, psmPublicKey, registerMultisig, getMultisig, pauseSync, resumeSync } = usePSMProvider();
+  const { psmCommitment, psmPublicKey, registerMultisig, getMultisig, pauseSync, resumeSync, ensureConnected } = usePSMProvider();
   const { client: webClient } = useMidenProvider();
   const { isReady: signerReady, createSigner } = useParaSigner();
 
@@ -826,7 +857,7 @@ export function useExecuteProposal() {
     { proposalId: number; proposal: MultisigProposalResponseDto }
   >({
     mutationFn: async ({ proposalId, proposal }) => {
-      if (!multisigClient) throw new Error("MultisigClient not initialized");
+      const multisigClient = await ensureConnected();
       if (!webClient) throw new Error("WebClient not initialized");
       if (!signerReady) throw new Error("Para signer not ready");
 
@@ -856,18 +887,25 @@ export function useExecuteProposal() {
         // Sync WebClient with Miden node first so local store has all notes.
         // Critical for consume_notes proposals: signer 2 needs the note in their
         // local store even though signer 1 created the proposal.
-        try {
-          await webClient.syncState();
-        } catch {
-          await new Promise(resolve => setTimeout(resolve, 500));
-          await webClient.syncState();
-        }
+        await withRetry(
+          () => withTimeout(webClient!.syncState(), 30_000),
+          {
+            maxRetries: 2,
+            onRetry: (attempt) => console.warn(`[useExecuteProposal] syncState retry ${attempt} after timeout`),
+          },
+        );
 
         // syncAll() ensures the WebClient has the latest account state (signerCommitments,
         // threshold, psmCommitment) from PSM, which the MASM auth verifier needs.
         // Use resilientSyncAll to handle "nonce too low" when executing back-to-back.
         const { resilientSyncAll } = await import("@/services/utils/miden/sync");
-        await resilientSyncAll(multisig, webClient);
+        await withRetry(
+          () => withTimeout(resilientSyncAll(multisig!, webClient!), 30_000),
+          {
+            maxRetries: 2,
+            onRetry: (attempt) => console.warn(`[useExecuteProposal] resilientSyncAll retry ${attempt} after timeout`),
+          },
+        );
 
         // 2. Check if this is a batch proposal (multiple recipients from backend metadata)
         const isBatch = (proposal.payments?.length ?? 0) > 1;
@@ -885,19 +923,31 @@ export function useExecuteProposal() {
                 amount: p.amount.toString(),
               })),
             );
-            await executeBatchProposal({
-              webClient,
-              psmClient: multisigClient.psmClient,
-              multisig,
-              accountId: normalizedId,
-              commitment,
-              psmCommitment,
-              psmPublicKey,
-              batchRecipients,
-            });
+            await withRetry(
+              () => withTimeout(executeBatchProposal({
+                webClient,
+                psmClient: multisigClient.psmClient,
+                multisig,
+                accountId: normalizedId,
+                commitment,
+                psmCommitment,
+                psmPublicKey,
+                batchRecipients,
+              }), 60_000),
+              {
+                maxRetries: 2,
+                onRetry: (attempt) => console.warn(`[useExecuteProposal] Batch execute retry ${attempt} after timeout`),
+              },
+            );
           } else {
             // Standard execution for single-recipient proposals
-            await multisig.executeTransactionProposal(commitment);
+            await withRetry(
+              () => withTimeout(multisig!.executeTransactionProposal(commitment), 60_000),
+              {
+                maxRetries: 2,
+                onRetry: (attempt) => console.warn(`[useExecuteProposal] Execute retry ${attempt} after timeout`),
+              },
+            );
           }
         } catch (execErr: any) {
           const msg = execErr?.message || String(execErr);

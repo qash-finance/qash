@@ -8,8 +8,14 @@ import { CountryDropdown } from "../Common/Dropdown/CountryDropdown";
 import { CompanyInfoDto as CompanyInfo } from "@qash/types/dto/company";
 import toast from "react-hot-toast";
 import SettingHeader from "./SettingHeader";
-import { useGetMyCompany, useUpdateCompany } from "@/services/api/company";
+import { useQueryClient } from "@tanstack/react-query";
+import { useGetMyCompany, useUpdateCompany, useDeleteCompany } from "@/services/api/company";
 import { useUploadCompanyLogo } from "@/services/api/upload";
+import { useModal } from "@/contexts/ModalManagerProvider";
+import { MODAL_IDS } from "@/types/modal";
+import { SecondaryButton } from "../Common/SecondaryButton";
+import { useRouter } from "next/navigation";
+import { useClient as useParaClient } from "@getpara/react-sdk-lite";
 
 interface CompanyFormData {
   companyName: string;
@@ -25,17 +31,46 @@ interface CompanyFormData {
 }
 
 export default function CompanySettings() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const para = useParaClient();
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  const { openModal } = useModal();
   const [selectedCompanyType, setSelectedCompanyType] = useState<string>("");
   const [selectedCountry, setSelectedCountry] = useState<string>("");
   const [hasChanges, setHasChanges] = useState(false);
   const { mutate: updateCompany, isPending: isUpdating } = useUpdateCompany();
+  const deleteCompanyMutation = useDeleteCompany();
   const uploadLogoMutation = useUploadCompanyLogo();
   const { data: myCompany } = useGetMyCompany();
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
 
   const isAdmin = user?.teamMembership?.role === "ADMIN" || user?.teamMembership?.role === "OWNER";
+  const isOwner = user?.teamMembership?.role === "OWNER";
+
+  const handleDeleteCompany = () => {
+    openModal(MODAL_IDS.DELETE_COMPANY, {
+      onDelete: async () => {
+        try {
+          await deleteCompanyMutation.mutateAsync();
+          toast.success("Company deleted successfully");
+          // Disconnect Para session directly on the client instance
+          // to ensure the persisted session is fully cleared.
+          try {
+            await para?.logout();
+          } catch {
+            // Ignore — may already be disconnected
+          }
+          await logout();
+          queryClient.clear();
+          window.location.href = "/login";
+        } catch (error: any) {
+          toast.error(error?.message || "Failed to delete company");
+        }
+      },
+    });
+  };
 
   const {
     register,
@@ -276,6 +311,27 @@ export default function CompanySettings() {
           />
         </div>
       </form>
+
+      {/* Danger Zone - Only visible to company owner */}
+      {isOwner && (
+        <div className="flex flex-col gap-3 pt-6 mt-6 border-t border-primary-divider">
+          <p className="font-medium text-sm text-text-secondary tracking-[-0.56px] leading-5">Danger Zone</p>
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-1">
+              <p className="font-medium text-sm text-text-primary tracking-[-0.56px] leading-5">Delete company</p>
+              <p className="text-xs text-text-secondary">
+                Permanently remove your company and all associated data.
+              </p>
+            </div>
+            <SecondaryButton
+              text="Delete Company"
+              variant="red"
+              onClick={handleDeleteCompany}
+              buttonClassName="w-fit px-4"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

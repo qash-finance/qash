@@ -33,6 +33,8 @@ interface PSMContextType {
   error: string | null;
   syncWarning: string | null;
   reconnect: () => Promise<void>;
+  /** Ensures PSM is connected, auto-reconnecting if needed. Throws if reconnection fails. */
+  ensureConnected: () => Promise<MultisigClient>;
   registerMultisig: (accountId: string, multisig: Multisig, syncResult?: SyncResult) => void;
   getMultisig: (accountId: string) => Multisig | undefined;
   pauseSync: () => void;
@@ -375,6 +377,38 @@ export function PSMProvider({ children }: { children: ReactNode }) {
     await connectToPsm();
   }, [connectToPsm]);
 
+  // Ref to track the latest multisigClient for use inside ensureConnected
+  const multisigClientRef = useRef(multisigClient);
+  multisigClientRef.current = multisigClient;
+
+  const psmStatusRef = useRef(psmStatus);
+  psmStatusRef.current = psmStatus;
+
+  const ensureConnected = useCallback(async (): Promise<MultisigClient> => {
+    // Already connected — return immediately
+    if (multisigClientRef.current && psmStatusRef.current === "connected") {
+      return multisigClientRef.current;
+    }
+
+    // Not connected — attempt reconnection
+    console.log("[PSMProvider] ensureConnected: triggering reconnect...");
+    await reconnect();
+
+    // Wait for connection to settle (poll for up to 15s)
+    const deadline = Date.now() + 15_000;
+    while (Date.now() < deadline) {
+      if (multisigClientRef.current && psmStatusRef.current === "connected") {
+        return multisigClientRef.current;
+      }
+      if (psmStatusRef.current === "error") {
+        throw new Error("Failed to reconnect to PSM. Please refresh the page and try again.");
+      }
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    throw new Error("PSM reconnection timed out. Please refresh the page and try again.");
+  }, [reconnect]);
+
   const value: PSMContextType = {
     multisigClient,
     psmCommitment,
@@ -383,6 +417,7 @@ export function PSMProvider({ children }: { children: ReactNode }) {
     error,
     syncWarning,
     reconnect,
+    ensureConnected,
     registerMultisig,
     getMultisig,
     pauseSync,

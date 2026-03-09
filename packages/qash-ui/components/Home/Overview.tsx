@@ -486,7 +486,7 @@ const BalanceOverviewHeader = ({
   );
 };
 
-export const Overview = () => {
+export const Overview = ({ onCreateAccount }: { onCreateAccount?: () => void }) => {
   const { data: myCompany } = useGetMyCompany();
   const { data: multisigAccounts } = useListAccountsByCompany(myCompany?.id, { enabled: !!myCompany?.id });
 
@@ -506,7 +506,7 @@ export const Overview = () => {
         childrenClassName="px-3 py-5"
       >
         <div className="flex flex-row h-full items-start w-full border border-primary-divider rounded-3xl">
-          <TransactionHistory />
+          <TransactionHistory onCreateAccount={onCreateAccount} />
         </div>
       </BaseContainer>
     </div>

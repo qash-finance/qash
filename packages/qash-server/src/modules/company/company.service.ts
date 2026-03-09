@@ -220,7 +220,9 @@ export class CompanyService {
   }
 
   /**
-   * Deactivate company
+   * Deactivate company (soft delete)
+   * Removes all team members so they can join/create new companies,
+   * then sets isActive = false. Company data is preserved as backup.
    */
   async deactivateCompany(companyId: number, userId: number) {
     try {
@@ -236,6 +238,12 @@ export class CompanyService {
             ErrorCompany.OnlyCompanyOwnerCanDeactivate,
           );
         }
+
+        // Delete all team members (frees users to join/create new companies)
+        // Cascade deletes MultisigAccountMember records as well
+        await tx.teamMember.deleteMany({
+          where: { companyId },
+        });
 
         return this.companyRepository.deactivate(companyId, tx);
       });

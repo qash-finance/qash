@@ -5,7 +5,6 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { useListAccountsByCompany, useLocalAccountBalances, useListProposalsByCompany } from "@/services/api/multisig";
 import { useGetMyCompany } from "@/services/api/company";
 import { formatUnits } from "viem";
-import Link from "next/link";
 import type { MultisigProposalResponseDto, MultisigAccountResponseDto } from "@qash/types";
 import { QASH_TOKEN_ADDRESS } from "@/services/utils/constant";
 import { formatNumberWithCommas } from "@/services/utils/formatNumber";
@@ -173,7 +172,7 @@ function useResolvedTokenMeta(faucetHexIds: string[]) {
   return tokenMetaMap;
 }
 
-const TransactionHistory = () => {
+const TransactionHistory = ({ onCreateAccount }: { onCreateAccount?: () => void }) => {
   const { data: myCompany } = useGetMyCompany();
   const { data: multisigAccounts } = useListAccountsByCompany(myCompany?.id, { enabled: !!myCompany?.id });
   const accountIds = useMemo(() => multisigAccounts?.map(a => a.accountId) || [], [multisigAccounts]);
@@ -313,12 +312,12 @@ const TransactionHistory = () => {
               <p className="text-sm font-medium text-text-secondary">
                 You need to create a multisig account to access this feature.
               </p>
-              <Link
-                href="/setting"
+              <button
+                onClick={onCreateAccount}
                 className="bg-text-primary hover:bg-text-primary/90 text-white font-semibold rounded-xl px-4 py-2.5 text-sm transition-colors"
               >
                 Create account
-              </Link>
+              </button>
             </div>
           ) : (
             <>

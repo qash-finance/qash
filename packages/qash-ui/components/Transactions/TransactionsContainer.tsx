@@ -26,6 +26,7 @@ import { PageHeader } from "../Common/PageHeader";
 import { useAuth } from "@/services/auth/context";
 import { trackEvent } from "@/services/analytics/posthog";
 import { PostHogEvent } from "@/types/posthog";
+import { TimeoutError } from "@/services/utils/async";
 
 // Previously a fixed enum - we now allow any multisig account id
 type SubTabType = "pending" | "history" | "receive";
@@ -152,7 +153,11 @@ export function TransactionsContainer() {
     } catch (error) {
       closeModal("PROCESSING_TRANSACTION");
       console.error("Failed to sign proposal:", error);
-      toast.error("Failed to sign proposal");
+      if (error instanceof TimeoutError) {
+        toast.error("Signing timed out after retries. Please try again.");
+      } else {
+        toast.error("Failed to sign proposal");
+      }
     } finally {
       setActionLoadingId(null);
       setActionType(null);
@@ -182,7 +187,9 @@ export function TransactionsContainer() {
       closeModal("PROCESSING_TRANSACTION");
       console.error("Failed to execute proposal:", error);
       const msg = error?.message || "";
-      if (msg.includes("still being finalized") || msg.includes("non-canonical delta pending")) {
+      if (error instanceof TimeoutError) {
+        toast.error("Execution timed out after retries. Please try again.");
+      } else if (msg.includes("still being finalized") || msg.includes("non-canonical delta pending")) {
         toast.error("A previous transaction is still being finalized on-chain. Please wait a moment and try again.");
       } else if (msg.includes("account state has changed")) {
         toast.error(msg);
@@ -301,7 +308,11 @@ export function TransactionsContainer() {
     } catch (error) {
       closeModal("PROCESSING_TRANSACTION");
       console.error("Failed to create consume proposal:", error);
-      toast.error("Failed to create consume proposal");
+      if (error instanceof TimeoutError) {
+        toast.error("Operation timed out after retries. Please try again.");
+      } else {
+        toast.error("Failed to create consume proposal");
+      }
     } finally {
       setIsCreatingProposal(false);
     }
@@ -371,7 +382,11 @@ export function TransactionsContainer() {
     } catch (error) {
       closeModal("PROCESSING_TRANSACTION");
       console.error("Failed to create consume proposal:", error);
-      toast.error("Failed to create consume proposal");
+      if (error instanceof TimeoutError) {
+        toast.error("Operation timed out after retries. Please try again.");
+      } else {
+        toast.error("Failed to create consume proposal");
+      }
     } finally {
       setIsCreatingProposal(false);
     }
