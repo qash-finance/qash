@@ -6,6 +6,7 @@ import { PageHeader } from "../Common/PageHeader";
 import { usePSMProvider } from "@/contexts/PSMProvider";
 import { useGetMyCompany } from "@/services/api/company";
 import { useListAccountsByCompany } from "@/services/api/multisig";
+import { useModal } from "@/contexts/ModalManagerProvider";
 
 const SyncBanner = () => {
   const { psmStatus, accountCacheMap, error } = usePSMProvider();
@@ -65,6 +66,8 @@ const SyncBanner = () => {
 };
 
 export const HomeContainer = () => {
+  const { openModal } = useModal();
+
   return (
     <div className="w-full h-full p-5 flex flex-col items-start gap-4">
       <div className="w-full flex flex-col gap-4 px-5">
@@ -72,7 +75,7 @@ export const HomeContainer = () => {
         <SyncBanner />
         <CardContainer />
       </div>
-      <Overview />
+      <Overview onCreateAccount={() => openModal("CREATE_ACCOUNT")} />
     </div>
   );
 };

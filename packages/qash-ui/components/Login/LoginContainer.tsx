@@ -24,6 +24,7 @@ export default function LoginContainer() {
   const router = useRouter();
   const { loginWithPara, isLoading, error, isAuthenticated, user, refreshUser } = useAuth();
   const [authenticatingWithPara, setAuthenticatingWithPara] = useState(false);
+  const [userClickedConnect, setUserClickedConnect] = useState(false);
   const { openModal: openParaModal } = useParaModal();
   const para = useClient();
   const { isConnected } = useParaAccount();
@@ -109,12 +110,15 @@ export default function LoginContainer() {
     }
   };
 
-  // Auto-authenticate when Para connection is established
+  // Auto-authenticate when Para connection is established,
+  // but only after the user explicitly clicked the connect button.
+  // This prevents Para's persisted session from auto-creating a new
+  // backend session after logout or company deletion.
   useEffect(() => {
-    if (isConnected && !isAuthenticated && !authenticatingWithPara && !isAuthenticatingRef.current) {
+    if (isConnected && !isAuthenticated && !authenticatingWithPara && !isAuthenticatingRef.current && userClickedConnect) {
       handleParaAuthentication();
     }
-  }, [isConnected, isAuthenticated, authenticatingWithPara]);
+  }, [isConnected, isAuthenticated, authenticatingWithPara, userClickedConnect]);
 
   // Redirect authenticated users away from login
   useEffect(() => {
@@ -144,7 +148,14 @@ export default function LoginContainer() {
 
         <PrimaryButton
           onClick={() => {
-            openParaModal?.();
+            setUserClickedConnect(true);
+            // If Para is already connected (persisted session), auth directly
+            // since the effect won't re-fire for isConnected (already true).
+            if (isConnected && !isAuthenticated && !isAuthenticatingRef.current) {
+              handleParaAuthentication();
+            } else {
+              openParaModal?.();
+            }
           }}
           text={authenticatingWithPara ? "Authenticating..." : "Continue by email"}
           disabled={authenticatingWithPara || isLoading || isAuthenticated}

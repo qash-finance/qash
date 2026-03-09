@@ -62,3 +62,20 @@ export function useUpdateCompany() {
   });
 }
 
+// *************************************************
+// **************** DELETE METHODS *****************
+// *************************************************
+
+export function useDeleteCompany() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error>({
+    mutationFn: async () => {
+      return apiServerWithAuth.deleteData("/companies");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["company"] });
+    },
+  });
+}
+

@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Delete,
   Body,
   HttpCode,
   HttpStatus,
@@ -135,4 +136,35 @@ export class CompanyController {
     );
   }
   //#endregion POST METHODS
+
+  //#region DELETE METHODS
+  // *************************************************
+  // **************** DELETE METHODS *****************
+  // *************************************************
+
+  @Delete()
+  @CompanyAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Delete company (soft delete)',
+    description:
+      'Deactivate the company and remove all team members. Only the company owner can perform this action.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Company deleted successfully',
+  })
+  @ApiForbiddenResponse({
+    description: 'Only company owner can delete company',
+  })
+  @ApiNotFoundResponse({ description: 'Company not found' })
+  async deleteCompany(
+    @CurrentUser('withCompany') user: UserWithCompany,
+  ) {
+    return this.companyService.deactivateCompany(
+      user.company.id,
+      user.internalUserId,
+    );
+  }
+  //#endregion DELETE METHODS
 }

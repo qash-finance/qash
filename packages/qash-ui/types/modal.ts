@@ -69,6 +69,7 @@ import ChooseAccountModal from "@/components/Modal/Account/ChooseAccountModal";
 import ReviewPlanModal from "@/components/Modal/ReviewPlanModal";
 import PermissionRequiredModal from "@/components/Modal/PermissionRequiredModal";
 import PayrollNotSavedModal from "@/components/Modal/Payroll/PayrollNotSavedModal";
+import DeleteCompanyModal from "@/components/Modal/Company/DeleteCompanyModal";
 import { Group } from "./group-payment";
 import { CompanyGroupResponseDto, CompanyContactResponseDto } from "@qash/types/dto/employee";
 import { BatchTransaction } from "@/services/store/batchTransactions";
@@ -152,6 +153,7 @@ export const MODAL_IDS = {
   CHOOSE_ACCOUNT: "CHOOSE_ACCOUNT",
   REVIEW_PLAN: "REVIEW_PLAN",
   PAYROLL_NOT_SAVED: "PAYROLL_NOT_SAVED",
+  DELETE_COMPANY: "DELETE_COMPANY",
 } as const;
 
 export type ModalId = keyof typeof MODAL_IDS;
@@ -545,6 +547,10 @@ export interface PayrollNotSavedModalProps extends BaseModalProps {
   onConfirm?: () => void;
 }
 
+export interface DeleteCompanyModalProps extends BaseModalProps {
+  onDelete: () => Promise<void>;
+}
+
 export type ModalPropsMap = {
   [MODAL_IDS.SELECT_TOKEN]: SelectTokenModalProps;
   [MODAL_IDS.EDIT_TRANSACTION]: EditTransactionModalProps;
@@ -614,6 +620,7 @@ export type ModalPropsMap = {
   [MODAL_IDS.REVIEW_PLAN]: ReviewPlanModalProps;
   [MODAL_IDS.PERMISSION_REQUIRED]: PermissionRequiredModalProps;
   [MODAL_IDS.PAYROLL_NOT_SAVED]: PayrollNotSavedModalProps;
+  [MODAL_IDS.DELETE_COMPANY]: DeleteCompanyModalProps;
 };
 
 export type ModalProps = ModalPropsMap[keyof ModalPropsMap];
@@ -688,4 +695,5 @@ export const modalRegistry = {
   [MODAL_IDS.REVIEW_PLAN]: ReviewPlanModal,
   [MODAL_IDS.PERMISSION_REQUIRED]: PermissionRequiredModal,
   [MODAL_IDS.PAYROLL_NOT_SAVED]: PayrollNotSavedModal,
+  [MODAL_IDS.DELETE_COMPANY]: DeleteCompanyModal,
 } as const;

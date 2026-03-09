@@ -116,13 +116,13 @@ const MemberRow = ({
   );
 };
 
-export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountModalProps>) {
+export function CreateAccountModal({ isOpen, onClose, zIndex }: ModalProp<CreateAccountModalProps>) {
   const { openModal } = useModal();
   const { data: company } = useGetMyCompany();
   const { data: teamMembersData } = useGetCompanyTeamMembers(company?.id);
   const { user } = useAuth();
   const createAccountMutation = useCreateMultisigAccount();
-  const { multisigClient, psmCommitment, psmPublicKey, psmStatus } = usePSMProvider();
+  const { multisigClient, psmCommitment, psmPublicKey, psmStatus, ensureConnected } = usePSMProvider();
   const { para } = useParaMiden(NODE_ENDPOINT);
   const { data: wallet } = useWallet();
 
@@ -252,11 +252,6 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
       return;
     }
 
-    if (!multisigClient || psmStatus !== "connected") {
-      toast.error("PSM not connected. Please wait and try again.");
-      return;
-    }
-
     if (!para) {
       toast.error("Para wallet not connected. Please reconnect.");
       return;
@@ -264,6 +259,19 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
 
     try {
       setIsLoading(true);
+
+      // Auto-reconnect to PSM if not connected, use returned client
+      let activeClient = multisigClient;
+      if (!activeClient || psmStatus !== "connected") {
+        openModal("PROCESSING_TRANSACTION");
+        try {
+          activeClient = await ensureConnected();
+        } catch (err) {
+          onClose();
+          toast.error(err instanceof Error ? err.message : "Failed to connect to PSM");
+          return;
+        }
+      }
 
       // 1. Get current user's commitment and public key
       const currentUser = selectedMembers.find(m => m.email === user?.email);
@@ -318,7 +326,7 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
         signerCount: allCommitments.length,
       });
 
-      const ms = await multisigClient.create(config, signer);
+      const ms = await activeClient.create(config, signer);
 
       // 8. Register on PSM
       console.log("Registering multisig on PSM...");
@@ -637,7 +645,7 @@ export function CreateAccountModal({ isOpen, onClose }: ModalProp<CreateAccountM
 
   if (!isOpen) return null;
   return (
-    <BaseModal isOpen={isOpen} onClose={handleClose}>
+    <BaseModal isOpen={isOpen} onClose={handleClose} zIndex={zIndex}>
       <ModalHeader title="Create new account" onClose={handleClose} icon="/misc/create-account-icon.svg" />
       <div className="flex flex-col w-[800px] p-4 justify-center  rounded-b-2xl items-center border-2  border-primary-divider bg-background gap-5">
         {!isSuccess ? (
